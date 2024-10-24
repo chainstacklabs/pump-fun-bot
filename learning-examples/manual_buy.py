@@ -35,7 +35,7 @@ SOL = Pubkey.from_string("So11111111111111111111111111111111111111112")
 LAMPORTS_PER_SOL = 1_000_000_000
 
 # RPC endpoint
-RPC_ENDPOINT = "SOLANA_NODE_RPC_ENDPOINT"
+RPC_ENDPOINT = "https://nd-789-855-895.p2pify.com/a24eec46e256346bd48e6a7ae9aab4c5"
 
 class BondingCurveState:
     _STRUCT = Struct(
@@ -69,7 +69,7 @@ def calculate_pump_curve_price(curve_state: BondingCurveState) -> float:
     return (curve_state.virtual_sol_reserves / LAMPORTS_PER_SOL) / (curve_state.virtual_token_reserves / 10 ** TOKEN_DECIMALS)
 
 async def buy_token(mint: Pubkey, bonding_curve: Pubkey, associated_bonding_curve: Pubkey, amount: float, slippage: float = 0.01, max_retries=5):
-    private_key = base58.b58decode("SOLANA_PRIVATE_KEY")
+    private_key = base58.b58decode("5dhFD6KgGThDa2c8ytNquSVgpD1o1WuG4qGrSaT4yy3AbW812dYctgUEj8wV4XoWYfmdqFy6UaWLK8QZ7XzgnLZE")
     payer = Keypair.from_bytes(private_key)
 
     async with AsyncClient(RPC_ENDPOINT) as client:
@@ -165,7 +165,7 @@ async def buy_token(mint: Pubkey, bonding_curve: Pubkey, associated_bonding_curv
                 else:
                     print("Max retries reached. Unable to complete the transaction.")
 
-RPC_NODE_URL = "SOLANA_NODE_WS_ENDPOINT"
+RPC_NODE_URL = "wss://ws-nd-789-855-895.p2pify.com/a24eec46e256346bd48e6a7ae9aab4c5"
 
 def load_idl(file_path):
     with open(file_path, 'r') as f:

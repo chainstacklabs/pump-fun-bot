@@ -3,19 +3,25 @@ import json
 import base64
 import struct
 import base58
+import os
+
+from solana.transaction import Message
 from solana.rpc.async_api import AsyncClient
-from solana.transaction import Transaction
 from solana.rpc.commitment import Confirmed
+from solana.rpc.types import TxOpts
+
 from solders.pubkey import Pubkey
 from solders.keypair import Keypair
 from solders.instruction import Instruction, AccountMeta
-from solana.rpc.types import TxOpts
 from solders.system_program import TransferParams, transfer
+from solders.transaction import VersionedTransaction, Transaction
+from solders.compute_budget import set_compute_unit_price
+
+import spl.token.instructions as spl_token
 from spl.token.instructions import get_associated_token_address
+
 import websockets
 import hashlib
-from solders.transaction import VersionedTransaction
-import spl.token.instructions as spl_token
 from construct import Struct, Int64ul, Flag
 
 # Here and later all the discriminators are precalculated. See learning-examples/discriminator.py
@@ -34,8 +40,9 @@ SYSTEM_RENT = Pubkey.from_string("SysvarRent111111111111111111111111111111111")
 SOL = Pubkey.from_string("So11111111111111111111111111111111111111112")
 LAMPORTS_PER_SOL = 1_000_000_000
 
-# RPC endpoint
-RPC_ENDPOINT = "https://nd-789-855-895.p2pify.com/a24eec46e256346bd48e6a7ae9aab4c5"
+# RPC ENDPOINTS
+RPC_ENDPOINT = "ENTER_YOUR_CHAINSTACK_HTTP_ENDPOINT"
+RPC_WEBSOCKET = "ENTER_YOUR_CHAINSTACK_WS_ENDPOINT"
 
 class BondingCurveState:
     _STRUCT = Struct(
@@ -68,8 +75,8 @@ def calculate_pump_curve_price(curve_state: BondingCurveState) -> float:
 
     return (curve_state.virtual_sol_reserves / LAMPORTS_PER_SOL) / (curve_state.virtual_token_reserves / 10 ** TOKEN_DECIMALS)
 
-async def buy_token(mint: Pubkey, bonding_curve: Pubkey, associated_bonding_curve: Pubkey, amount: float, slippage: float = 0.01, max_retries=5):
-    private_key = base58.b58decode("5dhFD6KgGThDa2c8ytNquSVgpD1o1WuG4qGrSaT4yy3AbW812dYctgUEj8wV4XoWYfmdqFy6UaWLK8QZ7XzgnLZE")
+async def buy_token(mint: Pubkey, bonding_curve: Pubkey, associated_bonding_curve: Pubkey, amount: float, slippage: float = 0.25, max_retries=5):
+    private_key = base58.b58decode("ENTER_PRIVATE_KEY")
     payer = Keypair.from_bytes(private_key)
 
     async with AsyncClient(RPC_ENDPOINT) as client:
@@ -95,11 +102,15 @@ async def buy_token(mint: Pubkey, bonding_curve: Pubkey, associated_bonding_curv
                         owner=payer.pubkey(),
                         mint=mint
                     )
-                    create_ata_tx = Transaction()
-                    create_ata_tx.add(create_ata_ix)
-                    recent_blockhash = await client.get_latest_blockhash()
-                    create_ata_tx.recent_blockhash = recent_blockhash.value.blockhash
-                    await client.send_transaction(create_ata_tx, payer)
+
+                    msg = Message([create_ata_ix], payer.pubkey())
+                    tx_ata = await client.send_transaction(
+                        Transaction([payer], msg, (await client.get_latest_blockhash()).value.blockhash),
+                        opts=TxOpts(skip_preflight=True, preflight_commitment=Confirmed)
+                        )
+                    
+                    await client.confirm_transaction(tx_ata.value, commitment="confirmed")
+
                     print("Associated token account created.")
                     print(f"Associated token account address: {associated_token_account}")
                     break
@@ -139,33 +150,26 @@ async def buy_token(mint: Pubkey, bonding_curve: Pubkey, associated_bonding_curv
                 data = discriminator + struct.pack("<Q", int(token_amount * 10**6)) + struct.pack("<Q", max_amount_lamports)
                 buy_ix = Instruction(PUMP_PROGRAM, data, accounts)
 
-                recent_blockhash = await client.get_latest_blockhash()
-                transaction = Transaction()
-                transaction.add(buy_ix)
-                transaction.recent_blockhash = recent_blockhash.value.blockhash
+                msg = Message([set_compute_unit_price(1_000), buy_ix], payer.pubkey())
+                tx_buy = await client.send_transaction(
+                    Transaction([payer], msg, (await client.get_latest_blockhash()).value.blockhash),
+                    opts=TxOpts(skip_preflight=True, preflight_commitment=Confirmed)
+                    )
 
-                tx = await client.send_transaction(
-                    transaction,
-                    payer,
-                    opts=TxOpts(skip_preflight=True, preflight_commitment=Confirmed),
-                )
+                print(f"Transaction sent: https://explorer.solana.com/tx/{tx_buy.value}")
 
-                print(f"Transaction sent: https://explorer.solana.com/tx/{tx.value}")
-
-                await client.confirm_transaction(tx.value, commitment="confirmed")
+                await client.confirm_transaction(tx_buy.value, commitment="confirmed")
                 print("Transaction confirmed")
                 return  # Success, exit the function
 
             except Exception as e:
-                print(f"Attempt {attempt + 1} failed: {str(e)}")
+                print(f"Attempt {attempt + 1} failed: {str(e)[:50]}")
                 if attempt < max_retries - 1:
                     wait_time = 2 ** attempt
                     print(f"Retrying in {wait_time} seconds...")
                     await asyncio.sleep(wait_time)
                 else:
                     print("Max retries reached. Unable to complete the transaction.")
-
-RPC_NODE_URL = "wss://ws-nd-789-855-895.p2pify.com/a24eec46e256346bd48e6a7ae9aab4c5"
 
 def load_idl(file_path):
     with open(file_path, 'r') as f:
@@ -203,10 +207,11 @@ def decode_create_instruction(ix_data, ix_def, accounts):
     return args
 
 async def listen_for_create_transaction():
-    idl = load_idl('../idl/pump_fun_idl.json')
+    idl_path = os.path.join(os.path.dirname(__file__), '..', 'idl', 'pump_fun_idl.json')
+    idl = load_idl(idl_path)
     create_discriminator = calculate_discriminator("global:create")
     
-    async with websockets.connect(RPC_NODE_URL) as websocket:
+    async with websockets.connect(RPC_WEBSOCKET) as websocket:
         subscription_message = json.dumps({
             "jsonrpc": "2.0",
             "id": 1,
@@ -257,8 +262,9 @@ async def main():
     print("New token created:")
     print(json.dumps(token_data, indent=2))
 
-    print("Waiting for 15 seconds for things to stabilize...")
-    await asyncio.sleep(15)
+    sleep_duration_sec = 15
+    print(f"Waiting for {sleep_duration_sec} seconds for things to stabilize...")
+    await asyncio.sleep(sleep_duration_sec)
 
     mint = Pubkey.from_string(token_data['mint'])
     bonding_curve = Pubkey.from_string(token_data['bondingCurve'])

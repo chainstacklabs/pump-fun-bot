@@ -4,6 +4,8 @@ For near-instantaneous transaction propagation, you can use the [Chainstack Sola
 
 [Sign up with Chainstack](https://console.chainstack.com).
 
+Make sure you have your endpoints set up in `config.py`.
+
 Quick note on a couple of new scripts in `/learning-examples`:
 
 ## Bonding curve state check
@@ -21,3 +23,7 @@ When the bonding curve state completes, the liquidity and the token graduate to 
 `listen_to_raydium_migration.py` — listens to the migration events of the tokens from pump_fun to Raydium and prints the signature of the migration, the token address, and the liquidity pool address on Raydium.
 
 Note that it's using the [blockSubscribe]([url](https://docs.chainstack.com/reference/blocksubscribe-solana)) method that not all providers support, but Chainstack does and I (although obviously biased) found it pretty reliable.
+
+To run:
+
+`python listen_to_raydium_migration.py`

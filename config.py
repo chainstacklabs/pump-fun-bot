@@ -19,7 +19,7 @@ BUY_SLIPPAGE = 0.2  # 20% slippage tolerance for buying
 SELL_SLIPPAGE = 0.2  # 20% slippage tolerance for selling
 
 # Your nodes
-# You can also get a trader node https://docs.chainstack.com/docs/warp-transactions
+# You can also get a trader node https://docs.chainstack.com/docs/solana-trader-nodes
 RPC_ENDPOINT = "SOLANA_NODE_RPC_ENDPOINT"
 WSS_ENDPOINT = "SOLANA_NODE_WSS_ENDPOINT"
 

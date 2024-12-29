@@ -59,7 +59,7 @@ To run:
 
 ## Listen to new direct full details
 
-`listen_new_direct_full_details.py` — listens to the new direct full details events and prints the signature, the token address, and the bonding curve address.
+`listen_new_direct_full_details.py` — listens to the new direct full details events and prints the signature, the token address, the user, the bonding curve address, and the associated bonding curve address using just the `logsSubscribe` method. Basically everything you need for sniping using just `logsSubscribe` and no extra calls like doing `getTransaction` to get the missing data. It's just computed on the fly now.
 
 To run:
 

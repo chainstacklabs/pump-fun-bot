@@ -1,3 +1,3 @@
 The  maintainers are:
-@akegaviar (primary contact, issue manager)
-@smypmsa
+* @akegaviar (primary contact, issue manager)
+* @smypmsa

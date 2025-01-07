@@ -1,4 +1,5 @@
-**WARNNING ON SCAMS IN ISSUES COMMENT SECTION**
+**>>WARNNING ON SCAMS IN ISSUES COMMENT SECTION<<**
+
 The issues comment section is often targeted by scam bots willing to redirect you to an external resource and drain your funds.
 
 I have enabled a GitHub actions script to detect the common patterns and tag them, which obviously is not 100% accurate.
@@ -7,7 +8,7 @@ The official maintainers are in the [MAINTAINERS.md](MAINTAINERS.md) file.
 
 Not everyone is a scammer though, sometimes there are helpful outside devs who comment and I absolutely appreciate it.
 
-**END OF WARNING**
+**>>END OF WARNING<<**
 
 For the full walkthrough, see [Solana: Creating a trading and sniping pump.fun bot](https://docs.chainstack.com/docs/solana-creating-a-pumpfun-bot).
 

@@ -1,0 +1,80 @@
+name: Suspicious Comment Detection
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+jobs:
+  check_comment:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for suspicious patterns
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const comment = context.payload.comment;
+            const body = comment.body.toLowerCase();
+            const author = comment.user.login;
+            
+            // Suspicious patterns
+            const suspiciousPatterns = [
+              'support team',
+              'customer service',
+              'telegram',
+              'whatsapp',
+              'contact us',
+              'click here',
+              'support group',
+              't.me/',
+              'wa.me/',
+              'support chat',
+              'live chat',
+              'support ticket',
+              'ticket id',
+              'live support',
+              'support line',
+              'support agent',
+              'support network',
+              'dedicated support',
+              'personalized assistance',
+              'opened for you',
+              'kindly talk to',
+              'we apologize',
+            ];
+            
+            // Check for external links (excluding common legitimate domains)
+            const hasExternalLinks = body.includes('http') || body.includes('www');
+            const hasGithubLinks = body.includes('github.com');
+            const suspiciousLinks = hasExternalLinks && !hasGithubLinks;
+            
+            // Check for suspicious patterns
+            const foundPatterns = suspiciousPatterns.filter(pattern => 
+              body.includes(pattern)
+            );
+            
+            if (foundPatterns.length > 0 || suspiciousLinks) {
+              // Create a warning comment
+              const warningMessage = `⚠️ Potential scam detected in comment by ${author}:
+              - Suspicious patterns found: ${foundPatterns.join(', ')}
+              ${suspiciousLinks ? '- Contains external links' : ''}
+              
+              @${context.repo.owner} Please review this comment.`;
+              
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.issue ? context.payload.issue.number : context.payload.pull_request.number,
+                body: warningMessage
+              });
+              
+              // Add 'potential-scam' label
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.issue ? context.payload.issue.number : context.payload.pull_request.number,
+                labels: ['potential-scam']
+              });
+            }

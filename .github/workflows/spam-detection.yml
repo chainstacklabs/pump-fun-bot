@@ -43,6 +43,18 @@ jobs:
               'opened for you',
               'kindly talk to',
               'we apologize',
+              'live chat with an agent',
+              'chat button',
+              'dapp portal',
+              'decentralized dapp',
+              'access the portal',
+              'report your request',
+              'start a conversation',
+              'click the chat',
+              'for assistance',
+              'reach out to',
+              'through the chat',
+              'portal',
             ];
             
             // Check for external links (excluding common legitimate domains)

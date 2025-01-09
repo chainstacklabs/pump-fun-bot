@@ -24,6 +24,8 @@ Quick note on a couple on a few new scripts in `/learning-examples`:
 
 *(this is basically a changelog now)*
 
+Also, here's a quick doc: [Listening to pump.fun migrations to Raydium](https://docs.chainstack.com/docs/solana-listening-to-pumpfun-migrations-to-raydium)
+
 ## Bonding curve state check
 
 `check_boding_curve_status.py` — checks the state of the bonding curve associated with a token. When the bonding curve state is completed, the token is migrated to Raydium.

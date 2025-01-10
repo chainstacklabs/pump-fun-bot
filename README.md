@@ -20,6 +20,20 @@ Make sure you have the required packages installed `pip install -r requirements.
 
 Make sure you have your endpoints set up in `config.py`.
 
+## Note on limits
+
+Solana is an amazing piece of web3 architecture, but it's also very complex to maintain.
+
+Chainstack is daily (literally, including weekends) working on optimizing our Solana infrastructure to make it the best in the industry.
+
+That said, all node providers have their own setup recommendations & limits, like method availability, requests per second (RPS), free and paid plan specific limitations and so on.
+
+So please make sure you consult the docs of the node provider you are going to use for the bot here. And obviously the public RPC nodes won't work for the heavier use case scenarios like this bot.
+
+For Chainstack, all of the details and limits you need to be aware of are consolidated here: [Limits](https://docs.chainstack.com/docs/limits) <— we are _always_ keeping this piece up to date so you can rely on it.
+
+## Changelog
+
 Quick note on a couple on a few new scripts in `/learning-examples`:
 
 *(this is basically a changelog now)*

@@ -15,78 +15,86 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const comment = context.payload.comment;
-            const body = comment.body.toLowerCase();
-            const author = comment.user.login;
-            
-            // Suspicious patterns
-            const suspiciousPatterns = [
-              'support team',
-              'customer service',
-              'telegram',
-              'whatsapp',
-              'contact us',
-              'click here',
-              'support group',
-              't.me/',
-              'wa.me/',
-              'support chat',
-              'live chat',
-              'support ticket',
-              'ticket id',
-              'live support',
-              'support line',
-              'support agent',
-              'support network',
-              'dedicated support',
-              'personalized assistance',
-              'opened for you',
-              'kindly talk to',
-              'we apologize',
-              'live chat with an agent',
-              'chat button',
-              'dapp portal',
-              'decentralized dapp',
-              'access the portal',
-              'report your request',
-              'start a conversation',
-              'click the chat',
-              'for assistance',
-              'reach out to',
-              'through the chat',
-              'portal',
-            ];
-            
-            // Check for external links (excluding common legitimate domains)
-            const hasExternalLinks = body.includes('http') || body.includes('www');
-            const hasGithubLinks = body.includes('github.com');
-            const suspiciousLinks = hasExternalLinks && !hasGithubLinks;
-            
-            // Check for suspicious patterns
-            const foundPatterns = suspiciousPatterns.filter(pattern => 
-              body.includes(pattern)
-            );
-            
-            if (foundPatterns.length > 0 || suspiciousLinks) {
-              // Create a warning comment
-              const warningMessage = `⚠️ Potential scam detected in comment by ${author}:
-              - Suspicious patterns found: ${foundPatterns.join(', ')}
-              ${suspiciousLinks ? '- Contains external links' : ''}
+            try {
+              const comment = context.payload.comment;
+              const body = comment.body.toLowerCase();
+              const author = comment.user.login;
               
-              @${context.repo.owner} Please review this comment.`;
+              // Suspicious patterns
+              const suspiciousPatterns = [
+                'support team',
+                'customer service',
+                'telegram',
+                'whatsapp',
+                'contact us',
+                'click here',
+                'support group',
+                't.me/',
+                'wa.me/',
+                'support chat',
+                'live chat',
+                'support ticket',
+                'ticket id',
+                'live support',
+                'support line',
+                'support agent',
+                'support network',
+                'dedicated support',
+                'personalized assistance',
+                'opened for you',
+                'kindly talk to',
+                'we apologize',
+                'live chat with an agent',
+                'chat button',
+                'dapp portal',
+                'decentralized dapp',
+                'access the portal',
+                'report your request',
+                'start a conversation',
+                'click the chat',
+                'for assistance',
+                'reach out to',
+                'through the chat',
+                'portal',
+              ];
               
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.payload.issue ? context.payload.issue.number : context.payload.pull_request.number,
-                body: warningMessage
-              });
+              // Check for external links (excluding common legitimate domains)
+              const hasExternalLinks = body.includes('http') || body.includes('www');
+              const hasGithubLinks = body.includes('github.com');
+              const suspiciousLinks = hasExternalLinks && !hasGithubLinks;
               
-              // Add 'potential-scam' label
-              await github.rest.issues.addLabels({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.payload.issue ? context.payload.issue.number : context.payload.pull_request.number,
-                labels: ['potential-scam']
-              });
+              // Check for suspicious patterns
+              const foundPatterns = suspiciousPatterns.filter(pattern => 
+                body.includes(pattern)
+              );
+              
+              if (foundPatterns.length > 0 || suspiciousLinks) {
+                try {
+                  // Create a warning comment
+                  await github.rest.issues.createComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: context.payload.issue ? context.payload.issue.number : context.payload.pull_request.number,
+                    body: warningMessage
+                  });
+                } catch (e) {
+                  console.log('Failed to create comment:', e);
+                }
+                
+                try {
+                  // Add 'potential-scam' label
+                  await github.rest.issues.addLabels({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: context.payload.issue ? context.payload.issue.number : context.payload.pull_request.number,
+                    labels: ['potential-scam']
+                  });
+                } catch (e) {
+                  console.log('Failed to add label:', e);
+                }
+              }
+            } catch (e) {
+              console.log('Workflow error:', e);
+              // Still mark as failure but with more context
+              core.setFailed(`Workflow failed: ${e.message}`);
             }

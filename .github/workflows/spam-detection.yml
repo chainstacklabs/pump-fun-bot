@@ -1,4 +1,4 @@
-kname: Suspicious Comment Detection
+name: Suspicious Comment Detection
 
 on:
   issue_comment:

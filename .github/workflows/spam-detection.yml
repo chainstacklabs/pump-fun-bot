@@ -1,4 +1,4 @@
-name: Suspicious Comment Detection
+kname: Suspicious Comment Detection
 
 on:
   issue_comment:
@@ -56,19 +56,42 @@ jobs:
                 'reach out to',
                 'through the chat',
                 'portal',
+                'help center',
+                'ticket',
+                'this will be review',
+                'bringing this to our notice',
+                'initiate a chat',
+                'regards',
+                'hello @',
+                'thanks for bringing',
               ];
+              
+              // Add pattern weight scoring
+              const patternWeights = {
+                'ticket id': 2,
+                'support team': 2,
+                'live support': 2,
+                'help center': 2,
+                // Regular patterns have weight of 1
+              };
+              
+              // Calculate spam score
+              let spamScore = 0;
+              const foundPatterns = suspiciousPatterns.filter(pattern => {
+                if (body.includes(pattern)) {
+                  spamScore += patternWeights[pattern] || 1;
+                  return true;
+                }
+                return false;
+              });
               
               // Check for external links (excluding common legitimate domains)
               const hasExternalLinks = body.includes('http') || body.includes('www');
               const hasGithubLinks = body.includes('github.com');
               const suspiciousLinks = hasExternalLinks && !hasGithubLinks;
               
-              // Check for suspicious patterns
-              const foundPatterns = suspiciousPatterns.filter(pattern => 
-                body.includes(pattern)
-              );
-              
-              if (foundPatterns.length > 0 || suspiciousLinks) {
+              // Trigger on either multiple patterns or high spam score
+              if (foundPatterns.length > 2 || spamScore >= 3) {
                 try {
                   // Create a warning comment
                   await github.rest.issues.createComment({
@@ -98,3 +121,4 @@ jobs:
               // Still mark as failure but with more context
               core.setFailed(`Workflow failed: ${e.message}`);
             }
+

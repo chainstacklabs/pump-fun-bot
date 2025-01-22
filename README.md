@@ -4,7 +4,7 @@ The issues comment section is often targeted by scam bots willing to redirect yo
 
 I have enabled a GitHub actions script to detect the common patterns and tag them, which obviously is not 100% accurate.
 
-This is also why you will see deleted comments in the issues—I only deleted the scam bot comments targeting your private keys.
+This is also why you will see deleted comments in the issues—I only delete the scam bot comments targeting your private keys.
 
 The official maintainers are in the [MAINTAINERS.md](MAINTAINERS.md) file.
 

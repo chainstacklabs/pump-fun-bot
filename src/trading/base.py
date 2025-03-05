@@ -64,10 +64,10 @@ class TradeResult:
     """Result of a trading operation."""
 
     success: bool
-    tx_signature: Optional[str] = None
-    error_message: Optional[str] = None
-    amount: Optional[float] = None
-    price: Optional[float] = None
+    tx_signature: str | None = None
+    error_message: str | None = None
+    amount: float | None = None
+    price: float | None = None
 
 
 class Trader(ABC):

@@ -6,9 +6,9 @@ import asyncio
 import struct
 from typing import Optional
 
-from solana.transaction import Transaction
 from solders.instruction import AccountMeta, Instruction
 from solders.pubkey import Pubkey
+from solders.transaction import Transaction
 
 from src.core.client import SolanaClient
 from src.core.curve import BondingCurveManager

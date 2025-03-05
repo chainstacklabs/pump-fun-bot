@@ -8,10 +8,10 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 from solana.rpc.async_api import AsyncClient
 from solana.rpc.commitment import Confirmed
 from solana.rpc.types import TxOpts
-from solana.transaction import Transaction
 from solders.instruction import Instruction
 from solders.keypair import Keypair
 from solders.pubkey import Pubkey
+from solders.transaction import Transaction
 
 from src.utils.logger import get_logger
 

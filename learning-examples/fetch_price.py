@@ -1,14 +1,14 @@
 import asyncio
+import os
 import struct
 import sys
-import os
 from typing import Final
 
-from construct import Struct, Int64ul, Flag
+from construct import Flag, Int64ul, Struct
 from solana.rpc.async_api import AsyncClient
 from solders.pubkey import Pubkey
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from config import RPC_ENDPOINT
 
 LAMPORTS_PER_SOL: Final[int] = 1_000_000_000
@@ -18,6 +18,7 @@ CURVE_ADDRESS: Final[str] = "6GXfUqrmPM4VdN1NoDZsE155jzRegJngZRjMkGyby7do"
 # Here and later all the discriminators are precalculated. See learning-examples/discriminator.py
 EXPECTED_DISCRIMINATOR: Final[bytes] = struct.pack("<Q", 6966180631402821399)
 
+
 class BondingCurveState:
     _STRUCT = Struct(
         "virtual_token_reserves" / Int64ul,
@@ -25,14 +26,17 @@ class BondingCurveState:
         "real_token_reserves" / Int64ul,
         "real_sol_reserves" / Int64ul,
         "token_total_supply" / Int64ul,
-        "complete" / Flag
+        "complete" / Flag,
     )
 
     def __init__(self, data: bytes) -> None:
         parsed = self._STRUCT.parse(data[8:])
         self.__dict__.update(parsed)
 
-async def get_bonding_curve_state(conn: AsyncClient, curve_address: Pubkey) -> BondingCurveState:
+
+async def get_bonding_curve_state(
+    conn: AsyncClient, curve_address: Pubkey
+) -> BondingCurveState:
     response = await conn.get_account_info(curve_address)
     if not response.value or not response.value.data:
         raise ValueError("Invalid curve state: No data")
@@ -43,11 +47,15 @@ async def get_bonding_curve_state(conn: AsyncClient, curve_address: Pubkey) -> B
 
     return BondingCurveState(data)
 
+
 def calculate_bonding_curve_price(curve_state: BondingCurveState) -> float:
     if curve_state.virtual_token_reserves <= 0 or curve_state.virtual_sol_reserves <= 0:
         raise ValueError("Invalid reserve state")
 
-    return (curve_state.virtual_sol_reserves / LAMPORTS_PER_SOL) / (curve_state.virtual_token_reserves / 10 ** TOKEN_DECIMALS)
+    return (curve_state.virtual_sol_reserves / LAMPORTS_PER_SOL) / (
+        curve_state.virtual_token_reserves / 10**TOKEN_DECIMALS
+    )
+
 
 async def main() -> None:
     try:
@@ -62,6 +70,7 @@ async def main() -> None:
         print(f"Error: {e}")
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -21,6 +21,7 @@ from solders.transaction import VersionedTransaction
 from spl.token.instructions import get_associated_token_address
 
 from config import *
+from trade import trade
 
 # Here and later all the discriminators are precalculated. See learning-examples/discriminator.py
 EXPECTED_DISCRIMINATOR = struct.pack("<Q", 6966180631402821399)

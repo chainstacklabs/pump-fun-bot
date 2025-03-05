@@ -1,6 +1,11 @@
 {
     "python.languageServer": "Pylance",
     "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.diagnosticSeverityOverrides": {
+        "reportMissingTypeStubs": "none",
+        "reportUnknownMemberType": "warning",
+        "reportUnknownParameterType": "warning"
+    },
     
     "ruff.lint.enable": true,
     "ruff.format.enable": true,

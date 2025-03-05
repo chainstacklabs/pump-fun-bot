@@ -1,6 +1,11 @@
-[tool.black]
+[tool.ruff]
 line-length = 88
-target-version = ['py39']
+target-version = "py311"
 
-[tool.isort]
-profile = "black"
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "N", "B", "A", "C4", "T10", "ARG", "PTH"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

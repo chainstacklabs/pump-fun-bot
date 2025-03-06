@@ -7,7 +7,6 @@ import asyncio
 import json
 import os
 from datetime import datetime
-from typing import Dict, Optional, Set
 
 import config
 from src.core.client import SolanaClient
@@ -74,13 +73,13 @@ class PumpTrader:
         self.buy_slippage = buy_slippage
         self.sell_slippage = sell_slippage
         self.max_retries = max_retries
-        self.max_token_age = max_token_age
+        self.max_token_age = 1  # seconds
 
         # Token processing state
         self.token_queue = asyncio.Queue()
         self.processing = False
-        self.processed_tokens: Set[str] = set()
-        self.token_timestamps: Dict[str, float] = {}
+        self.processed_tokens: set[str] = set()
+        self.token_timestamps: dict[str, float] = {}
 
     async def start(
         self,
@@ -139,7 +138,6 @@ class PumpTrader:
     async def _process_token_queue(self, marry_mode: bool, yolo_mode: bool) -> None:
         """Continuously process tokens from the queue, only if they're fresh."""
         while True:
-            # Get next token
             token_info = await self.token_queue.get()
             token_key = str(token_info.mint)
 
@@ -156,16 +154,13 @@ class PumpTrader:
                 self.token_queue.task_done()
                 continue
 
-            # Mark as processing
             self.processed_tokens.add(token_key)
 
-            # Process token
             logger.info(
                 f"Processing fresh token: {token_info.symbol} (age: {token_age:.1f}s)"
             )
             await self._handle_token(token_info, marry_mode, yolo_mode)
 
-            # Mark queue task as done
             self.token_queue.task_done()
 
     async def _handle_token(

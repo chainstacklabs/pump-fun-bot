@@ -6,7 +6,6 @@ import struct
 from typing import Final
 
 from construct import Flag, Int64ul, Struct
-from solana.rpc.async_api import AsyncClient
 from solders.pubkey import Pubkey
 
 from src.core.client import SolanaClient

@@ -4,7 +4,7 @@ WebSocket monitoring for pump.fun tokens.
 
 import asyncio
 import json
-from typing import Awaitable, Callable, Optional
+from collections.abc import Awaitable, Callable
 
 import websockets
 from solders.pubkey import Pubkey
@@ -138,7 +138,7 @@ class PumpTokenListener:
         except Exception as e:
             logger.error(f"Ping error: {str(e)}")
 
-    async def _wait_for_token_creation(self, websocket) -> Optional[TokenInfo]:
+    async def _wait_for_token_creation(self, websocket) -> TokenInfo | None:
         """Wait for token creation event.
 
         Args:

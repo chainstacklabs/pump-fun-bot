@@ -4,10 +4,9 @@ Base interfaces for trading operations.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from solders.pubkey import Pubkey
-from solders.signature import Signature
 
 
 @dataclass
@@ -23,7 +22,7 @@ class TokenInfo:
     user: Pubkey
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "TokenInfo":
+    def from_dict(cls, data: dict[str, Any]) -> "TokenInfo":
         """Create TokenInfo from dictionary.
 
         Args:
@@ -42,7 +41,7 @@ class TokenInfo:
             user=Pubkey.from_string(data["user"]),
         )
 
-    def to_dict(self) -> Dict[str, str]:
+    def to_dict(self) -> dict[str, str]:
         """Convert to dictionary.
 
         Returns:

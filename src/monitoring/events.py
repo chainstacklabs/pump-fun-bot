@@ -5,7 +5,7 @@ Event processing for pump.fun tokens.
 import base64
 import json
 import struct
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from solders.pubkey import Pubkey
 from solders.transaction import VersionedTransaction
@@ -31,7 +31,7 @@ class PumpEventProcessor:
         self.pump_program = pump_program
         self._idl = self._load_idl()
 
-    def _load_idl(self) -> Dict[str, Any]:
+    def _load_idl(self) -> dict[str, Any]:
         """Load IDL from file.
 
         Returns:
@@ -56,7 +56,7 @@ class PumpEventProcessor:
                 ]
             }
 
-    def process_transaction(self, tx_data: str) -> Optional[TokenInfo]:
+    def process_transaction(self, tx_data: str) -> TokenInfo | None:
         """Process a transaction and extract token info.
 
         Args:
@@ -130,8 +130,8 @@ class PumpEventProcessor:
         return None
 
     def _decode_create_instruction(
-        self, ix_data: bytes, ix_def: Dict[str, Any], accounts: List[Pubkey]
-    ) -> Dict[str, Any]:
+        self, ix_data: bytes, ix_def: dict[str, Any], accounts: list[Pubkey]
+    ) -> dict[str, Any]:
         """Decode create instruction data.
 
         Args:

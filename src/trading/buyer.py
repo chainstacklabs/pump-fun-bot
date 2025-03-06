@@ -2,20 +2,13 @@
 Buy operations for pump.fun tokens.
 """
 
-import asyncio
 import struct
-from typing import Final, List, Optional
+from typing import Final
 
-import spl.token.instructions as spl_token
-from solana.rpc.async_api import AsyncClient
-from solana.rpc.commitment import Confirmed
-from solana.rpc.types import TxOpts
 from solders.hash import Hash
 from solders.instruction import AccountMeta, Instruction
-from solders.keypair import Keypair
 from solders.message import Message
 from solders.pubkey import Pubkey
-from solders.system_program import TransferParams, transfer
 from solders.transaction import Transaction
 from spl.token.instructions import create_associated_token_account
 

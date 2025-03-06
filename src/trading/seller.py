@@ -2,9 +2,8 @@
 Sell operations for pump.fun tokens.
 """
 
-import asyncio
 import struct
-from typing import Final, Optional
+from typing import Final
 
 from solders.hash import Hash
 from solders.instruction import AccountMeta, Instruction

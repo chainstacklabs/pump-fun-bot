@@ -3,13 +3,12 @@ Solana client abstraction for blockchain operations.
 """
 
 import asyncio
-from typing import Any, Dict
+from typing import Any
 
 from solana.rpc.async_api import AsyncClient
 from solana.rpc.commitment import Confirmed
 from solana.rpc.types import TxOpts
 from solders.hash import Hash
-from solders.keypair import Keypair
 from solders.pubkey import Pubkey
 from solders.transaction import Transaction
 
@@ -46,7 +45,7 @@ class SolanaClient:
             await self._client.close()
             self._client = None
 
-    async def get_account_info(self, pubkey: Pubkey) -> Dict[str, Any]:
+    async def get_account_info(self, pubkey: Pubkey) -> dict[str, Any]:
         """Get account info from the blockchain.
 
         Args:

@@ -4,10 +4,9 @@ Logging utilities for the pump.fun trading bot.
 
 import logging
 import sys
-from typing import Dict
 
 # Global dict to store loggers
-_loggers: Dict[str, logging.Logger] = {}
+_loggers: dict[str, logging.Logger] = {}
 
 
 def get_logger(name: str, level: int = logging.INFO) -> logging.Logger:

@@ -125,7 +125,14 @@ class PumpTokenListener:
         try:
             while True:
                 await asyncio.sleep(self.ping_interval)
-                await websocket.ping()
+                try:
+                    pong_waiter = await websocket.ping()
+                    await asyncio.wait_for(pong_waiter, timeout=10)
+                except asyncio.TimeoutError:
+                    logger.warning("Ping timeout - server not responding")
+                    # Force reconnection
+                    await websocket.close()
+                    return
         except asyncio.CancelledError:
             pass
         except Exception as e:

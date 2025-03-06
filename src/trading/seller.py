@@ -4,9 +4,11 @@ Sell operations for pump.fun tokens.
 
 import asyncio
 import struct
-from typing import Optional
+from typing import Final, Optional
 
+from solders.hash import Hash
 from solders.instruction import AccountMeta, Instruction
+from solders.message import Message
 from solders.pubkey import Pubkey
 from solders.transaction import Transaction
 
@@ -23,6 +25,9 @@ from src.trading.base import TokenInfo, Trader, TradeResult
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+# Discriminator for the sell instruction
+EXPECTED_DISCRIMINATOR: Final[bytes] = struct.pack("<Q", 12502976635542562355)
 
 
 class TokenSeller(Trader):
@@ -190,22 +195,21 @@ class TokenSeller(Trader):
         ]
 
         # Prepare sell instruction data
-        # Discriminator for sell instruction
-        discriminator = struct.pack("<Q", 12502976635542562355)
         data = (
-            discriminator
+            EXPECTED_DISCRIMINATOR
             + struct.pack("<Q", token_amount)
             + struct.pack("<Q", min_sol_output)
         )
         sell_ix = Instruction(PumpAddresses.PROGRAM, data, accounts)
 
-        transaction = Transaction()
-        transaction.add(sell_ix)
+        # Prepare sell transaction data
+        recent_blockhash: Hash = await self.client.get_latest_blockhash()
+        sell_message = Message([sell_ix], self.wallet.keypair.pubkey())
+        sell_tx = Transaction([self.wallet.keypair], sell_message, recent_blockhash)
 
         try:
             return await self.client.send_transaction(
-                transaction,
-                self.wallet.keypair,
+                sell_tx,
                 skip_preflight=True,
                 max_retries=self.max_retries,
             )

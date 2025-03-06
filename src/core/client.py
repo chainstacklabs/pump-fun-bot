@@ -8,6 +8,7 @@ from typing import Any, Dict
 from solana.rpc.async_api import AsyncClient
 from solana.rpc.commitment import Confirmed
 from solana.rpc.types import TxOpts
+from solders.hash import Hash
 from solders.keypair import Keypair
 from solders.pubkey import Pubkey
 from solders.transaction import Transaction
@@ -78,7 +79,7 @@ class SolanaClient:
             return int(response.value.amount)
         return 0
 
-    async def get_latest_blockhash(self) -> str:
+    async def get_latest_blockhash(self) -> Hash:
         """Get the latest blockhash.
 
         Returns:
@@ -91,7 +92,6 @@ class SolanaClient:
     async def send_transaction(
         self,
         transaction: Transaction,
-        signer: Keypair,
         skip_preflight: bool = True,
         max_retries: int = 3,
     ) -> str:
@@ -99,7 +99,6 @@ class SolanaClient:
 
         Args:
             transaction: Prepared transaction
-            signer: Transaction signer
             skip_preflight: Whether to skip preflight checks
             max_retries: Maximum number of sending attempts
 
@@ -111,20 +110,13 @@ class SolanaClient:
         """
         client = await self.get_client()
 
-        # Ensure transaction has a recent blockhash
-        if not transaction.recent_blockhash:
-            blockhash = await self.get_latest_blockhash()
-            transaction.recent_blockhash = blockhash
-
         # Attempt to send with retries
         for attempt in range(max_retries):
             try:
                 tx_opts = TxOpts(
                     skip_preflight=skip_preflight, preflight_commitment=Confirmed
                 )
-                response = await client.send_transaction(
-                    transaction, signer, opts=tx_opts
-                )
+                response = await client.send_transaction(transaction, opts=tx_opts)
                 return response.value
 
             except Exception as e:

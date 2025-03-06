@@ -4,18 +4,20 @@ Buy operations for pump.fun tokens.
 
 import asyncio
 import struct
-from typing import List, Optional
+from typing import Final, List, Optional
 
 import spl.token.instructions as spl_token
 from solana.rpc.async_api import AsyncClient
 from solana.rpc.commitment import Confirmed
 from solana.rpc.types import TxOpts
+from solders.hash import Hash
 from solders.instruction import AccountMeta, Instruction
 from solders.keypair import Keypair
+from solders.message import Message
 from solders.pubkey import Pubkey
 from solders.system_program import TransferParams, transfer
 from solders.transaction import Transaction
-from spl.token.instructions import get_associated_token_address
+from spl.token.instructions import create_associated_token_account
 
 from src.core.client import SolanaClient
 from src.core.curve import BondingCurveManager
@@ -30,6 +32,9 @@ from src.trading.base import TokenInfo, Trader, TradeResult
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+# Discriminator for the buy instruction
+EXPECTED_DISCRIMINATOR: Final[bytes] = struct.pack("<Q", 16927863322537952870)
 
 
 class TokenBuyer(Trader):
@@ -145,18 +150,17 @@ class TokenBuyer(Trader):
             if account_info.value is None:
                 logger.info(f"Creating associated token account for {mint}...")
 
-                create_ata_ix = spl_token.create_associated_token_account(
+                create_ata_ix = create_associated_token_account(
                     payer=self.wallet.pubkey, owner=self.wallet.pubkey, mint=mint
                 )
 
-                create_ata_tx = Transaction()
-                create_ata_tx.add(create_ata_ix)
-                blockhash = await self.client.get_latest_blockhash()
-                create_ata_tx.recent_blockhash = blockhash
-
-                tx_sig = await self.client.send_transaction(
-                    create_ata_tx, self.wallet.keypair
+                recent_blockhash: Hash = await self.client.get_latest_blockhash()
+                create_ata_msg = Message([create_ata_ix], self.wallet.keypair.pubkey())
+                create_ata_tx = Transaction(
+                    [self.wallet.keypair], create_ata_msg, recent_blockhash
                 )
+
+                tx_sig = await self.client.send_transaction(create_ata_tx)
 
                 await self.client.confirm_transaction(tx_sig)
                 logger.info(
@@ -228,23 +232,22 @@ class TokenBuyer(Trader):
         ]
 
         # Prepare buy instruction data
-        # Discriminator for buy instruction
-        discriminator = struct.pack("<Q", 16927863322537952870)
         token_amount_raw = int(token_amount * 10**TOKEN_DECIMALS)
         data = (
-            discriminator
+            EXPECTED_DISCRIMINATOR
             + struct.pack("<Q", token_amount_raw)
             + struct.pack("<Q", max_amount_lamports)
         )
         buy_ix = Instruction(PumpAddresses.PROGRAM, data, accounts)
 
-        transaction = Transaction()
-        transaction.add(buy_ix)
+        # Prepare buy transaction data
+        recent_blockhash: Hash = await self.client.get_latest_blockhash()
+        buy_message = Message([buy_ix], self.wallet.keypair.pubkey())
+        buy_tx = Transaction([self.wallet.keypair], buy_message, recent_blockhash)
 
         try:
             return await self.client.send_transaction(
-                transaction,
-                self.wallet.keypair,
+                buy_tx,
                 skip_preflight=True,
                 max_retries=self.max_retries,
             )

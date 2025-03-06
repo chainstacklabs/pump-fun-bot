@@ -3,17 +3,17 @@ Configuration for the pump.fun trading bot.
 """
 
 # Trading parameters
-BUY_AMOUNT = 0.0001  # Amount of SOL to spend when buying
-BUY_SLIPPAGE = 0.2  # 20% slippage tolerance for buying
-SELL_SLIPPAGE = 0.2  # 20% slippage tolerance for selling
+BUY_AMOUNT = 0.000001  # Amount of SOL to spend when buying
+BUY_SLIPPAGE = 0.4  # 40% slippage tolerance for buying
+SELL_SLIPPAGE = 0.4  # 40% slippage tolerance for selling
 ENABLE_DYNAMIC_PRIORITY_FEE = True  # TODO: not implemented. getRecentPriorityFee is used to get current priority fee
 EXTRA_PRIORITY_FEE = 0.1  # TODO: not implemented. 10% increase in dynamic priority fee
 
 # Retries and timeouts
-MAX_RETRIES: int = 5
-WAIT_TIME_AFTER_BUY: int = 5
-WAIT_TIME_BEFORE_NEW_TOKEN: int = 5
-WAIT_TIME_AFTER_CREATION: int = 5
+MAX_RETRIES: int = 2
+WAIT_TIME_AFTER_BUY: int = 15
+WAIT_TIME_BEFORE_NEW_TOKEN: int = 120
+WAIT_TIME_AFTER_CREATION: int = 15
 
 # Node provier configuration
 # You can also get a trader node https://docs.chainstack.com/docs/solana-trader-nodes

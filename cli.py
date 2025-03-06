@@ -52,16 +52,7 @@ def parse_args() -> argparse.Namespace:
         type=float,
         help=f"Sell slippage tolerance (default: {config.SELL_SLIPPAGE})",
     )
-    parser.add_argument("--rpc", type=str, help="Solana RPC endpoint")
-    parser.add_argument("--wss", type=str, help="Solana WebSocket endpoint")
 
-    parser.add_argument("--wss", type=str, help="Solana WebSocket endpoint")
-    parser.add_argument(
-        "--key",
-        type=str,
-        help="Solana private key (better to use environment variable)",
-    )
-    parser.add_argument("--log", type=str, help="Log file path")
     return parser.parse_args()
 
 
@@ -73,23 +64,19 @@ async def main() -> None:
 
     # Get configuration values, preferring command line args over config.py
     rpc_endpoint: str | None = (
-        args.rpc
-        or os.environ.get("SOLANA_NODE_RPC_ENDPOINT")
-        or config.PUBLIC_RPC_ENDPOINT
+        os.environ.get("SOLANA_NODE_RPC_ENDPOINT") or config.PUBLIC_RPC_ENDPOINT
     )
     wss_endpoint: str | None = (
-        args.wss
-        or os.environ.get("SOLANA_NODE_WSS_ENDPOINT")
-        or config.PUBLIC_WSS_ENDPOINT
+        os.environ.get("SOLANA_NODE_WSS_ENDPOINT") or config.PUBLIC_WSS_ENDPOINT
     )
-    private_key: str | None = args.key or os.environ.get("SOLANA_PRIVATE_KEY")
+    private_key: str | None = os.environ.get("SOLANA_PRIVATE_KEY")
 
     # Validate configuration values
-    if not rpc_endpoint or rpc_endpoint.startswith(("http://", "https://")):
+    if not rpc_endpoint or not rpc_endpoint.startswith(("http://", "https://")):
         logger.error("Invalid RPC endpoint. Must start with http:// or https://")
         sys.exit(1)
 
-    if not wss_endpoint or wss_endpoint.startswith(("ws://", "wss://")):
+    if not wss_endpoint or not wss_endpoint.startswith(("ws://", "wss://")):
         logger.error("Invalid WebSocket endpoint. Must start with ws:// or wss://")
         sys.exit(1)
 

@@ -1,11 +1,13 @@
 """
 Main trading coordinator for pump.fun tokens.
+Refactored PumpTrader to only process fresh tokens from WebSocket.
 """
 
 import asyncio
 import json
 import os
 from datetime import datetime
+from typing import Dict, Optional, Set
 
 import config
 from src.core.client import SolanaClient
@@ -22,7 +24,7 @@ logger = get_logger(__name__)
 
 
 class PumpTrader:
-    """Coordinates trading operations for pump.fun tokens."""
+    """Coordinates trading operations for pump.fun tokens with focus on freshness."""
 
     def __init__(
         self,
@@ -72,6 +74,13 @@ class PumpTrader:
         self.buy_slippage = buy_slippage
         self.sell_slippage = sell_slippage
         self.max_retries = max_retries
+        self.max_token_age = max_token_age
+
+        # Token processing state
+        self.token_queue = asyncio.Queue()
+        self.processing = False
+        self.processed_tokens: Set[str] = set()
+        self.token_timestamps: Dict[str, float] = {}
 
     async def start(
         self,
@@ -93,19 +102,73 @@ class PumpTrader:
         logger.info(f"Creator filter: {bro_address if bro_address else 'None'}")
         logger.info(f"Marry mode: {marry_mode}")
         logger.info(f"YOLO mode: {yolo_mode}")
+        logger.info(f"Max token age: {self.max_token_age} seconds")
+
+        # Start processor task
+        processor_task = asyncio.create_task(
+            self._process_token_queue(marry_mode, yolo_mode)
+        )
 
         try:
             await self.token_listener.listen_for_tokens(
-                lambda token: self._handle_new_token(token, marry_mode, yolo_mode),
+                lambda token: self._queue_token(token),
                 match_string,
                 bro_address,
             )
 
         except Exception as e:
             logger.error(f"Trading stopped due to error: {str(e)}")
+            processor_task.cancel()
             await self.solana_client.close()
 
-    async def _handle_new_token(
+    async def _queue_token(self, token_info: TokenInfo) -> None:
+        """Queue a token for processing if not already processed."""
+        token_key = str(token_info.mint)
+
+        if token_key in self.processed_tokens:
+            logger.debug(f"Token {token_info.symbol} already processed. Skipping...")
+            return
+
+        # Record timestamp when token was discovered
+        self.token_timestamps[token_key] = asyncio.get_event_loop().time()
+
+        # Add to queue
+        await self.token_queue.put(token_info)
+        logger.info(f"Queued new token: {token_info.symbol} ({token_info.mint})")
+
+    async def _process_token_queue(self, marry_mode: bool, yolo_mode: bool) -> None:
+        """Continuously process tokens from the queue, only if they're fresh."""
+        while True:
+            # Get next token
+            token_info = await self.token_queue.get()
+            token_key = str(token_info.mint)
+
+            # Check if token is still fresh
+            current_time = asyncio.get_event_loop().time()
+            token_age = current_time - self.token_timestamps.get(
+                token_key, current_time
+            )
+
+            if token_age > self.max_token_age:
+                logger.info(
+                    f"Skipping token {token_info.symbol} - too old ({token_age:.1f}s > {self.max_token_age}s)"
+                )
+                self.token_queue.task_done()
+                continue
+
+            # Mark as processing
+            self.processed_tokens.add(token_key)
+
+            # Process token
+            logger.info(
+                f"Processing fresh token: {token_info.symbol} (age: {token_age:.1f}s)"
+            )
+            await self._handle_token(token_info, marry_mode, yolo_mode)
+
+            # Mark queue task as done
+            self.token_queue.task_done()
+
+    async def _handle_token(
         self, token_info: TokenInfo, marry_mode: bool, yolo_mode: bool
     ) -> None:
         """Handle a new token creation event.
@@ -168,6 +231,13 @@ class PumpTrader:
             elif marry_mode:
                 logger.info("Marry mode enabled. Skipping sell operation.")
 
+            # Wait before looking for the next token
+            if yolo_mode:
+                logger.info(
+                    f"YOLO mode enabled. Waiting {config.WAIT_TIME_BEFORE_NEW_TOKEN} seconds before looking for next token..."
+                )
+            await asyncio.sleep(config.WAIT_TIME_BEFORE_NEW_TOKEN)
+
         except Exception as e:
             logger.error(f"Error handling token {token_info.symbol}: {str(e)}")
 
@@ -211,7 +281,7 @@ class PumpTrader:
             "symbol": token_info.symbol,
             "price": price,
             "amount": amount,
-            "tx_hash": tx_hash,
+            "tx_hash": str(tx_hash),
         }
 
         with open("trades/trades.log", "a") as log_file:

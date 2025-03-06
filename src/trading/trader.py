@@ -73,7 +73,7 @@ class PumpTrader:
         self.buy_slippage = buy_slippage
         self.sell_slippage = sell_slippage
         self.max_retries = max_retries
-        self.max_token_age = 1  # seconds
+        self.max_token_age = config.MAX_TOKEN_AGE
 
         # Token processing state
         self.token_queue = asyncio.Queue()
@@ -131,9 +131,8 @@ class PumpTrader:
         # Record timestamp when token was discovered
         self.token_timestamps[token_key] = asyncio.get_event_loop().time()
 
-        # Add to queue
         await self.token_queue.put(token_info)
-        logger.info(f"Queued new token: {token_info.symbol} ({token_info.mint})")
+        # logger.info(f"Queued new token: {token_info.symbol} ({token_info.mint})")
 
     async def _process_token_queue(self, marry_mode: bool, yolo_mode: bool) -> None:
         """Continuously process tokens from the queue, only if they're fresh."""
@@ -141,7 +140,7 @@ class PumpTrader:
             token_info = await self.token_queue.get()
             token_key = str(token_info.mint)
 
-            # Check if token is still fresh
+            # Check if token is still "fresh"
             current_time = asyncio.get_event_loop().time()
             token_age = current_time - self.token_timestamps.get(
                 token_key, current_time

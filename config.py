@@ -11,9 +11,14 @@ EXTRA_PRIORITY_FEE = 0.1  # TODO: not implemented. 10% increase in dynamic prior
 
 # Retries and timeouts
 MAX_RETRIES: int = 2
-WAIT_TIME_AFTER_BUY: int = 15
-WAIT_TIME_BEFORE_NEW_TOKEN: int = 120
-WAIT_TIME_AFTER_CREATION: int = 15
+WAIT_TIME_AFTER_BUY: int = 12
+WAIT_TIME_BEFORE_NEW_TOKEN: int = 5
+WAIT_TIME_AFTER_CREATION: int = 12
+
+# Maximum age (in seconds) for a token to be considered "fresh" and eligible for processing.
+# This threshold is checked before processing starts - tokens older than this are skipped
+# since they likely contain outdated information from the websocket stream
+MAX_TOKEN_AGE: int = 1
 
 # Node provier configuration
 # You can also get a trader node https://docs.chainstack.com/docs/solana-trader-nodes

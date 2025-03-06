@@ -72,10 +72,19 @@ async def main() -> None:
     args = parse_args()
 
     # Get configuration values, preferring command line args over config.py
-    rpc_endpoint: str | None = args.rpc or os.environ.get("SOLANA_NODE_RPC_ENDPOINT")
-    wss_endpoint: str | None = args.wss or os.environ.get("SOLANA_NODE_WSS_ENDPOINT")
+    rpc_endpoint: str | None = (
+        args.rpc
+        or os.environ.get("SOLANA_NODE_RPC_ENDPOINT")
+        or config.PUBLIC_RPC_ENDPOINT
+    )
+    wss_endpoint: str | None = (
+        args.wss
+        or os.environ.get("SOLANA_NODE_WSS_ENDPOINT")
+        or config.PUBLIC_WSS_ENDPOINT
+    )
     private_key: str | None = args.key or os.environ.get("SOLANA_PRIVATE_KEY")
 
+    # Validate configuration values
     if not rpc_endpoint or rpc_endpoint.startswith(("http://", "https://")):
         logger.error("Invalid RPC endpoint. Must start with http:// or https://")
         sys.exit(1)
@@ -88,6 +97,7 @@ async def main() -> None:
         logger.error("Invalid private key. Key appears to be missing or too short")
         sys.exit(1)
 
+    # Get trading parameters
     buy_amount: float = args.amount if args.amount is not None else config.BUY_AMOUNT
     buy_slippage: float = (
         args.buy_slippage if args.buy_slippage is not None else config.BUY_SLIPPAGE
@@ -95,6 +105,12 @@ async def main() -> None:
     sell_slippage: float = (
         args.sell_slippage if args.sell_slippage is not None else config.SELL_SLIPPAGE
     )
+
+    # Not implemented parameters
+    enable_dynamic_prior__fee = (
+        config.ENABLE_DYNAMIC_PRIORITY_FEE
+    )  # TODO: to be implemented
+    prior_fee_multiplier = config.EXTRA_PRIORITY_FEE  # TODO: to be implemented
 
     trader: PumpTrader = PumpTrader(
         rpc_endpoint=rpc_endpoint,  # type: ignore

@@ -4,15 +4,14 @@ WebSocket monitoring for pump.fun tokens.
 
 import asyncio
 import json
-import time
-from typing import Any, Awaitable, Callable, Dict, Optional
+from typing import Awaitable, Callable, Optional
 
 import websockets
 from solders.pubkey import Pubkey
 
-from src.monitoring.events import PumpEventProcessor
-from src.trading.base import TokenInfo
-from src.utils.logger import get_logger
+from monitoring.events import PumpEventProcessor
+from trading.base import TokenInfo
+from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -61,7 +60,6 @@ class PumpTokenListener:
                                 f"New token detected: {token_info.name} ({token_info.symbol})"
                             )
 
-                            # Apply filters
                             if match_string and not (
                                 match_string.lower() in token_info.name.lower()
                                 or match_string.lower() in token_info.symbol.lower()

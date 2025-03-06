@@ -5,13 +5,13 @@ Event processing for pump.fun tokens.
 import base64
 import json
 import struct
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from solders.pubkey import Pubkey
 from solders.transaction import VersionedTransaction
 
-from src.trading.base import TokenInfo
-from src.utils.logger import get_logger
+from trading.base import TokenInfo
+from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -38,7 +38,7 @@ class PumpEventProcessor:
             IDL as dictionary
         """
         try:
-            with open("idl/pump_fun_idl.json", "r") as f:
+            with open("idl/pump_fun_idl.json") as f:
                 return json.load(f)
         except Exception as e:
             logger.error(f"Failed to load IDL: {str(e)}")

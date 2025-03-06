@@ -168,13 +168,6 @@ class PumpTrader:
             elif marry_mode:
                 logger.info("Marry mode enabled. Skipping sell operation.")
 
-            # Wait before looking for the next token
-            if yolo_mode:
-                logger.info(
-                    f"YOLO mode enabled. Waiting {config.WAIT_TIME_BEFORE_NEW_TOKEN} seconds before looking for next token..."
-                )
-                await asyncio.sleep(config.WAIT_TIME_BEFORE_NEW_TOKEN)
-
         except Exception as e:
             logger.error(f"Error handling token {token_info.symbol}: {str(e)}")
 

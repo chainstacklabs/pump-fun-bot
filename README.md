@@ -21,7 +21,7 @@ That'll be in a separate branch.
 Overall, it'll be a gradual development & rollout:
 
 * Stage 1: General updates & QoL
-  * Lib updates
+  * ✅ Lib updates
   * Error handling
   * Ability to set RPS in the config to match your provider's and plan RPS (preferably [Chainstack](https://console.chainstack.com/) 🤩)
   * Ability to set dynamic priority fees

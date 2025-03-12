@@ -9,6 +9,7 @@ import os
 from datetime import datetime
 
 import config
+from core.priority_fee.manager import PriorityFeeManager
 from src.core.client import SolanaClient
 from src.core.curve import BondingCurveManager
 from src.core.pubkeys import PumpAddresses
@@ -50,10 +51,20 @@ class PumpTrader:
         self.wallet = Wallet(private_key)
         self.curve_manager = BondingCurveManager(self.solana_client)
 
+        self.priority_fee_manager = PriorityFeeManager(
+            client=self.solana_client,
+            enable_dynamic_fee=config.ENABLE_DYNAMIC_PRIORITY_FEE,
+            enable_fixed_fee=config.ENABLE_FIXED_PRIORITY_FEE,
+            fixed_fee=config.FIXED_PRIORITY_FEE,
+            extra_fee=config.EXTRA_PRIORITY_FEE,
+            hard_cap=config.HARD_CAP_PRIOR_FEE,
+        )
+
         self.buyer = TokenBuyer(
             self.solana_client,
             self.wallet,
             self.curve_manager,
+            self.priority_fee_manager,
             buy_amount,
             buy_slippage,
             max_retries,
@@ -63,6 +74,7 @@ class PumpTrader:
             self.solana_client,
             self.wallet,
             self.curve_manager,
+            self.priority_fee_manager,
             sell_slippage,
             max_retries,
         )

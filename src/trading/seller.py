@@ -5,12 +5,10 @@ Sell operations for pump.fun tokens.
 import struct
 from typing import Final
 
-from solders.hash import Hash
 from solders.instruction import AccountMeta, Instruction
-from solders.message import Message
 from solders.pubkey import Pubkey
-from solders.transaction import Transaction
 
+from core.priority_fee.manager import PriorityFeeManager
 from src.core.client import SolanaClient
 from src.core.curve import BondingCurveManager
 from src.core.pubkeys import (
@@ -37,6 +35,7 @@ class TokenSeller(Trader):
         client: SolanaClient,
         wallet: Wallet,
         curve_manager: BondingCurveManager,
+        priority_fee_manager: PriorityFeeManager,
         slippage: float = 0.25,
         max_retries: int = 5,
     ):
@@ -52,6 +51,7 @@ class TokenSeller(Trader):
         self.client = client
         self.wallet = wallet
         self.curve_manager = curve_manager
+        self.priority_fee_manager = priority_fee_manager
         self.slippage = slippage
         self.max_retries = max_retries
 
@@ -202,15 +202,17 @@ class TokenSeller(Trader):
         sell_ix = Instruction(PumpAddresses.PROGRAM, data, accounts)
 
         # Prepare sell transaction data
-        recent_blockhash: Hash = await self.client.get_latest_blockhash()
-        sell_message = Message([sell_ix], self.wallet.keypair.pubkey())
-        sell_tx = Transaction([self.wallet.keypair], sell_message, recent_blockhash)
+        # recent_blockhash: Hash = await self.client.get_latest_blockhash()
+        # sell_message = Message([sell_ix], self.wallet.keypair.pubkey())
+        # sell_tx = Transaction([self.wallet.keypair], sell_message, recent_blockhash)
 
         try:
-            return await self.client.send_transaction(
-                sell_tx,
+            return await self.client.build_and_send_transaction(
+                [sell_ix],
+                self.wallet.keypair,
                 skip_preflight=True,
                 max_retries=self.max_retries,
+                priority_fee=await self.priority_fee_manager.calculate_priority_fee(),  # Get priority fee from manager
             )
         except Exception as e:
             logger.error(f"Sell transaction failed: {str(e)}")

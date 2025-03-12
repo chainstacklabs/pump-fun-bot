@@ -5,13 +5,11 @@ Buy operations for pump.fun tokens.
 import struct
 from typing import Final
 
-from solders.hash import Hash
 from solders.instruction import AccountMeta, Instruction
-from solders.message import Message
 from solders.pubkey import Pubkey
-from solders.transaction import Transaction
 from spl.token.instructions import create_associated_token_account
 
+from core.priority_fee.manager import PriorityFeeManager
 from src.core.client import SolanaClient
 from src.core.curve import BondingCurveManager
 from src.core.pubkeys import (
@@ -38,6 +36,7 @@ class TokenBuyer(Trader):
         client: SolanaClient,
         wallet: Wallet,
         curve_manager: BondingCurveManager,
+        priority_fee_manager: PriorityFeeManager,
         amount: float,
         slippage: float = 0.01,
         max_retries: int = 5,
@@ -55,6 +54,7 @@ class TokenBuyer(Trader):
         self.client = client
         self.wallet = wallet
         self.curve_manager = curve_manager
+        self.priority_fee_manager = priority_fee_manager
         self.amount = amount
         self.slippage = slippage
         self.max_retries = max_retries
@@ -147,13 +147,19 @@ class TokenBuyer(Trader):
                     payer=self.wallet.pubkey, owner=self.wallet.pubkey, mint=mint
                 )
 
-                recent_blockhash: Hash = await self.client.get_latest_blockhash()
-                create_ata_msg = Message([create_ata_ix], self.wallet.keypair.pubkey())
-                create_ata_tx = Transaction(
-                    [self.wallet.keypair], create_ata_msg, recent_blockhash
-                )
+                # recent_blockhash: Hash = await self.client.get_latest_blockhash()
+                # create_ata_msg = Message([create_ata_ix], self.wallet.keypair.pubkey())
+                # create_ata_tx = Transaction(
+                #    [self.wallet.keypair], create_ata_msg, recent_blockhash
+                # )
 
-                tx_sig = await self.client.send_transaction(create_ata_tx)
+                tx_sig = await self.client.build_and_send_transaction(
+                    [create_ata_ix],
+                    self.wallet.keypair,
+                    skip_preflight=True,
+                    max_retries=self.max_retries,
+                    priority_fee=await self.priority_fee_manager.calculate_priority_fee(),  # Get priority fee from manager
+                )
 
                 await self.client.confirm_transaction(tx_sig)
                 logger.info(
@@ -234,15 +240,17 @@ class TokenBuyer(Trader):
         buy_ix = Instruction(PumpAddresses.PROGRAM, data, accounts)
 
         # Prepare buy transaction data
-        recent_blockhash: Hash = await self.client.get_latest_blockhash()
-        buy_message = Message([buy_ix], self.wallet.keypair.pubkey())
-        buy_tx = Transaction([self.wallet.keypair], buy_message, recent_blockhash)
+        # recent_blockhash: Hash = await self.client.get_latest_blockhash()
+        # buy_message = Message([buy_ix], self.wallet.keypair.pubkey())
+        # buy_tx = Transaction([self.wallet.keypair], buy_message, recent_blockhash)
 
         try:
-            return await self.client.send_transaction(
-                buy_tx,
+            return await self.client.build_and_send_transaction(
+                [buy_ix],
+                self.wallet.keypair,
                 skip_preflight=True,
                 max_retries=self.max_retries,
+                priority_fee=await self.priority_fee_manager.calculate_priority_fee(),  # Get priority fee from manager
             )
         except Exception as e:
             logger.error(f"Buy transaction failed: {str(e)}")

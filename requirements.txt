@@ -6,3 +6,4 @@ solana==0.36.6
 solders>=0.26.0
 websockets>=15.0
 python-dotenv>=1.0.1
+aiohttp==3.11.13

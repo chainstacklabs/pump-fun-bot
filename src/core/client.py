@@ -3,8 +3,10 @@ Solana client abstraction for blockchain operations.
 """
 
 import asyncio
+import json
 from typing import Any
 
+import aiohttp
 from solana.rpc.async_api import AsyncClient
 from solana.rpc.commitment import Confirmed
 from solana.rpc.types import TxOpts
@@ -107,17 +109,21 @@ class SolanaClient:
             instructions: List of instructions to include in the transaction.
             skip_preflight: Whether to skip preflight checks.
             max_retries: Maximum number of retry attempts.
-            priority_fee: Optional priority fee in lamports.
+            priority_fee: Optional priority fee in microlamports.
 
         Returns:
             Transaction signature.
         """
         client = await self.get_client()
 
+        logger.info(
+            f"Priority fee in microlamports: {priority_fee if priority_fee else 0}"
+        )
+
         # Add priority fee instructions if applicable
         if priority_fee is not None:
             fee_instructions = [
-                set_compute_unit_limit(200_000),  # Default compute unit limit
+                set_compute_unit_limit(100_000),  # Default compute unit limit
                 set_compute_unit_price(priority_fee),
             ]
             instructions = fee_instructions + instructions
@@ -166,3 +172,29 @@ class SolanaClient:
         except Exception as e:
             logger.error(f"Failed to confirm transaction {signature}: {str(e)}")
             return False
+
+    async def post_rpc(self, body: dict[str, Any]) -> dict[str, Any] | None:
+        """
+        Send a raw RPC request to the Solana node.
+
+        Args:
+            body: JSON-RPC request body.
+
+        Returns:
+            Optional[Dict[str, Any]]: Parsed JSON response, or None if the request fails.
+        """
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    self.rpc_endpoint,
+                    json=body,
+                    timeout=aiohttp.ClientTimeout(10),  # 10-second timeout
+                ) as response:
+                    response.raise_for_status()
+                    return await response.json()
+        except aiohttp.ClientError as e:
+            logger.error(f"RPC request failed: {str(e)}", exc_info=True)
+            return None
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to decode RPC response: {str(e)}", exc_info=True)
+            return None

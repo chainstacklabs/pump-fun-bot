@@ -3,18 +3,20 @@ Configuration for the pump.fun trading bot.
 """
 
 # Trading parameters
-BUY_AMOUNT: float = 0.000001  # Amount of SOL to spend when buying
+BUY_AMOUNT: float = 0.000_001  # Amount of SOL to spend when buying
 BUY_SLIPPAGE: float = 0.4  # 40% slippage tolerance for buying
 SELL_SLIPPAGE: float = 0.4  # 40% slippage tolerance for selling
 
 # Configuration for priority fee settings
 ENABLE_DYNAMIC_PRIORITY_FEE: bool = True  # Enable dynamic priority fee calculation
-ENABLE_FIXED_PRIORITY_FEE: bool = True  # Enable fixed priority fee
-FIXED_PRIORITY_FEE: int = 200000  # Fixed priority fee in lamports (0 means no fee)
+ENABLE_FIXED_PRIORITY_FEE: bool = False  # Enable fixed priority fee
+FIXED_PRIORITY_FEE: int = 50_000  # Fixed priority fee in microlamports
 EXTRA_PRIORITY_FEE: float = (
     0.1  # Percentage increase applied to priority fee (0.1 = 10%)
 )
-HARD_CAP_PRIOR_FEE: int = 1000000  # Maximum allowed priority fee in lamports (hard cap)
+HARD_CAP_PRIOR_FEE: int = (
+    200_000  # Maximum allowed priority fee in microlamports (hard cap)
+)
 
 # Retries and timeouts
 MAX_RETRIES: int = 2

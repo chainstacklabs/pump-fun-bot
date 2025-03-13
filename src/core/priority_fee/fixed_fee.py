@@ -9,7 +9,7 @@ class FixedPriorityFee(PriorityFeePlugin):
         Initialize the fixed fee plugin.
 
         Args:
-            fixed_fee: Fixed priority fee in lamports.
+            fixed_fee: Fixed priority fee in microlamports.
         """
         self.fixed_fee = fixed_fee
 
@@ -18,7 +18,7 @@ class FixedPriorityFee(PriorityFeePlugin):
         Return the fixed priority fee.
 
         Returns:
-            Optional[int]: Fixed priority fee in lamports, or None if fixed_fee is 0.
+            Optional[int]: Fixed priority fee in microlamports, or None if fixed_fee is 0.
         """
         if self.fixed_fee == 0:
             return None

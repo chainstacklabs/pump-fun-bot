@@ -1,3 +1,5 @@
+from solders.pubkey import Pubkey
+
 from src.core.client import SolanaClient
 from src.core.priority_fee.dynamic_fee import DynamicPriorityFee
 from src.core.priority_fee.fixed_fee import FixedPriorityFee
@@ -25,9 +27,9 @@ class PriorityFeeManager:
             client: Solana RPC client for dynamic fee calculation.
             enable_dynamic_fee: Whether to enable dynamic fee calculation.
             enable_fixed_fee: Whether to enable fixed fee.
-            fixed_fee: Fixed priority fee in lamports.
+            fixed_fee: Fixed priority fee in microlamports.
             extra_fee: Percentage increase to apply to the base fee.
-            hard_cap: Maximum allowed priority fee in lamports.
+            hard_cap: Maximum allowed priority fee in microlamports.
         """
         self.client = client
         self.enable_dynamic_fee = enable_dynamic_fee
@@ -40,14 +42,20 @@ class PriorityFeeManager:
         self.dynamic_fee_plugin = DynamicPriorityFee(client)
         self.fixed_fee_plugin = FixedPriorityFee(fixed_fee)
 
-    async def calculate_priority_fee(self) -> int | None:
+    async def calculate_priority_fee(
+        self, accounts: list[Pubkey] | None = None
+    ) -> int | None:
         """
         Calculate the priority fee based on the configuration.
 
+        Args:
+            accounts: List of accounts to consider for dynamic fee calculation.
+                     If None, the fee is calculated without specific account constraints.
+
         Returns:
-            Optional[int]: Calculated priority fee in lamports, or None if no fee should be applied.
+            Optional[int]: Calculated priority fee in microlamports, or None if no fee should be applied.
         """
-        base_fee = await self._get_base_fee()
+        base_fee = await self._get_base_fee(accounts)
         if base_fee is None:
             return None
 
@@ -63,16 +71,16 @@ class PriorityFeeManager:
 
         return final_fee
 
-    async def _get_base_fee(self) -> int | None:
+    async def _get_base_fee(self, accounts: list[Pubkey] | None = None) -> int | None:
         """
         Determine the base fee based on the configuration.
 
         Returns:
-            Optional[int]: Base fee in lamports, or None if no fee should be applied.
+            Optional[int]: Base fee in microlamports, or None if no fee should be applied.
         """
         # Prefer dynamic fee if both are enabled
         if self.enable_dynamic_fee:
-            dynamic_fee = await self.dynamic_fee_plugin.get_priority_fee()
+            dynamic_fee = await self.dynamic_fee_plugin.get_priority_fee(accounts)
             if dynamic_fee is not None:
                 return dynamic_fee
 
@@ -80,5 +88,5 @@ class PriorityFeeManager:
         if self.enable_fixed_fee:
             return await self.fixed_fee_plugin.get_priority_fee()
 
-        # No fee if both are disabled or return None
+        # No priority fee if both are disabled
         return None

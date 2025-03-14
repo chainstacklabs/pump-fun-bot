@@ -62,12 +62,8 @@ async def main() -> None:
     args = parse_args()
 
     # Get configuration values, preferring command line args over config.py
-    rpc_endpoint: str | None = (
-        os.environ.get("SOLANA_NODE_RPC_ENDPOINT") or config.PUBLIC_RPC_ENDPOINT
-    )
-    wss_endpoint: str | None = (
-        os.environ.get("SOLANA_NODE_WSS_ENDPOINT") or config.PUBLIC_WSS_ENDPOINT
-    )
+    rpc_endpoint: str | None = os.environ.get("SOLANA_NODE_RPC_ENDPOINT")
+    wss_endpoint: str | None = os.environ.get("SOLANA_NODE_WSS_ENDPOINT")
     private_key: str | None = os.environ.get("SOLANA_PRIVATE_KEY")
 
     # Validate configuration values

@@ -5,13 +5,11 @@ Buy operations for pump.fun tokens.
 import struct
 from typing import Final
 
-from solders.hash import Hash
 from solders.instruction import AccountMeta, Instruction
-from solders.message import Message
 from solders.pubkey import Pubkey
-from solders.transaction import Transaction
 from spl.token.instructions import create_associated_token_account
 
+from core.priority_fee.manager import PriorityFeeManager
 from src.core.client import SolanaClient
 from src.core.curve import BondingCurveManager
 from src.core.pubkeys import (
@@ -38,6 +36,7 @@ class TokenBuyer(Trader):
         client: SolanaClient,
         wallet: Wallet,
         curve_manager: BondingCurveManager,
+        priority_fee_manager: PriorityFeeManager,
         amount: float,
         slippage: float = 0.01,
         max_retries: int = 5,
@@ -55,6 +54,7 @@ class TokenBuyer(Trader):
         self.client = client
         self.wallet = wallet
         self.curve_manager = curve_manager
+        self.priority_fee_manager = priority_fee_manager
         self.amount = amount
         self.slippage = slippage
         self.max_retries = max_retries
@@ -69,16 +69,13 @@ class TokenBuyer(Trader):
             TradeResult with buy outcome
         """
         try:
-            # Extract token info
-            mint = token_info.mint
-            bonding_curve = token_info.bonding_curve
-            associated_bonding_curve = token_info.associated_bonding_curve
-
             # Convert amount to lamports
             amount_lamports = int(self.amount * LAMPORTS_PER_SOL)
 
             # Fetch token price
-            curve_state = await self.curve_manager.get_curve_state(bonding_curve)
+            curve_state = await self.curve_manager.get_curve_state(
+                token_info.bonding_curve
+            )
             token_price_sol = curve_state.calculate_price()
             token_amount = self.amount / token_price_sol
 
@@ -92,14 +89,16 @@ class TokenBuyer(Trader):
                 f"Total cost: {self.amount:.6f} SOL (max: {max_amount_lamports / LAMPORTS_PER_SOL:.6f} SOL)"
             )
 
-            associated_token_account = self.wallet.get_associated_token_address(mint)
+            associated_token_account = self.wallet.get_associated_token_address(
+                token_info.mint
+            )
 
-            await self._ensure_associated_token_account(mint, associated_token_account)
+            await self._ensure_associated_token_account(
+                token_info.mint, associated_token_account
+            )
 
             tx_signature = await self._send_buy_transaction(
-                mint,
-                bonding_curve,
-                associated_bonding_curve,
+                token_info,
                 associated_token_account,
                 token_amount,
                 max_amount_lamports,
@@ -128,7 +127,7 @@ class TokenBuyer(Trader):
     async def _ensure_associated_token_account(
         self, mint: Pubkey, associated_token_account: Pubkey
     ) -> None:
-        """Ensure associated token account exists.
+        """Ensure associated token account exists, else create it.
 
         Args:
             mint: Token mint
@@ -147,13 +146,15 @@ class TokenBuyer(Trader):
                     payer=self.wallet.pubkey, owner=self.wallet.pubkey, mint=mint
                 )
 
-                recent_blockhash: Hash = await self.client.get_latest_blockhash()
-                create_ata_msg = Message([create_ata_ix], self.wallet.keypair.pubkey())
-                create_ata_tx = Transaction(
-                    [self.wallet.keypair], create_ata_msg, recent_blockhash
+                tx_sig = await self.client.build_and_send_transaction(
+                    [create_ata_ix],
+                    self.wallet.keypair,
+                    skip_preflight=True,
+                    max_retries=self.max_retries,
+                    priority_fee=await self.priority_fee_manager.calculate_priority_fee(
+                        [mint, SystemAddresses.PROGRAM, SystemAddresses.TOKEN_PROGRAM]
+                    ),
                 )
-
-                tx_sig = await self.client.send_transaction(create_ata_tx)
 
                 await self.client.confirm_transaction(tx_sig)
                 logger.info(
@@ -170,9 +171,7 @@ class TokenBuyer(Trader):
 
     async def _send_buy_transaction(
         self,
-        mint: Pubkey,
-        bonding_curve: Pubkey,
-        associated_bonding_curve: Pubkey,
+        token_info: TokenInfo,
         associated_token_account: Pubkey,
         token_amount: float,
         max_amount_lamports: int,
@@ -180,9 +179,7 @@ class TokenBuyer(Trader):
         """Send buy transaction.
 
         Args:
-            mint: Token mint
-            bonding_curve: Bonding curve address
-            associated_bonding_curve: Associated bonding curve address
+            token_info: Token information
             associated_token_account: User's token account
             token_amount: Amount of tokens to buy
             max_amount_lamports: Maximum SOL to spend in lamports
@@ -198,10 +195,14 @@ class TokenBuyer(Trader):
                 pubkey=PumpAddresses.GLOBAL, is_signer=False, is_writable=False
             ),
             AccountMeta(pubkey=PumpAddresses.FEE, is_signer=False, is_writable=True),
-            AccountMeta(pubkey=mint, is_signer=False, is_writable=False),
-            AccountMeta(pubkey=bonding_curve, is_signer=False, is_writable=True),
+            AccountMeta(pubkey=token_info.mint, is_signer=False, is_writable=False),
             AccountMeta(
-                pubkey=associated_bonding_curve, is_signer=False, is_writable=True
+                pubkey=token_info.bonding_curve, is_signer=False, is_writable=True
+            ),
+            AccountMeta(
+                pubkey=token_info.associated_bonding_curve,
+                is_signer=False,
+                is_writable=True,
             ),
             AccountMeta(
                 pubkey=associated_token_account, is_signer=False, is_writable=True
@@ -233,16 +234,15 @@ class TokenBuyer(Trader):
         )
         buy_ix = Instruction(PumpAddresses.PROGRAM, data, accounts)
 
-        # Prepare buy transaction data
-        recent_blockhash: Hash = await self.client.get_latest_blockhash()
-        buy_message = Message([buy_ix], self.wallet.keypair.pubkey())
-        buy_tx = Transaction([self.wallet.keypair], buy_message, recent_blockhash)
-
         try:
-            return await self.client.send_transaction(
-                buy_tx,
+            return await self.client.build_and_send_transaction(
+                [buy_ix],
+                self.wallet.keypair,
                 skip_preflight=True,
                 max_retries=self.max_retries,
+                priority_fee=await self.priority_fee_manager.calculate_priority_fee(
+                    self._get_relevant_accounts(token_info)
+                ),
             )
         except Exception as e:
             logger.error(f"Buy transaction failed: {str(e)}")

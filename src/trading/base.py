@@ -8,6 +8,8 @@ from typing import Any
 
 from solders.pubkey import Pubkey
 
+from core.pubkeys import PumpAddresses
+
 
 @dataclass
 class TokenInfo:
@@ -80,3 +82,20 @@ class Trader(ABC):
             TradeResult with operation outcome
         """
         pass
+
+    def _get_relevant_accounts(self, token_info: TokenInfo) -> list[Pubkey]:
+        """
+        Get the list of accounts relevant for calculating the priority fee.
+
+        Args:
+            token_info: Token information for the buy/sell operation.
+
+        Returns:
+            list[Pubkey]: List of relevant accounts.
+        """
+        return [
+            token_info.mint,  # Token mint address
+            token_info.bonding_curve,  # Bonding curve address
+            PumpAddresses.PROGRAM,  # Pump.fun program address
+            PumpAddresses.FEE,  # Pump.fun fee account
+        ]

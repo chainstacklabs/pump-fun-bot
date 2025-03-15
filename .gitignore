@@ -1,5 +1,6 @@
 trades/*
 
+.vscode
 .pylintrc
 .ruff_cache
 

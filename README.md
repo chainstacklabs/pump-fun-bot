@@ -24,7 +24,7 @@ Overall, it'll be a gradual development & rollout:
   * ✅ Lib updates
   * Error handling
   * Ability to set RPS in the config to match your provider's and plan RPS (preferably [Chainstack](https://console.chainstack.com/) 🤩)
-  * Ability to set dynamic priority fees
+  * ✅ Ability to set dynamic priority fees
 * Stage 2: Bonding curve and migration management
   * Integrate `logsSubscribe` instead of `blockSubscribe` for sniping minted tokens into the main bot (currently it's separate in the learning examples section that you can integrate yourself)
   * Keep both `logsSubscribe` & `blockSubscribe` in the main bot — so that you can try out/choose which one works best for you — plus the Solana node architecture and provders change, so it's useful to have both

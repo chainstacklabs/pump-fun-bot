@@ -54,9 +54,70 @@ For near-instantaneous transaction propagation, you can use the [Chainstack Sola
 
 [Sign up with Chainstack](https://console.chainstack.com).
 
-Make sure you have the required packages installed `pip install -r requirements.txt`.
 
-Make sure you have your endpoints set up in `config.py`.
+## 🚀 Getting started
+
+### Prerequisites
+- Install [uv](https://github.com/astral-sh/uv), a fast Python package manager.
+
+> If Python is already installed, `uv` will detect and use it automatically.
+
+### Installation
+
+#### 1️⃣ Install Python (if needed)
+```bash
+uv python install
+```
+> **Why?** `uv` will fetch and install the required Python version for your system.
+
+#### 2️⃣ Clone the repository
+```bash
+git clone https://github.com/chainstacklabs/pump-fun-bot.git
+cd pump-fun-bot
+```
+
+#### 3️⃣ Set up a virtual environment
+```bash
+# Create virtual environment
+uv venv
+
+# Activate (Unix/macOS)
+source .venv/bin/activate  
+
+# Activate (Windows)
+.venv\Scripts\activate
+```
+> Virtual environments help keep dependencies isolated and prevent conflicts.
+
+#### 4️⃣ Install dependencies
+```bash
+uv pip install -e .
+```
+> **Why `-e` (editable mode)?** Lets you modify the code without reinstalling the package—useful for development!
+
+#### 5️⃣ Configure the bot
+```bash
+# Copy example config
+cp .env.example .env  # Unix/macOS
+
+# Windows
+copy .env.example .env
+```
+Edit the `.env` file and add your **Solana RPC endpoints** and **private key**.
+
+### Running the bot
+
+#### Option 1: Run as installed package
+```bash
+pump_bot --help
+```
+
+#### Option 2: Run directly
+```bash
+python -m src.cli --help
+```
+
+> **You're all set! 🎉**  Now you can start using the bot. Check `--help` for available commands. 🚀
 
 ## Note on limits
 

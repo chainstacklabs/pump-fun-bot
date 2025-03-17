@@ -8,9 +8,9 @@ import asyncio
 import os
 import sys
 
-import config
-from src.trading.trader import PumpTrader
-from src.utils.logger import get_logger, setup_file_logging
+import config as config
+from trading.trader import PumpTrader
+from utils.logger import get_logger, setup_file_logging
 
 logger = get_logger(__name__)
 
@@ -120,6 +120,10 @@ async def main() -> None:
             await trader.solana_client.close()
         except Exception:
             pass
+
+
+def sync_main():
+    asyncio.run(main())
 
 
 if __name__ == "__main__":

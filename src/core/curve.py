@@ -8,9 +8,9 @@ from typing import Final
 from construct import Flag, Int64ul, Struct
 from solders.pubkey import Pubkey
 
-from src.core.client import SolanaClient
-from src.core.pubkeys import LAMPORTS_PER_SOL, TOKEN_DECIMALS
-from src.utils.logger import get_logger
+from core.client import SolanaClient
+from core.pubkeys import LAMPORTS_PER_SOL, TOKEN_DECIMALS
+from utils.logger import get_logger
 
 logger = get_logger(__name__)
 

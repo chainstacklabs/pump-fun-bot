@@ -1,3 +1,30 @@
+[project]
+name = "pump_bot"
+version = "2.0"
+description = "Trade tokens on pump.fun"
+readme = "README.md"
+requires-python = ">=3.9"
+
+dependencies = [
+    "base58>=2.1.1",
+    "borsh-construct>=0.1.0",
+    "construct>=2.10.67",
+    "construct-typing>=0.5.2",
+    "solana==0.36.6",
+    "solders>=0.26.0",
+    "websockets>=15.0",
+    "python-dotenv>=1.0.1",
+    "aiohttp>=3.11.13",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.10.0"
+]
+
+[project.scripts]
+pump_bot = "cli:sync_main"
+
 [tool.ruff]
 line-length = 88
 target-version = "py311"

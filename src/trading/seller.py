@@ -8,18 +8,18 @@ from typing import Final
 from solders.instruction import AccountMeta, Instruction
 from solders.pubkey import Pubkey
 
+from core.client import SolanaClient
+from core.curve import BondingCurveManager
 from core.priority_fee.manager import PriorityFeeManager
-from src.core.client import SolanaClient
-from src.core.curve import BondingCurveManager
-from src.core.pubkeys import (
+from core.pubkeys import (
     LAMPORTS_PER_SOL,
     TOKEN_DECIMALS,
     PumpAddresses,
     SystemAddresses,
 )
-from src.core.wallet import Wallet
-from src.trading.base import TokenInfo, Trader, TradeResult
-from src.utils.logger import get_logger
+from core.wallet import Wallet
+from trading.base import TokenInfo, Trader, TradeResult
+from utils.logger import get_logger
 
 logger = get_logger(__name__)
 

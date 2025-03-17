@@ -8,17 +8,17 @@ import json
 import os
 from datetime import datetime
 
-import config
+import config as config
+from core.client import SolanaClient
+from core.curve import BondingCurveManager
 from core.priority_fee.manager import PriorityFeeManager
-from src.core.client import SolanaClient
-from src.core.curve import BondingCurveManager
-from src.core.pubkeys import PumpAddresses
-from src.core.wallet import Wallet
-from src.monitoring.listener import PumpTokenListener
-from src.trading.base import TokenInfo, TradeResult
-from src.trading.buyer import TokenBuyer
-from src.trading.seller import TokenSeller
-from src.utils.logger import get_logger
+from core.pubkeys import PumpAddresses
+from core.wallet import Wallet
+from monitoring.listener import PumpTokenListener
+from trading.base import TokenInfo, TradeResult
+from trading.buyer import TokenBuyer
+from trading.seller import TokenSeller
+from utils.logger import get_logger
 
 logger = get_logger(__name__)
 

@@ -1,9 +1,9 @@
 from solders.pubkey import Pubkey
 
-from src.core.client import SolanaClient
-from src.core.priority_fee.dynamic_fee import DynamicPriorityFee
-from src.core.priority_fee.fixed_fee import FixedPriorityFee
-from src.utils.logger import get_logger
+from core.client import SolanaClient
+from core.priority_fee.dynamic_fee import DynamicPriorityFee
+from core.priority_fee.fixed_fee import FixedPriorityFee
+from utils.logger import get_logger
 
 logger = get_logger(__name__)
 

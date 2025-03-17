@@ -6,8 +6,11 @@ Tests websocket monitoring for new pump.fun tokens
 import asyncio
 import logging
 import os
+import sys
+from pathlib import Path
 
-import config
+sys.path.append(str(Path(__file__).parent.parent / "src"))
+
 from core.pubkeys import PumpAddresses
 from monitoring.listener import PumpTokenListener
 from trading.base import TokenInfo
@@ -45,8 +48,7 @@ async def test_pump_token_listener(
 ):
     """Test the token listener functionality"""
     wss_endpoint = os.environ.get(
-        "SOLANA_NODE_WSS_ENDPOINT", config.PUBLIC_WSS_ENDPOINT
-    )
+        "SOLANA_NODE_WSS_ENDPOINT")
     logger.info(f"Connecting to WebSocket: {wss_endpoint}")
     listener = PumpTokenListener(wss_endpoint, PumpAddresses.PROGRAM)
     callback = TestTokenCallback()

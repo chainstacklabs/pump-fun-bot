@@ -107,13 +107,11 @@ Edit the `.env` file and add your **Solana RPC endpoints** and **private key**.
 
 ### Running the bot
 
-#### Option 1: Run as installed package
 ```bash
+# Option 1: run as installed package
 pump_bot --help
-```
 
-#### Option 2: Run directly
-```bash
+# Option 2: run directly
 python -m src.cli --help
 ```
 

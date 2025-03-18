@@ -14,7 +14,8 @@ from core.curve import BondingCurveManager
 from core.priority_fee.manager import PriorityFeeManager
 from core.pubkeys import PumpAddresses
 from core.wallet import Wallet
-from monitoring.listener import PumpTokenListener
+from monitoring.block_listener import BlockListener
+from monitoring.logs_listener import LogsListener
 from trading.base import TokenInfo, TradeResult
 from trading.buyer import TokenBuyer
 from trading.seller import TokenSeller
@@ -35,6 +36,7 @@ class PumpTrader:
         buy_slippage: float,
         sell_slippage: float,
         max_retries: int = 5,
+        listener_type: str = "block",  # Add this parameter
     ):
         """Initialize the pump trader.
 
@@ -46,6 +48,7 @@ class PumpTrader:
             buy_slippage: Slippage tolerance for buys
             sell_slippage: Slippage tolerance for sells
             max_retries: Maximum number of retry attempts
+            listener_type: Type of listener to use ('block' or 'logs')
         """
         self.solana_client = SolanaClient(rpc_endpoint)
         self.wallet = Wallet(private_key)
@@ -79,7 +82,13 @@ class PumpTrader:
             max_retries,
         )
 
-        self.token_listener = PumpTokenListener(wss_endpoint, PumpAddresses.PROGRAM)
+        # Initialize the appropriate listener type
+        if listener_type.lower() == "logs":
+            self.token_listener = LogsListener(wss_endpoint, PumpAddresses.PROGRAM)
+            logger.info("Using logsSubscribe listener for token monitoring")
+        else:
+            self.token_listener = BlockListener(wss_endpoint, PumpAddresses.PROGRAM)
+            logger.info("Using blockSubscribe listener for token monitoring")
 
         self.buy_amount = buy_amount
         self.buy_slippage = buy_slippage
@@ -92,7 +101,7 @@ class PumpTrader:
         self.processing = False
         self.processed_tokens: set[str] = set()
         self.token_timestamps: dict[str, float] = {}
-
+        
     async def start(
         self,
         match_string: str | None = None,

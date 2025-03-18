@@ -20,6 +20,10 @@ HARD_CAP_PRIOR_FEE: int = (
 )
 
 
+# Listener configuration
+LISTENER_TYPE = "block"  # Options: "block" or "logs"
+
+
 # Retries and timeouts
 MAX_RETRIES: int = 10  # Number of retries for transaction sending
 # TODO: waiting times will be replaced with retries to shorten delays

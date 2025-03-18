@@ -54,7 +54,6 @@ class LogsEventProcessor:
                 try:
                     encoded_data = log.split(": ")[1]
                     decoded_data = base64.b64decode(encoded_data)
-                    print(signature)
                     parsed_data = self._parse_create_instruction(decoded_data)
                     
                     if parsed_data and "name" in parsed_data:

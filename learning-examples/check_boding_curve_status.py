@@ -10,10 +10,13 @@ from solana.rpc.async_api import AsyncClient
 from solders.pubkey import Pubkey
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from config import PUMP_PROGRAM, RPC_ENDPOINT
+
+from core.pubkeys import PumpAddresses
 
 # Constants
 EXPECTED_DISCRIMINATOR: Final[bytes] = struct.pack("<Q", 6966180631402821399)
+
+RPC_ENDPOINT = os.environ.get("SOLANA_NODE_RPC_ENDPOINT")
 
 
 class BondingCurveState:
@@ -60,7 +63,7 @@ async def check_token_status(mint_address: str) -> None:
 
         # Get the associated bonding curve address
         bonding_curve_address, bump = get_associated_bonding_curve_address(
-            mint, PUMP_PROGRAM
+            mint, PumpAddresses.PROGRAM
         )
 
         print("\nToken Status:")

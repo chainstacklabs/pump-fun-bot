@@ -4,18 +4,16 @@ import json
 import struct
 import sys
 
-from solana.transaction import Transaction
-from solders.pubkey import Pubkey
-from solders.transaction import VersionedTransaction
+from solders.transaction import Transaction, VersionedTransaction
 
 
 def load_idl(file_path):
-    with open(file_path, "r") as f:
+    with open(file_path) as f:
         return json.load(f)
 
 
 def load_transaction(file_path):
-    with open(file_path, "r") as f:
+    with open(file_path) as f:
         data = json.load(f)
     return data
 
@@ -67,8 +65,8 @@ def decode_transaction(tx_data, idl):
         print("Versioned transaction detected")
     else:
         # Use legacy deserialization for older transactions
-        transaction = Transaction.deserialize(tx_data_decoded)
-        instructions = transaction.instructions
+        transaction = Transaction.from_bytes(tx_data_decoded)
+        instructions = transaction.message.instructions
         account_keys = transaction.message.account_keys
         print("Legacy transaction detected")
 
@@ -137,12 +135,15 @@ def decode_transaction(tx_data, idl):
     return decoded_instructions
 
 
-if len(sys.argv) != 2:
-    print("Usage: python decode_fromBlock.py <transaction_file_path>")
-    sys.exit(1)
+tx_file_path = ""
 
-tx_file_path = sys.argv[1]
-idl = load_idl("../idl/pump_fun_idl.json")
+if len(sys.argv) != 2:
+    tx_file_path = "learning-examples/blockSubscribe-transactions/raw_create_tx_from_blockSubscribe.json"
+    print(f"No path provided, using the path: {tx_file_path}")
+else:
+    tx_file_path = sys.argv[1]
+
+idl = load_idl("idl/pump_fun_idl.json")
 tx_data = load_transaction(tx_file_path)
 
 decoded_instructions = decode_transaction(tx_data, idl)

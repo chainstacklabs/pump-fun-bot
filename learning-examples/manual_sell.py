@@ -1,19 +1,17 @@
 import asyncio
-import base64
-import json
+import os
 import struct
 
 import base58
-import spl.token.instructions as spl_token
 from construct import Flag, Int64ul, Struct
 from solana.rpc.async_api import AsyncClient
 from solana.rpc.commitment import Confirmed
 from solana.rpc.types import TxOpts
-from solana.transaction import Transaction
 from solders.instruction import AccountMeta, Instruction
 from solders.keypair import Keypair
 from solders.pubkey import Pubkey
 from solders.system_program import TransferParams, transfer
+from solders.transaction import Transaction
 from spl.token.instructions import get_associated_token_address
 
 # Here and later all the discriminators are precalculated. See learning-examples/discriminator.py
@@ -39,7 +37,7 @@ UNIT_PRICE = 10_000_000
 UNIT_BUDGET = 100_000
 
 # RPC endpoint
-RPC_ENDPOINT = "SOLANA_NODE_RPC_ENDPOINT"
+RPC_ENDPOINT = os.environ.get("SOLANA_NODE_WSS_ENDPOINT")
 
 
 class BondingCurveState:
@@ -94,7 +92,7 @@ async def sell_token(
     slippage: float = 0.25,
     max_retries=5,
 ):
-    private_key = base58.b58decode("SOLANA_PRIVATE_KEY")
+    private_key = base58.b58decode(os.environ.get("SOLANA_PRIVATE_KEY"))
     payer = Keypair.from_bytes(private_key)
 
     async with AsyncClient(RPC_ENDPOINT) as client:

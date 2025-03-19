@@ -1,24 +1,23 @@
-import base64
 import json
 import struct
 import sys
 
 import base58
-from solana.transaction import Transaction
-from solders.pubkey import Pubkey
+
+tx_file_path = ""
 
 if len(sys.argv) != 2:
-    print("Usage: python decode_getTransaction.py <transaction_file_path>")
-    sys.exit(1)
-
-tx_file_path = sys.argv[1]
+    tx_file_path = "learning-examples/raw_buy_tx_from_getTransaction.json"
+    print(f"No path provided, using the path: {tx_file_path}")
+else:
+    tx_file_path = sys.argv[1]
 
 # Load the IDL
-with open("../idl/pump_fun_idl.json", "r") as f:
+with open("idl/pump_fun_idl.json") as f:
     idl = json.load(f)
 
 # Load the transaction log
-with open(tx_file_path, "r") as f:
+with open(tx_file_path) as f:
     tx_log = json.load(f)
 
 # Extract the transaction data

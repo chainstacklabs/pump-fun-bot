@@ -41,7 +41,7 @@ def decode_bonding_curve_data(raw_data: str) -> BondingCurveState:
 
 
 # Load the JSON data
-with open("raw_bondingCurve_from_getAccountInfo.json", "r") as file:
+with open("learning-examples/raw_bondingCurve_from_getAccountInfo.json", "r") as file:
     json_data = json.load(file)
 
 # Extract the base64 encoded data

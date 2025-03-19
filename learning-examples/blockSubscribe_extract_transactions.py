@@ -7,7 +7,10 @@ import sys
 import websockets
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from config import PUMP_PROGRAM, WSS_ENDPOINT
+
+from core.pubkeys import PumpAddresses
+
+WSS_ENDPOINT = os.environ.get("SOLANA_NODE_WSS_ENDPOINT")
 
 
 async def save_transaction(tx_data, tx_signature):
@@ -27,7 +30,7 @@ async def listen_for_transactions():
                 "id": 1,
                 "method": "blockSubscribe",
                 "params": [
-                    {"mentionsAccountOrProgram": str(PUMP_PROGRAM)},
+                    {"mentionsAccountOrProgram": str(PumpAddresses.PROGRAM)},
                     {
                         "commitment": "confirmed",
                         "encoding": "base64",
@@ -36,10 +39,10 @@ async def listen_for_transactions():
                         "maxSupportedTransactionVersion": 0,
                     },
                 ],
-            }
+            },
         )
         await websocket.send(subscription_message)
-        print(f"Subscribed to blocks mentioning program: {PUMP_PROGRAM}")
+        print(f"Subscribed to blocks mentioning program: {PumpAddresses.PROGRAM}")
 
         while True:
             try:
@@ -71,9 +74,9 @@ async def listen_for_transactions():
                                             continue
                                         await save_transaction(tx, tx_signature)
                 elif "result" in data:
-                    print(f"Subscription confirmed")
+                    print("Subscription confirmed")
             except Exception as e:
-                print(f"An error occurred: {str(e)}")
+                print(f"An error occurred: {e!s}")
 
 
 if __name__ == "__main__":

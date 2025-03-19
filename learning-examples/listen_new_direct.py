@@ -9,10 +9,13 @@ import base58
 import websockets
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from config import PUMP_PROGRAM, WSS_ENDPOINT
+from core.pubkeys import PumpAddresses
+
+WSS_ENDPOINT = os.environ.get("SOLANA_NODE_WSS_ENDPOINT")
+
 
 # Load the IDL JSON file
-with open("../idl/pump_fun_idl.json", "r") as f:
+with open("idl/pump_fun_idl.json") as f:
     idl = json.load(f)
 
 # Extract the "create" instruction definition
@@ -77,13 +80,15 @@ async def listen_for_new_tokens():
                         "id": 1,
                         "method": "logsSubscribe",
                         "params": [
-                            {"mentions": [str(PUMP_PROGRAM)]},
+                            {"mentions": [str(PumpAddresses.PROGRAM)]},
                             {"commitment": "processed"},
                         ],
                     }
                 )
                 await websocket.send(subscription_message)
-                print(f"Listening for new token creations from program: {PUMP_PROGRAM}")
+                print(
+                    f"Listening for new token creations from program: {PumpAddresses.PROGRAM}"
+                )
 
                 # Wait for subscription confirmation
                 response = await websocket.recv()
@@ -124,7 +129,7 @@ async def listen_for_new_tokens():
                                                 )
                                         except Exception as e:
                                             print(f"Failed to decode: {log}")
-                                            print(f"Error: {str(e)}")
+                                            print(f"Error: {e!s}")
 
                     except Exception as e:
                         print(f"An error occurred while processing message: {e}")

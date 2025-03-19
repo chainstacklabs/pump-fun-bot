@@ -1,14 +1,15 @@
 import asyncio
-import base64
 import json
 import os
 import sys
 
 import websockets
-from solders.pubkey import Pubkey
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from config import PUMP_LIQUIDITY_MIGRATOR, WSS_ENDPOINT
+
+from core.pubkeys import PumpAddresses
+
+WSS_ENDPOINT = os.environ.get("SOLANA_NODE_WSS_ENDPOINT")
 
 
 def process_initialize2_transaction(data):
@@ -32,7 +33,7 @@ def process_initialize2_transaction(data):
             print(f"\nError: Not enough account keys (found {len(account_keys)})")
 
     except Exception as e:
-        print(f"\nError: {str(e)}")
+        print(f"\nError: {e!s}")
 
 
 async def listen_for_events():
@@ -45,7 +46,11 @@ async def listen_for_events():
                         "id": 1,
                         "method": "blockSubscribe",
                         "params": [
-                            {"mentionsAccountOrProgram": str(PUMP_LIQUIDITY_MIGRATOR)},
+                            {
+                                "mentionsAccountOrProgram": str(
+                                    PumpAddresses.LIQUIDITY_MIGRATOR
+                                )
+                            },
                             {
                                 "commitment": "confirmed",
                                 "encoding": "json",
@@ -93,13 +98,13 @@ async def listen_for_events():
                                                     process_initialize2_transaction(tx)
                                                     break
 
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         print("\nChecking connection...")
                         print("Connection alive")
                         continue
 
         except Exception as e:
-            print(f"\nConnection error: {str(e)}")
+            print(f"\nConnection error: {e!s}")
             print("Retrying in 5 seconds...")
             await asyncio.sleep(5)
 

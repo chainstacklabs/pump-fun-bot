@@ -9,7 +9,6 @@ from solana.rpc.async_api import AsyncClient
 from solders.pubkey import Pubkey
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from config import RPC_ENDPOINT
 
 LAMPORTS_PER_SOL: Final[int] = 1_000_000_000
 TOKEN_DECIMALS: Final[int] = 6
@@ -17,6 +16,8 @@ CURVE_ADDRESS: Final[str] = "6GXfUqrmPM4VdN1NoDZsE155jzRegJngZRjMkGyby7do"
 
 # Here and later all the discriminators are precalculated. See learning-examples/discriminator.py
 EXPECTED_DISCRIMINATOR: Final[bytes] = struct.pack("<Q", 6966180631402821399)
+
+RPC_ENDPOINT = os.environ.get("SOLANA_NODE_RPC_ENDPOINT")
 
 
 class BondingCurveState:

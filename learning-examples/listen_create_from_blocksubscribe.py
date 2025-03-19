@@ -1,21 +1,21 @@
 import asyncio
 import base64
-import hashlib
 import json
 import os
 import struct
 import sys
 
 import websockets
-from solders.pubkey import Pubkey
 from solders.transaction import VersionedTransaction
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from config import PUMP_PROGRAM, WSS_ENDPOINT
+from core.pubkeys import PumpAddresses
+
+WSS_ENDPOINT = os.environ.get("SOLANA_NODE_WSS_ENDPOINT")
 
 
 def load_idl(file_path):
-    with open(file_path, "r") as f:
+    with open(file_path) as f:
         return json.load(f)
 
 
@@ -48,7 +48,7 @@ def decode_create_instruction(ix_data, ix_def, accounts):
 
 # Here and later all the discriminators are precalculated. See learning-examples/discriminator.py
 async def listen_and_decode_create():
-    idl = load_idl("../idl/pump_fun_idl.json")
+    idl = load_idl("idl/pump_fun_idl.json")
     create_discriminator = 8576854823835016728
 
     async with websockets.connect(WSS_ENDPOINT) as websocket:
@@ -58,7 +58,7 @@ async def listen_and_decode_create():
                 "id": 1,
                 "method": "blockSubscribe",
                 "params": [
-                    {"mentionsAccountOrProgram": str(PUMP_PROGRAM)},
+                    {"mentionsAccountOrProgram": str(PumpAddresses.PROGRAM)},
                     {
                         "commitment": "confirmed",
                         "encoding": "base64",
@@ -70,7 +70,7 @@ async def listen_and_decode_create():
             }
         )
         await websocket.send(subscription_message)
-        print(f"Subscribed to blocks mentioning program: {PUMP_PROGRAM}")
+        print(f"Subscribed to blocks mentioning program: {PumpAddresses.PROGRAM}")
 
         while True:
             try:
@@ -97,7 +97,7 @@ async def listen_and_decode_create():
                                                 transaction.message.account_keys[
                                                     ix.program_id_index
                                                 ]
-                                            ) == str(PUMP_PROGRAM):
+                                            ) == str(PumpAddresses.PROGRAM):
                                                 ix_data = bytes(ix.data)
                                                 discriminator = struct.unpack(
                                                     "<Q", ix_data[:8]
@@ -134,13 +134,13 @@ async def listen_and_decode_create():
                                                     )
                                                     print("--------------------")
                 elif "result" in data:
-                    print(f"Subscription confirmed")
+                    print("Subscription confirmed")
                 else:
                     print(
                         f"Received unexpected message type: {data.get('method', 'Unknown')}"
                     )
             except Exception as e:
-                print(f"An error occurred: {str(e)}")
+                print(f"An error occurred: {e!s}")
                 print(f"Error details: {type(e).__name__}")
                 import traceback
 

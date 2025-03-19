@@ -10,14 +10,9 @@ import websockets
 from solders.pubkey import Pubkey
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from config import (
-    PUMP_PROGRAM,
-)
-from config import SYSTEM_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM as ATA_PROGRAM_ID
-from config import SYSTEM_TOKEN_PROGRAM as TOKEN_PROGRAM_ID
-from config import (
-    WSS_ENDPOINT,
-)
+from core.pubkeys import PumpAddresses, SystemAddresses
+
+WSS_ENDPOINT = os.environ.get("SOLANA_NODE_WSS_ENDPOINT")
 
 
 def find_associated_bonding_curve(mint: Pubkey, bonding_curve: Pubkey) -> Pubkey:
@@ -28,16 +23,16 @@ def find_associated_bonding_curve(mint: Pubkey, bonding_curve: Pubkey) -> Pubkey
     derived_address, _ = Pubkey.find_program_address(
         [
             bytes(bonding_curve),
-            bytes(TOKEN_PROGRAM_ID),
+            bytes(SystemAddresses.TOKEN_PROGRAM),
             bytes(mint),
         ],
-        ATA_PROGRAM_ID,
+        SystemAddresses.ASSOCIATED_TOKEN_PROGRAM,
     )
     return derived_address
 
 
 # Load the IDL JSON file
-with open("../idl/pump_fun_idl.json", "r") as f:
+with open("idl/pump_fun_idl.json") as f:
     idl = json.load(f)
 
 # Extract the "create" instruction definition
@@ -102,13 +97,15 @@ async def listen_for_new_tokens():
                         "id": 1,
                         "method": "logsSubscribe",
                         "params": [
-                            {"mentions": [str(PUMP_PROGRAM)]},
+                            {"mentions": [str(PumpAddresses.PROGRAM)]},
                             {"commitment": "processed"},
                         ],
                     }
                 )
                 await websocket.send(subscription_message)
-                print(f"Listening for new token creations from program: {PUMP_PROGRAM}")
+                print(
+                    f"Listening for new token creations from program: {PumpAddresses.PROGRAM}"
+                )
 
                 # Wait for subscription confirmation
                 response = await websocket.recv()
@@ -165,7 +162,7 @@ async def listen_for_new_tokens():
                                                 )
                                         except Exception as e:
                                             print(f"Failed to decode: {log}")
-                                            print(f"Error: {str(e)}")
+                                            print(f"Error: {e!s}")
 
                     except Exception as e:
                         print(f"An error occurred while processing message: {e}")

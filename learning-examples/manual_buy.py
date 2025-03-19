@@ -12,10 +12,10 @@ from construct import Flag, Int64ul, Struct
 from solana.rpc.async_api import AsyncClient
 from solana.rpc.commitment import Confirmed
 from solana.rpc.types import TxOpts
-from solana.transaction import Message
 from solders.compute_budget import set_compute_unit_price
 from solders.instruction import AccountMeta, Instruction
 from solders.keypair import Keypair
+from solders.message import Message
 from solders.pubkey import Pubkey
 from solders.system_program import TransferParams, transfer
 from solders.transaction import Transaction, VersionedTransaction
@@ -42,8 +42,8 @@ SOL = Pubkey.from_string("So11111111111111111111111111111111111111112")
 LAMPORTS_PER_SOL = 1_000_000_000
 
 # RPC ENDPOINTS
-RPC_ENDPOINT = "ENTER_YOUR_CHAINSTACK_HTTP_ENDPOINT"
-RPC_WEBSOCKET = "ENTER_YOUR_CHAINSTACK_WS_ENDPOINT"
+RPC_ENDPOINT = os.environ.get("SOLANA_NODE_RPC_ENDPOINT")
+RPC_WEBSOCKET = os.environ.get("SOLANA_NODE_WSS_ENDPOINT")
 
 
 class BondingCurveState:
@@ -92,7 +92,7 @@ async def buy_token(
     slippage: float = 0.25,
     max_retries=5,
 ):
-    private_key = base58.b58decode("ENTER_PRIVATE_KEY")
+    private_key = base58.b58decode(os.environ.get("SOLANA_PRIVATE_KEY"))
     payer = Keypair.from_bytes(private_key)
 
     async with AsyncClient(RPC_ENDPOINT) as client:

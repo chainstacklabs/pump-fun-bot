@@ -1,6 +1,6 @@
 """
-Test script for PumpTokenListener
-Tests websocket monitoring for new pump.fun tokens
+Test script for LogsListener
+Tests websocket monitoring for new pump.fun tokens using logsSubscribe
 """
 
 import asyncio
@@ -12,13 +12,13 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent / "src"))
 
 from core.pubkeys import PumpAddresses
-from monitoring.listener import PumpTokenListener
+from monitoring.logs_listener import LogsListener
 from trading.base import TokenInfo
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
-logger = logging.getLogger("token-listener-test")
+logger = logging.getLogger("logs-listener-test")
 
 
 class TestTokenCallback:
@@ -41,16 +41,19 @@ class TestTokenCallback:
         print(f"{'=' * 50}\n")
 
 
-async def test_pump_token_listener(
+async def test_logs_listener(
     match_string: str | None = None,
     creator_address: str | None = None,
     test_duration: int = 60,
 ):
-    """Test the token listener functionality"""
-    wss_endpoint = os.environ.get(
-        "SOLANA_NODE_WSS_ENDPOINT")
+    """Test the logs listener functionality"""
+    wss_endpoint = os.environ.get("SOLANA_NODE_WSS_ENDPOINT")
+    if not wss_endpoint:
+        logger.error("SOLANA_NODE_WSS_ENDPOINT environment variable is not set")
+        return []
+    
     logger.info(f"Connecting to WebSocket: {wss_endpoint}")
-    listener = PumpTokenListener(wss_endpoint, PumpAddresses.PROGRAM)
+    listener = LogsListener(wss_endpoint, PumpAddresses.PROGRAM)
     callback = TestTokenCallback()
 
     if match_string:
@@ -90,5 +93,5 @@ if __name__ == "__main__":
     creator_address = None  # Update if you want to filter tokens by creator address
     test_duration = 15
 
-    logger.info("Starting token listener test")
-    asyncio.run(test_pump_token_listener(match_string, creator_address, test_duration))
+    logger.info("Starting logs listener test (using logsSubscribe)")
+    asyncio.run(test_logs_listener(match_string, creator_address, test_duration))

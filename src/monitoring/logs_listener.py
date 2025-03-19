@@ -1,5 +1,5 @@
 """
-WebSocket monitoring for pump.fun tokens.
+WebSocket monitoring for pump.fun tokens using logsSubscribe.
 """
 
 import asyncio
@@ -9,15 +9,16 @@ from collections.abc import Awaitable, Callable
 import websockets
 from solders.pubkey import Pubkey
 
-from monitoring.events import PumpEventProcessor
+from monitoring.base_listener import BaseTokenListener
+from monitoring.logs_event_processor import LogsEventProcessor
 from trading.base import TokenInfo
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 
-class PumpTokenListener:
-    """WebSocket listener for pump.fun token creation events."""
+class LogsListener(BaseTokenListener):
+    """WebSocket listener for pump.fun token creation events using logsSubscribe."""
 
     def __init__(self, wss_endpoint: str, pump_program: Pubkey):
         """Initialize token listener.
@@ -28,7 +29,7 @@ class PumpTokenListener:
         """
         self.wss_endpoint = wss_endpoint
         self.pump_program = pump_program
-        self.event_processor = PumpEventProcessor(pump_program)
+        self.event_processor = LogsEventProcessor(pump_program)
         self.ping_interval = 20  # seconds
 
     async def listen_for_tokens(
@@ -37,7 +38,7 @@ class PumpTokenListener:
         match_string: str | None = None,
         creator_address: str | None = None,
     ) -> None:
-        """Listen for new token creations.
+        """Listen for new token creations using logsSubscribe.
 
         Args:
             token_callback: Callback function for new tokens
@@ -47,7 +48,7 @@ class PumpTokenListener:
         while True:
             try:
                 async with websockets.connect(self.wss_endpoint) as websocket:
-                    await self._subscribe_to_program(websocket)
+                    await self._subscribe_to_logs(websocket)
                     ping_task = asyncio.create_task(self._ping_loop(websocket))
 
                     try:
@@ -89,8 +90,8 @@ class PumpTokenListener:
                 logger.info("Reconnecting in 5 seconds...")
                 await asyncio.sleep(5)
 
-    async def _subscribe_to_program(self, websocket) -> None:
-        """Subscribe to blocks mentioning the pump.fun program.
+    async def _subscribe_to_logs(self, websocket) -> None:
+        """Subscribe to logs mentioning the pump.fun program.
 
         Args:
             websocket: Active WebSocket connection
@@ -99,22 +100,24 @@ class PumpTokenListener:
             {
                 "jsonrpc": "2.0",
                 "id": 1,
-                "method": "blockSubscribe",
+                "method": "logsSubscribe",
                 "params": [
-                    {"mentionsAccountOrProgram": str(self.pump_program)},
-                    {
-                        "commitment": "confirmed",
-                        "encoding": "base64",
-                        "showRewards": False,
-                        "transactionDetails": "full",
-                        "maxSupportedTransactionVersion": 0,
-                    },
+                    {"mentions": [str(self.pump_program)]},
+                    {"commitment": "processed"},
                 ],
             }
         )
 
         await websocket.send(subscription_message)
-        logger.info(f"Subscribed to blocks mentioning program: {self.pump_program}")
+        logger.info(f"Subscribed to logs mentioning program: {self.pump_program}")
+
+        # Wait for subscription confirmation
+        response = await websocket.recv()
+        response_data = json.loads(response)
+        if "result" in response_data:
+            logger.info(f"Subscription confirmed with ID: {response_data['result']}")
+        else:
+            logger.warning(f"Unexpected subscription response: {response}")
 
     async def _ping_loop(self, websocket) -> None:
         """Keep connection alive with pings.
@@ -139,41 +142,19 @@ class PumpTokenListener:
             logger.error(f"Ping error: {str(e)}")
 
     async def _wait_for_token_creation(self, websocket) -> TokenInfo | None:
-        """Wait for token creation event.
-
-        Args:
-            websocket: Active WebSocket connection
-
-        Returns:
-            TokenInfo if a token creation is found, None otherwise
-        """
         try:
             response = await asyncio.wait_for(websocket.recv(), timeout=30)
             data = json.loads(response)
 
-            if "method" not in data or data["method"] != "blockNotification":
+            if "method" not in data or data["method"] != "logsNotification":
                 return None
 
-            if "params" not in data or "result" not in data["params"]:
-                return None
+            log_data = data["params"]["result"]["value"]
+            logs = log_data.get("logs", [])
+            signature = log_data.get("signature", "unknown")
 
-            block_data = data["params"]["result"]
-            if "value" not in block_data or "block" not in block_data["value"]:
-                return None
-
-            block = block_data["value"]["block"]
-            if "transactions" not in block:
-                return None
-
-            for tx in block["transactions"]:
-                if not isinstance(tx, dict) or "transaction" not in tx:
-                    continue
-
-                token_info = self.event_processor.process_transaction(
-                    tx["transaction"][0]
-                )
-                if token_info:
-                    return token_info
+            # Use the processor to extract token info
+            return self.event_processor.process_program_logs(logs, signature)
 
         except asyncio.TimeoutError:
             logger.debug("No data received for 30 seconds")

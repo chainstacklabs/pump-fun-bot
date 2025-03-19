@@ -88,12 +88,6 @@ async def main() -> None:
         args.sell_slippage if args.sell_slippage is not None else config.SELL_SLIPPAGE
     )
 
-    # Not implemented parameters
-    enable_dynamic_prior__fee = (
-        config.ENABLE_DYNAMIC_PRIORITY_FEE
-    )  # TODO: to be implemented
-    prior_fee_multiplier = config.EXTRA_PRIORITY_FEE  # TODO: to be implemented
-
     trader: PumpTrader = PumpTrader(
         rpc_endpoint=rpc_endpoint,  # type: ignore
         wss_endpoint=wss_endpoint,  # type: ignore
@@ -102,6 +96,7 @@ async def main() -> None:
         buy_slippage=buy_slippage,
         sell_slippage=sell_slippage,
         max_retries=config.MAX_RETRIES,
+        listener_type=config.LISTENER_TYPE,
     )
 
     try:

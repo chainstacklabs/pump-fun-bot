@@ -7,10 +7,11 @@ from construct import Flag, Int64ul, Struct
 from solana.rpc.async_api import AsyncClient
 from solana.rpc.commitment import Confirmed
 from solana.rpc.types import TxOpts
+from solders.compute_budget import set_compute_unit_price
 from solders.instruction import AccountMeta, Instruction
 from solders.keypair import Keypair
+from solders.message import Message
 from solders.pubkey import Pubkey
-from solders.system_program import TransferParams, transfer
 from solders.transaction import Transaction
 from spl.token.instructions import get_associated_token_address
 
@@ -170,14 +171,13 @@ async def sell_token(
                 )
                 sell_ix = Instruction(PUMP_PROGRAM, data, accounts)
 
-                recent_blockhash = await client.get_latest_blockhash()
-                transaction = Transaction()
-                transaction.add(sell_ix)
-                transaction.recent_blockhash = recent_blockhash.value.blockhash
-
+                msg = Message([set_compute_unit_price(1_000), sell_ix], payer.pubkey())
                 tx = await client.send_transaction(
-                    transaction,
-                    payer,
+                    Transaction(
+                        [payer],
+                        msg,
+                        (await client.get_latest_blockhash()).value.blockhash,
+                    ),
                     opts=TxOpts(skip_preflight=True, preflight_commitment=Confirmed),
                 )
 
@@ -188,7 +188,7 @@ async def sell_token(
                 return  # Success, exit the function
 
             except Exception as e:
-                print(f"Attempt {attempt + 1} failed: {str(e)}")
+                print(f"Attempt {attempt + 1} failed: {e!s}")
                 if attempt < max_retries - 1:
                     wait_time = 2**attempt  # Exponential backoff
                     print(f"Retrying in {wait_time} seconds...")
@@ -199,10 +199,10 @@ async def sell_token(
 
 async def main():
     # Replace these with the actual values for the token you want to sell
-    mint = Pubkey.from_string("EyLuyWV5N1GVSqLLeumFDWYkmmSkLED5s2xqu37Lpump")
-    bonding_curve = Pubkey.from_string("AGZLYVwmGL9cXCLN4C3ki9hXGix1kXYjr59B2H7jwRMQ")
+    mint = Pubkey.from_string("7aXYndxpkHRU9xg1hyAE6z3X3KYPc2LR3dJMzYTSpump")
+    bonding_curve = Pubkey.from_string("5UYdCZigGDyAh1doCW8FdnA7VwJTJePayTLCyZkAWMxg")
     associated_bonding_curve = Pubkey.from_string(
-        "74H2bo2hjNnWgf9oDHzsVsu3mcsoiYYWJ3s9dVnL5erV"
+        "BS2RUaPXjQpfzncizvmEfnARZG6SNp1imXnv5USA7PMA"
     )
 
     slippage = 0.25  # 25% slippage tolerance

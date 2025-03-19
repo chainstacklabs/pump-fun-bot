@@ -17,7 +17,6 @@ from solders.instruction import AccountMeta, Instruction
 from solders.keypair import Keypair
 from solders.message import Message
 from solders.pubkey import Pubkey
-from solders.system_program import TransferParams, transfer
 from solders.transaction import Transaction, VersionedTransaction
 from spl.token.instructions import get_associated_token_address
 
@@ -148,7 +147,7 @@ async def buy_token(
                     break
             except Exception as e:
                 print(
-                    f"Attempt {ata_attempt + 1} to create associated token account failed: {str(e)}"
+                    f"Attempt {ata_attempt + 1} to create associated token account failed: {e!s}"
                 )
                 if ata_attempt < max_retries - 1:
                     wait_time = 2**ata_attempt
@@ -235,7 +234,7 @@ async def buy_token(
 
 
 def load_idl(file_path):
-    with open(file_path, "r") as f:
+    with open(file_path) as f:
         return json.load(f)
 
 
@@ -370,7 +369,7 @@ async def main():
         token_price_sol = calculate_pump_curve_price(curve_state)
 
     # Amount of SOL to spend (adjust as needed)
-    amount = 0.00001  # 0.00001 SOL
+    amount = 0.000_001  # 0.00001 SOL
     slippage = 0.3  # 30% slippage tolerance
 
     print(f"Bonding curve address: {bonding_curve}")

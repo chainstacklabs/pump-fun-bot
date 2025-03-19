@@ -26,8 +26,8 @@ Overall, it'll be a gradual development & rollout:
   * Ability to set RPS in the config to match your provider's and plan RPS (preferably [Chainstack](https://console.chainstack.com/) 🤩)
   * ✅ Ability to set dynamic priority fees
 * Stage 2: Bonding curve and migration management
-  * Integrate `logsSubscribe` instead of `blockSubscribe` for sniping minted tokens into the main bot (currently it's separate in the learning examples section that you can integrate yourself)
-  * Keep both `logsSubscribe` & `blockSubscribe` in the main bot — so that you can try out/choose which one works best for you — plus the Solana node architecture and provders change, so it's useful to have both
+  * ✅ Integrate `logsSubscribe` instead of `blockSubscribe` for sniping minted tokens into the main bot (currently it's separate in the learning examples section that you can integrate yourself)
+  * ✅ Keep both `logsSubscribe` & `blockSubscribe` in the main bot — so that you can try out/choose which one works best for you — plus the Solana node architecture and provders change, so it's useful to have both
   * Do retries instead of cooldown and/or keep the cooldown
   * Checking a bonding curve status progress. As in to predict how soon a token will start the migration process.
   * Script to close the associated bonding curve account if the rest of the flow txs fails

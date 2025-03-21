@@ -32,8 +32,8 @@ We assume no responsibility for the code or its usage. This is our public servic
 | Stage | Feature | Comments | Implementation status
 |-------|---------|----------|---------------------|
 | **Stage 1: General updates & QoL** | Lib updates | Updating to the latest libraries | ✅ |
-| | Error handling | Improving error handling | ✅ | 
-| | Configurable RPS | Ability to set RPS in the config to match your provider's and plan RPS (preferably [Chainstack](https://console.chainstack.com/) 🤩) | ✅ |
+| | Error handling | Improving error handling | WIP | 
+| | Configurable RPS | Ability to set RPS in the config to match your provider's and plan RPS (preferably [Chainstack](https://console.chainstack.com/) 🤩) | WIP |
 | | Dynamic priority fees | Ability to set dynamic priority fees | ✅ |
 | **Stage 2: Bonding curve and migration management** | `logsSubscribe` integration | Integrate `logsSubscribe` instead of `blockSubscribe` for sniping minted tokens into the main bot | ✅ |
 | | Dual subscription methods | Keep both `logsSubscribe` & `blockSubscribe` in the main bot for flexibility and adapting to Solana node architecture changes | ✅ |

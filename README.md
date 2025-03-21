@@ -1,3 +1,4 @@
+
 **>>WARNNING ON SCAMS IN ISSUES COMMENT SECTION<<**
 
 The issues comment section is often targeted by scam bots willing to redirect you to an external resource and drain your funds.
@@ -12,41 +13,48 @@ Not everyone is a scammer though, sometimes there are helpful outside devs who c
 
 **>>END OF WARNING<<**
 
-**>> FURTHER ROADMAP <<**
+Development ongoing in the [refactored/main-v2](https://github.com/chainstacklabs/pump-fun-bot/commits/refactored/main-v2/) branch.
 
-Hey guys, starting from the next week (**week of March 10**) we'll be rolling out updates to the bot v2 based on the feedback and the reported issues, including updating to the latest libs, better error handling etc. We are already actively working on it.
+As of March 21, 2025, the bot from the **refactored/main-v2** branch is signficantly better over the **main** version, so the suggestion is to FAFO with v2.
 
-That'll be in a separate branch.
+Leave your feedback by opening **Issues**.
 
-Overall, it'll be a gradual development & rollout:
+A word warning:
 
-* Stage 1: General updates & QoL
-  * Lib updates
-  * Error handling
-  * Ability to set RPS in the config to match your provider's and plan RPS (preferably [Chainstack](https://console.chainstack.com/) 🤩)
-  * Ability to set dynamic priority fees
-* Stage 2: Bonding curve and migration management
-  * Integrate `logsSubscribe` instead of `blockSubscribe` for sniping minted tokens into the main bot (currently it's separate in the learning examples section that you can integrate yourself)
-  * Keep both `logsSubscribe` & `blockSubscribe` in the main bot — so that you can try out/choose which one works best for you — plus the Solana node architecture and provders change, so it's useful to have both
-  * Do retries instead of cooldown and/or keep the cooldown
-  * Checking a bonding curve status progress. As in to predict how soon a token will start the migration process.
-  * Script to close the associated bonding curve account if the rest of the flow txs fails
-  * Add listening to Raydium migration (and try and figure out the `logSubscribe` way for it as well) — still not sure if I can FAFO this one out, but had some progress in the past
-* Stage 3: Trading experience
-  * Take profit, stop loss
-  * Sell when a specific market cap has been reached
-  * Copy trading
-  * Script for basic token analysis (market cap, creator investment, liquidity, token age) + being to go back with Solana archive nodes (e.g. accounts that consistently print token, average mint to raydium time for winning printing accounts and so on)
-* Stage 4: Minting experience
-  * Ability to mint tokens? (there is a request and there was someone who minted 18k tokens)
-* Bonus: Vector.fun
-  * There's a lot of pump.fun tokens on vector.fun but I didn't investigate yet if there's anything we can do with it.
+**Not For Production (NFP)**
 
-Note that the stage progression is from simple to more complex and we don't guarantee everything as move from Stage 1 to the rest.
+This code is not intended for production use. Feel free to take the source, modify it to your needs, and most importantly, **learn from it**.
 
-And we appreciate all your feedback and we'll keep you posted!
+We assume no responsibility for the code or its usage. This is our public service contribution to the community and Web3.
 
-**>> END OF ROADMPAP <<**
+# Pump.fun bot development roadmap
+
+| Stage | Feature | Comments | Implementation status
+|-------|---------|----------|---------------------|
+| **Stage 1: General updates & QoL** | Lib updates | Updating to the latest libraries | ✅ |
+| | Error handling | Improving error handling | ✅ | 
+| | Configurable RPS | Ability to set RPS in the config to match your provider's and plan RPS (preferably [Chainstack](https://console.chainstack.com/) 🤩) | ✅ |
+| | Dynamic priority fees | Ability to set dynamic priority fees | ✅ |
+| **Stage 2: Bonding curve and migration management** | `logsSubscribe` integration | Integrate `logsSubscribe` instead of `blockSubscribe` for sniping minted tokens into the main bot | ✅ |
+| | Dual subscription methods | Keep both `logsSubscribe` & `blockSubscribe` in the main bot for flexibility and adapting to Solana node architecture changes | ✅ |
+| | Transaction retries | Do retries instead of cooldown and/or keep the cooldown | WIP |
+| | Bonding curve status tracking | Checking a bonding curve status progress. Predict how soon a token will start the migration process | WIP | 
+| | Account closure script | Script to close the associated bonding curve account if the rest of the flow txs fails | WIP |
+| | Raydium migration listening | Add listening to Raydium migration (and attempt `logSubscribe` implementation) | FAFO |
+| **Stage 3: Trading experience** | Take profit/stop loss | Implement take profit, stop loss exit strategies | FAFO |
+| | Market cap-based selling | Sell when a specific market cap has been reached | Not started |
+| | Copy trading | Enable copy trading functionality | Not started |
+| | Token analysis script | Script for basic token analysis (market cap, creator investment, liquidity, token age) | Not started |
+| | Archive node integration | Use Solana archive nodes for historical analysis (accounts that consistently print tokens, average mint to raydium time) | Not started |
+| | Geyser implementation | Leverage Solana Geyser for real-time data stream processing | Not started |
+| **Stage 4: Minting experience** | Token minting | Ability to mint tokens (based on user request - someone minted 18k tokens) | FAFO |
+
+
+## Development Timeline
+- Development begins: Week of March 10, 2025
+- Implementation approach: Gradual rollout in separate branch
+- Priority: Stages progress from simple to complex features
+- Completion guarantee: Full completion of Stage 1, other stages dependent on feedback and feasibility
 
 For the full walkthrough, see [Solana: Creating a trading and sniping pump.fun bot](https://docs.chainstack.com/docs/solana-creating-a-pumpfun-bot).
 

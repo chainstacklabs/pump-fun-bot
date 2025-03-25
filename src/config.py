@@ -48,6 +48,21 @@ WAIT_TIME_BEFORE_NEW_TOKEN: int | float = (
 MAX_TOKEN_AGE: int | float = 0.1
 
 
+# Cleanup configuration
+
+# CLEANUP_MODE controls when to attempt closing token accounts (ATA)
+# Options:
+#   - "disabled": no cleanup at all
+#   - "on_fail": close ATA only if a buy transaction fails
+#   - "after_sell": close ATA after selling, but only if token balance is zero
+#   - "post_session": clean up all empty ATA accounts at the end of trading session
+CLEANUP_MODE: str = "disabled"
+
+# If True, cleanup transactions will skip priority fees (cheaper, slower confirmation)
+# Set to False if you want faster confirmations (e.g. when racing for SOL reclaim)
+CLEANUP_WITHOUT_PRIORITY_FEE: bool = True
+
+
 # Node provider configuration
 # Tested with Chainstack nodes (https://console.chainstack.com), but you can use any node provider
 # You can get a trader node https://docs.chainstack.com/docs/solana-trader-nodes

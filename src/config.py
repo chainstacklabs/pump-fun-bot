@@ -1,87 +1,103 @@
 """
 Configuration for the pump.fun trading bot.
+
+This file defines comprehensive parameters and settings for the trading bot.
+Carefully review and adjust values to match your trading strategy and risk tolerance.
 """
 
 # Trading parameters
-BUY_AMOUNT: int | float = 0.000_001  # Amount of SOL to spend when buying
-BUY_SLIPPAGE: float = 0.4  # 40% slippage tolerance for buying
-SELL_SLIPPAGE: float = 0.4  # 40% slippage tolerance for selling
+# Control trade execution: amount of SOL per trade and acceptable price deviation
+BUY_AMOUNT: int | float = 0.000_001  # Minimal SOL amount to prevent dust transactions
+BUY_SLIPPAGE: float = 0.4  # Maximum acceptable price deviation (0.4 = 40%)
+SELL_SLIPPAGE: float = 0.4  # Consistent slippage tolerance to maintain trading strategy
 
 
-# Configuration for priority fee settings
-ENABLE_DYNAMIC_PRIORITY_FEE: bool = False  # Enable dynamic priority fee calculation
-ENABLE_FIXED_PRIORITY_FEE: bool = True  # Enable fixed priority fee
-FIXED_PRIORITY_FEE: int = 2_000  # Fixed priority fee in microlamports
-EXTRA_PRIORITY_FEE: float = (
-    0.0  # Percentage increase applied to priority fee (0.1 = 10%)
-)
-HARD_CAP_PRIOR_FEE: int = (
-    200_000  # Maximum allowed priority fee in microlamports (hard cap)
-)
+# Priority fee configuration
+# Manage transaction speed and cost on the Solana network
+ENABLE_DYNAMIC_PRIORITY_FEE: bool = False  # Adaptive fee calculation
+ENABLE_FIXED_PRIORITY_FEE: bool = True  # Use consistent, predictable fee
+FIXED_PRIORITY_FEE: int = 2_000  # Base fee in microlamports
+EXTRA_PRIORITY_FEE: float = 0.0  # Percentage increase on base priority fee (0.1 = 10%)
+HARD_CAP_PRIOR_FEE: int = 200_000  # Maximum allowable fee to prevent excessive spending in microlamports
 
 
 # Listener configuration
-LISTENER_TYPE = "block"  # Options: "block" or "logs"
+# Choose method for detecting new tokens on the network
+# "logs": Recommended for more stable token detection
+# "blocks": Unstable method, potentially less reliable
+LISTENER_TYPE = "logs"
 
 
-# Retries and timeouts
-MAX_RETRIES: int = 10  # Number of retries for transaction sending
-# TODO: waiting times will be replaced with retries to shorten delays
-WAIT_TIME_AFTER_CREATION: int | float = (
-    15  # Time to wait after token creation (in seconds)
-    # Too short a delay may cause the RPC node to be unaware of the bonding curve account
-)
-WAIT_TIME_AFTER_BUY: int | float = (
-    15  # Time to wait after a buy transaction is confirmed (in seconds)
-    # Acts as a simple holding period
-    # Too short delay may cause the RPC node to be unaware of account balance
-)
-WAIT_TIME_BEFORE_NEW_TOKEN: int | float = (
-    5  # Time to wait after a sell transaction is confirmed (in seconds)
-    # Provides a pause between completed trades, can be set to 0
-)
+# Retry and timeout settings
+# Control bot resilience and transaction handling
+MAX_RETRIES: int = 10  # Number of attempts for transaction submission
+
+# Waiting periods in seconds between actions (TODO: to be replaced with retry mechanism)
+WAIT_TIME_AFTER_CREATION: int | float = 15  # Seconds to wait after token creation
+WAIT_TIME_AFTER_BUY: int | float = 15  # Holding period after buy transaction
+WAIT_TIME_BEFORE_NEW_TOKEN: int | float = 15  # Pause between token trades
 
 
-# Maximum age (in seconds) for a token to be considered "fresh" and eligible for processing.
-# This threshold is checked before processing starts - tokens older than this are skipped
-# since they likely contain outdated information from the websocket stream
-MAX_TOKEN_AGE: int | float = 0.1
+# Token and account management
+# Control token processing and account cleanup strategies
+MAX_TOKEN_AGE: int | float = 0.1  # Maximum token age in seconds for processing
+
+# Cleanup mode determines when to manage token accounts. Options:
+# "disabled": No cleanup will occur.
+# "on_fail": Only clean up if a buy transaction fails.
+# "after_sell": Clean up after selling, but only if the balance is zero.
+# "post_session": Clean up all empty accounts after a trading session ends.
+CLEANUP_MODE: str = "after_sell"
+CLEANUP_FORCE_CLOSE_WITH_BURN: bool = True  # Burn remaining tokens before closing account, else skip ATA with non-zero balances
+CLEANUP_WITH_PRIORITY_FEE: bool = False  # Use priority fees for cleanup transactions
 
 
-# Cleanup configuration
-
-# CLEANUP_MODE controls when to attempt closing token accounts (ATA)
-# Options:
-#   - "disabled": no cleanup at all
-#   - "on_fail": close ATA only if a buy transaction fails
-#   - "after_sell": close ATA after selling, but only if token balance is zero
-#   - "post_session": clean up all empty ATA accounts at the end of trading session
-CLEANUP_MODE: str = "disabled"
-
-# If True, cleanup transactions will skip priority fees (cheaper, slower confirmation)
-# Set to False if you want faster confirmations (e.g. when racing for SOL reclaim)
-CLEANUP_WITHOUT_PRIORITY_FEE: bool = True
+# Node provider configuration (TODO: to be implemented)
+# Manage RPC node interaction to prevent rate limiting
+MAX_RPS: int = 25  # Maximum requests per second
 
 
-# Node provider configuration
-# Tested with Chainstack nodes (https://console.chainstack.com), but you can use any node provider
-# You can get a trader node https://docs.chainstack.com/docs/solana-trader-nodes
-MAX_RPS: int = 25  # TODO: not implemented. Max RPS to avoid rate limit errors
+def validate_configuration() -> None:
+    """
+    Comprehensive validation of bot configuration.
+    
+    Checks:
+    - Type correctness
+    - Value ranges
+    - Logical consistency of settings
+    """
+    # Configuration validation checks
+    config_checks = [
+        # (value, type, min_value, max_value, error_message)
+        (BUY_AMOUNT, (int, float), 0, float('inf'), "BUY_AMOUNT must be a positive number"),
+        (BUY_SLIPPAGE, float, 0, 1, "BUY_SLIPPAGE must be between 0 and 1"),
+        (SELL_SLIPPAGE, float, 0, 1, "SELL_SLIPPAGE must be between 0 and 1"),
+        (FIXED_PRIORITY_FEE, int, 0, float('inf'), "FIXED_PRIORITY_FEE must be a non-negative integer"),
+        (EXTRA_PRIORITY_FEE, float, 0, 1, "EXTRA_PRIORITY_FEE must be between 0 and 1"),
+        (HARD_CAP_PRIOR_FEE, int, 0, float('inf'), "HARD_CAP_PRIOR_FEE must be a non-negative integer"),
+        (MAX_RETRIES, int, 0, 100, "MAX_RETRIES must be between 0 and 100")
+    ]
+
+    for value, expected_type, min_val, max_val, error_msg in config_checks:
+        if not isinstance(value, expected_type):
+            raise ValueError(f"Type error: {error_msg}")
+        
+        if isinstance(value, (int, float)) and not (min_val <= value <= max_val):
+            raise ValueError(f"Range error: {error_msg}")
+
+    # Logical consistency checks
+    if ENABLE_DYNAMIC_PRIORITY_FEE and ENABLE_FIXED_PRIORITY_FEE:
+        raise ValueError("Cannot enable both dynamic and fixed priority fees simultaneously")
+
+    # Validate listener type
+    if LISTENER_TYPE not in ["logs", "blocks"]:
+        raise ValueError("LISTENER_TYPE must be either 'logs' or 'blocks'")
+
+    # Validate cleanup mode
+    valid_cleanup_modes = ["disabled", "on_fail", "after_sell", "post_session"]
+    if CLEANUP_MODE not in valid_cleanup_modes:
+        raise ValueError(f"CLEANUP_MODE must be one of {valid_cleanup_modes}")
 
 
-def validate_priority_fee_config() -> None:
-    """Validate priority fee configuration values."""
-    if not isinstance(ENABLE_DYNAMIC_PRIORITY_FEE, bool):
-        raise ValueError("ENABLE_DYNAMIC_PRIORITY_FEE must be a boolean")
-    if not isinstance(ENABLE_FIXED_PRIORITY_FEE, bool):
-        raise ValueError("ENABLE_FIXED_PRIORITY_FEE must be a boolean")
-    if not isinstance(FIXED_PRIORITY_FEE, int) or FIXED_PRIORITY_FEE < 0:
-        raise ValueError("FIXED_PRIORITY_FEE must be a non-negative integer")
-    if not isinstance(EXTRA_PRIORITY_FEE, float) or EXTRA_PRIORITY_FEE < 0:
-        raise ValueError("EXTRA_PRIORITY_FEE must be a non-negative float")
-    if not isinstance(HARD_CAP_PRIOR_FEE, int) or HARD_CAP_PRIOR_FEE < 0:
-        raise ValueError("HARD_CAP_PRIOR_FEE must be a non-negative integer")
-
-
-# Validate config on import
-validate_priority_fee_config()
+# Validate configuration on import
+validate_configuration()

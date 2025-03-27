@@ -8,7 +8,14 @@ import json
 import os
 from datetime import datetime
 
+from solders.pubkey import Pubkey
+
 import config
+from cleanup.modes import (
+    handle_cleanup_after_failure,
+    handle_cleanup_after_sell,
+    handle_cleanup_post_session,
+)
 from core.client import SolanaClient
 from core.curve import BondingCurveManager
 from core.priority_fee.manager import PriorityFeeManager
@@ -96,6 +103,8 @@ class PumpTrader:
         self.max_retries = max_retries
         self.max_token_age = config.MAX_TOKEN_AGE
 
+        self.traded_mints: set[Pubkey] = set()
+
         # Token processing state
         self.token_queue = asyncio.Queue()
         self.processing = False
@@ -139,6 +148,13 @@ class PumpTrader:
         except Exception as e:
             logger.error(f"Trading stopped due to error: {e!s}")
             processor_task.cancel()
+            await self.solana_client.close()
+
+        finally:
+            processor_task.cancel()
+            if self.traded_mints:
+                # Close ATA if enabled
+                await handle_cleanup_post_session(self.solana_client, self.wallet, list(self.traded_mints), self.priority_fee_manager)
             await self.solana_client.close()
 
     async def _queue_token(self, token_info: TokenInfo) -> None:
@@ -215,10 +231,13 @@ class PumpTrader:
                     buy_result.amount,  # type: ignore
                     buy_result.tx_signature,
                 )
+                self.traded_mints.add(token_info.mint)
             else:
                 logger.error(
                     f"Failed to buy {token_info.symbol}: {buy_result.error_message}"
                 )
+                # Close ATA if enabled
+                await handle_cleanup_after_failure(self.solana_client, self.wallet, token_info.mint, self.priority_fee_manager)
 
             # Sell token if not in marry mode
             if not marry_mode and buy_result.success:
@@ -239,6 +258,8 @@ class PumpTrader:
                         sell_result.amount,  # type: ignore
                         sell_result.tx_signature,
                     )
+                    # Close ATA if enabled
+                    await handle_cleanup_after_sell(self.solana_client, self.wallet, token_info.mint, self.priority_fee_manager)
                 else:
                     logger.error(
                         f"Failed to sell {token_info.symbol}: {sell_result.error_message}"

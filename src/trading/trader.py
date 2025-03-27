@@ -8,7 +8,7 @@ import json
 import os
 from datetime import datetime
 
-import config as config
+import config
 from core.client import SolanaClient
 from core.curve import BondingCurveManager
 from core.priority_fee.manager import PriorityFeeManager
@@ -137,7 +137,7 @@ class PumpTrader:
             )
 
         except Exception as e:
-            logger.error(f"Trading stopped due to error: {str(e)}")
+            logger.error(f"Trading stopped due to error: {e!s}")
             processor_task.cancel()
             await self.solana_client.close()
 
@@ -153,7 +153,7 @@ class PumpTrader:
         self.token_timestamps[token_key] = asyncio.get_event_loop().time()
 
         await self.token_queue.put(token_info)
-        # logger.info(f"Queued new token: {token_info.symbol} ({token_info.mint})")
+        logger.info(f"Queued new token: {token_info.symbol} ({token_info.mint})")
 
     async def _process_token_queue(self, marry_mode: bool, yolo_mode: bool) -> None:
         """Continuously process tokens from the queue, only if they're fresh."""
@@ -254,7 +254,7 @@ class PumpTrader:
             await asyncio.sleep(config.WAIT_TIME_BEFORE_NEW_TOKEN)
 
         except Exception as e:
-            logger.error(f"Error handling token {token_info.symbol}: {str(e)}")
+            logger.error(f"Error handling token {token_info.symbol}: {e!s}")
 
     async def _save_token_info(self, token_info: TokenInfo) -> None:
         """Save token information to a file.

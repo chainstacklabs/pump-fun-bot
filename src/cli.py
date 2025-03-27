@@ -8,7 +8,7 @@ import asyncio
 import os
 import sys
 
-import config as config
+import config
 from trading.trader import PumpTrader
 from utils.logger import get_logger, setup_file_logging
 
@@ -109,7 +109,7 @@ async def main() -> None:
     except KeyboardInterrupt:
         logger.info("Trading stopped by user")
     except Exception as e:
-        logger.error(f"Trading stopped due to error: {str(e)}")
+        logger.error(f"Trading stopped due to error: {e!s}")
     finally:
         try:
             await trader.solana_client.close()
@@ -117,7 +117,7 @@ async def main() -> None:
             pass
 
 
-def sync_main():
+def sync_main() -> None:
     asyncio.run(main())
 
 

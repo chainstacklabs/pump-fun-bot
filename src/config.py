@@ -7,7 +7,7 @@ Carefully review and adjust values to match your trading strategy and risk toler
 
 # Trading parameters
 # Control trade execution: amount of SOL per trade and acceptable price deviation
-BUY_AMOUNT: int | float = 0.000_001  # Minimal SOL amount to prevent dust transactions
+BUY_AMOUNT: int | float = 0.000_001  # Amount of SOL to spend when buying
 BUY_SLIPPAGE: float = 0.4  # Maximum acceptable price deviation (0.4 = 40%)
 SELL_SLIPPAGE: float = 0.4  # Consistent slippage tolerance to maintain trading strategy
 
@@ -17,7 +17,7 @@ SELL_SLIPPAGE: float = 0.4  # Consistent slippage tolerance to maintain trading 
 ENABLE_DYNAMIC_PRIORITY_FEE: bool = False  # Adaptive fee calculation
 ENABLE_FIXED_PRIORITY_FEE: bool = True  # Use consistent, predictable fee
 FIXED_PRIORITY_FEE: int = 2_000  # Base fee in microlamports
-EXTRA_PRIORITY_FEE: float = 0.0  # Percentage increase on base priority fee (0.1 = 10%)
+EXTRA_PRIORITY_FEE: float = 0.0  # Percentage increase on priority fee (0.1 = 10%)
 HARD_CAP_PRIOR_FEE: int = 200_000  # Maximum allowable fee to prevent excessive spending in microlamports
 
 

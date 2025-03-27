@@ -47,8 +47,8 @@ MAX_TOKEN_AGE: int | float = 0.1  # Maximum token age in seconds for processing
 # "on_fail": Only clean up if a buy transaction fails.
 # "after_sell": Clean up after selling, but only if the balance is zero.
 # "post_session": Clean up all empty accounts after a trading session ends.
-CLEANUP_MODE: str = "after_sell"
-CLEANUP_FORCE_CLOSE_WITH_BURN: bool = True  # Burn remaining tokens before closing account, else skip ATA with non-zero balances
+CLEANUP_MODE: str = "disabled"
+CLEANUP_FORCE_CLOSE_WITH_BURN: bool = False  # Burn remaining tokens before closing account, else skip ATA with non-zero balances
 CLEANUP_WITH_PRIORITY_FEE: bool = False  # Use priority fees for cleanup transactions
 
 

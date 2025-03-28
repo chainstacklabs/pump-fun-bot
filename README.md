@@ -38,7 +38,7 @@ We assume no responsibility for the code or its usage. This is our public servic
 | | Dual subscription methods | Keep both `logsSubscribe` & `blockSubscribe` in the main bot for flexibility and adapting to Solana node architecture changes | ✅ |
 | | Transaction retries | Do retries instead of cooldown and/or keep the cooldown | WIP |
 | | Bonding curve status tracking | Checking a bonding curve status progress. Predict how soon a token will start the migration process | WIP | 
-| | Account closure script | Script to close the associated bonding curve account if the rest of the flow txs fails | WIP |
+| | Account closure script | Script to close the associated bonding curve account if the rest of the flow txs fails | ✅ |
 | | PumpSwap migration listening | pump_fun migrated to their own DEX — [PumpSwap](https://x.com/pumpdotfun/status/1902762309950292010), so we need to FAFO with that instead of Raydium (and attempt `logSubscribe` implementation) | FAFO |
 | **Stage 3: Trading experience** | Take profit/stop loss | Implement take profit, stop loss exit strategies | FAFO |
 | | Market cap-based selling | Sell when a specific market cap has been reached | Not started |

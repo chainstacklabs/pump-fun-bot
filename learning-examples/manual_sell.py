@@ -38,7 +38,7 @@ UNIT_PRICE = 10_000_000
 UNIT_BUDGET = 100_000
 
 # RPC endpoint
-RPC_ENDPOINT = os.environ.get("SOLANA_NODE_WSS_ENDPOINT")
+RPC_ENDPOINT = os.environ.get("SOLANA_NODE_RPC_ENDPOINT")
 
 
 class BondingCurveState:

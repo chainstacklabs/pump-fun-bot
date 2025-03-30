@@ -27,7 +27,7 @@ async def get_market_address_by_base_mint(base_mint_address: Pubkey, amm_program
         # Retrieve the accounts that match the filter
         response = await client.get_program_accounts(
             amm_program_id,  # AMM program ID
-            encoding="jsonParsed",
+            encoding="base64",
             filters=filters
         )
 

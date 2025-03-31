@@ -34,6 +34,7 @@ We assume no responsibility for the code or its usage. This is our public servic
 | | Error handling | Improving error handling | WIP | 
 | | Configurable RPS | Ability to set RPS in the config to match your provider's and plan RPS (preferably [Chainstack](https://console.chainstack.com/) 🤩) | WIP |
 | | Dynamic priority fees | Ability to set dynamic priority fees | ✅ |
+| | Review & optimize `json`, `jsonParsed`, `base64` | Improve speed and traffic for calls, not just `getBlock`. [Helpful overview](https://docs.chainstack.com/docs/solana-optimize-your-getblock-performance#json-jsonparsed-base58-base64).| WIP | 
 | **Stage 2: Bonding curve and migration management** | `logsSubscribe` integration | Integrate `logsSubscribe` instead of `blockSubscribe` for sniping minted tokens into the main bot | ✅ |
 | | Dual subscription methods | Keep both `logsSubscribe` & `blockSubscribe` in the main bot for flexibility and adapting to Solana node architecture changes | ✅ |
 | | Transaction retries | Do retries instead of cooldown and/or keep the cooldown | WIP |

@@ -3,9 +3,12 @@ import os
 import struct
 
 import base58
+from dotenv import load_dotenv
 from solana.rpc.async_api import AsyncClient
 from solana.rpc.types import MemcmpOpts
 from solders.pubkey import Pubkey
+
+load_dotenv()
 
 RPC_ENDPOINT = os.environ.get("SOLANA_NODE_RPC_ENDPOINT")
 PUMP_AMM_PROGRAM_ID = Pubkey.from_string("pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA")

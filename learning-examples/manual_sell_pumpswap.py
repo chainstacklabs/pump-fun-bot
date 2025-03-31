@@ -3,6 +3,7 @@ import os
 import struct
 
 import base58
+from dotenv import load_dotenv
 from solana.rpc.async_api import AsyncClient
 from solana.rpc.commitment import Confirmed
 from solana.rpc.types import MemcmpOpts, TxOpts
@@ -13,6 +14,8 @@ from solders.message import Message
 from solders.pubkey import Pubkey
 from solders.transaction import VersionedTransaction
 from spl.token.instructions import get_associated_token_address
+
+load_dotenv()
 
 RPC_ENDPOINT = os.environ.get("SOLANA_NODE_RPC_ENDPOINT")
 TOKEN_MINT = Pubkey.from_string("35ySx7Rt3RqeTp75QB81FgRvPT5yDY2m5BupsUYDpump")
@@ -32,6 +35,9 @@ SYSTEM_TOKEN_PROGRAM = Pubkey.from_string("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss62
 SYSTEM_PROGRAM = Pubkey.from_string("11111111111111111111111111111111")
 SYSTEM_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM = Pubkey.from_string("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL")
 PUMP_SWAP_EVENT_AUTHORITY = Pubkey.from_string("GS4CU59F31iL7aR2Q8zVS8DRrcRnXX1yjQ66TqNVQnaR")
+LAMPORTS_PER_SOL = 1_000_000_000
+COMPUTE_UNIT_PRICE = 10_000
+COMPUTE_UNIT_BUDGET = 100_000
 
 
 async def get_market_address_by_base_mint(client: AsyncClient, base_mint_address: Pubkey, amm_program_id: Pubkey) -> Pubkey:
@@ -88,29 +94,17 @@ async def get_market_data(client: AsyncClient, market_address: Pubkey):
 
     return parsed_data
 
-async def get_token_price_from_pool(client: AsyncClient, pool_base_token_account: Pubkey, pool_quote_token_account: Pubkey) -> float:
+async def calculate_token_pool_price(client: AsyncClient, pool_base_token_account: Pubkey, pool_quote_token_account: Pubkey) -> float:
     base_balance_resp = await client.get_token_account_balance(pool_base_token_account)
     quote_balance_resp = await client.get_token_account_balance(pool_quote_token_account)
         
     base_amount = float(base_balance_resp.value.ui_amount)
     quote_amount = float(quote_balance_resp.value.ui_amount)
-    token_price = base_amount / quote_amount
+    token_price = quote_amount / base_amount
     
-    return token_price, base_amount, quote_amount
+    return token_price
 
-async def calculate_sol_amount_from_token(client: AsyncClient, token_amount: float, pool_base_token_account: Pubkey, pool_quote_token_account: Pubkey) -> float:
-    _, base_amount, quote_amount = await get_token_price_from_pool(client, pool_base_token_account, pool_quote_token_account)
-    
-    k = base_amount * quote_amount
-    new_base_amount = base_amount + token_amount
-    new_quote_amount = k / new_base_amount
-    sol_amount = quote_amount - new_quote_amount
-        
-    sol_received = sol_amount * (1 - 0.25 / 100)
-
-    return sol_received
-
-def create_ata_idempotent_ix(payer_pubkey, owner_pubkey):
+def create_ata_idempotent_ix(payer_pubkey, owner_pubkey) -> Instruction:
     """
     Create an instruction to create an Associated Token Account for WSOL in an idempotent way.
     """
@@ -131,32 +125,26 @@ async def sell_pump_swap(client: AsyncClient, pump_fun_amm_pool: Pubkey, payer: 
                           user_quote_token_account: Pubkey, pool_base_token_account: Pubkey, 
                           pool_quote_token_account: Pubkey, slippage: float = 0.25):
     
-    token_balance = await client.get_token_account_balance(user_quote_token_account)
+    # Get token balance
+    token_balance = int((await client.get_token_account_balance(user_base_token_account)).value.amount)
     token_balance_decimal = token_balance / 10**TOKEN_DECIMALS
     print(f"Token balance: {token_balance_decimal}")
     if token_balance == 0:
         print("No tokens to sell.")
         return
+    
+    # Calculate token price
+    token_price_sol = await calculate_token_pool_price(client, pool_base_token_account, pool_quote_token_account)
+    print(f"Price per Token: {token_price_sol:.20f} SOL")
 
-    token_price, base_amount, quote_amount = await get_token_price_from_pool(client, pool_base_token_account, pool_quote_token_account)
-    
-    k = base_amount * quote_amount
-    new_quote_amount = quote_amount + token_balance_decimal
-    new_base_amount = k / new_quote_amount
-    expected_sol_amount = base_amount - new_base_amount
-    
-    expected_sol_after_fee = expected_sol_amount * (1 - 0.25 / 100)
-    min_sol_output_float = expected_sol_after_fee * (1 - slippage)
-    min_sol_output = min(int(min_sol_output_float * 10**9), 18_446_744_073_709_551_615)
-    
+    # Calculate minimum SOL output
+    amount = token_balance
+    min_sol_output = float(token_balance_decimal) * float(token_price_sol)
+    slippage_factor = 1 - slippage
+    min_sol_output = int((min_sol_output * slippage_factor) * LAMPORTS_PER_SOL)
+
     print(f"Selling {token_balance_decimal} tokens")
-    print(f"Expected SOL: {expected_sol_after_fee:.9f}")
-    print(f"Min SOL with {slippage*100}% slippage: {min_sol_output/10**9:.9f}")
-
-    print(f"Token balance to sell (raw): {token_balance}")
-    print(f"Min SOL output (raw): {min_sol_output}")
-
-    data = SELL_DISCRIMINATOR + struct.pack("<Q", token_balance) + struct.pack("<Q", min_sol_output)
+    print(f"Minimum SOL output: {min_sol_output / LAMPORTS_PER_SOL:.10f} SOL")
 
     accounts = [
             AccountMeta(pubkey=pump_fun_amm_pool, is_signer=False, is_writable=False),
@@ -178,8 +166,11 @@ async def sell_pump_swap(client: AsyncClient, pump_fun_amm_pool: Pubkey, payer: 
             AccountMeta(pubkey=PUMP_AMM_PROGRAM_ID, is_signer=False, is_writable=False),
     ]
     
-    compute_limit_ix = set_compute_unit_limit(87_122)
-    compute_price_ix = set_compute_unit_price(10_000)
+    data = SELL_DISCRIMINATOR + struct.pack("<Q", amount) + struct.pack("<Q", min_sol_output)
+
+    compute_limit_ix = set_compute_unit_limit(COMPUTE_UNIT_BUDGET)
+    compute_price_ix = set_compute_unit_price(COMPUTE_UNIT_PRICE)
+
     create_ata_ix = create_ata_idempotent_ix(
         payer_pubkey=payer.pubkey(),
         owner_pubkey=payer.pubkey()
@@ -210,6 +201,7 @@ async def sell_pump_swap(client: AsyncClient, pump_fun_amm_pool: Pubkey, payer: 
         tx_hash = tx_sig.value
         print(f"Transaction sent: https://explorer.solana.com/tx/{tx_hash}")
         await client.confirm_transaction(tx_hash, commitment="confirmed")
+
         print("Transaction confirmed")
         return tx_hash
     except Exception as e:
@@ -219,18 +211,18 @@ async def sell_pump_swap(client: AsyncClient, pump_fun_amm_pool: Pubkey, payer: 
 
 async def main():
     async with AsyncClient(RPC_ENDPOINT) as client:
-        market_address = await get_market_address_by_base_mint(client, TOKEN_MINT)
+        market_address = await get_market_address_by_base_mint(client, TOKEN_MINT, PUMP_AMM_PROGRAM_ID)
         market_data = await get_market_data(client, market_address)
         
         await sell_pump_swap(
             client,
             PUMP_AMM_PROGRAM_ID,
             PAYER,
-            Pubkey.from_string(TOKEN_MINT),
-            await get_associated_token_address(PAYER, TOKEN_MINT),
-            await get_associated_token_address(PAYER, SOL),
-            market_data["pool_base_token_account"],
-            market_data["pool_quote_token_account"],
+            TOKEN_MINT,
+            get_associated_token_address(PAYER.pubkey(), TOKEN_MINT),
+            get_associated_token_address(PAYER.pubkey(), SOL),
+            Pubkey.from_string(market_data["pool_base_token_account"]),
+            Pubkey.from_string(market_data["pool_quote_token_account"]),
             SLIPPAGE
         )
 

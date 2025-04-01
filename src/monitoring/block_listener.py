@@ -86,7 +86,7 @@ class BlockListener(BaseTokenListener):
                         ping_task.cancel()
 
             except Exception as e:
-                logger.error(f"WebSocket connection error: {str(e)}")
+                logger.error(f"WebSocket connection error: {e!s}")
                 logger.info("Reconnecting in 5 seconds...")
                 await asyncio.sleep(5)
 
@@ -105,7 +105,7 @@ class BlockListener(BaseTokenListener):
                     {"mentionsAccountOrProgram": str(self.pump_program)},
                     {
                         "commitment": "confirmed",
-                        "encoding": "base64",
+                        "encoding": "base64", # base64 is faster than other encoding options
                         "showRewards": False,
                         "transactionDetails": "full",
                         "maxSupportedTransactionVersion": 0,
@@ -129,7 +129,7 @@ class BlockListener(BaseTokenListener):
                 try:
                     pong_waiter = await websocket.ping()
                     await asyncio.wait_for(pong_waiter, timeout=10)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     logger.warning("Ping timeout - server not responding")
                     # Force reconnection
                     await websocket.close()
@@ -137,7 +137,7 @@ class BlockListener(BaseTokenListener):
         except asyncio.CancelledError:
             pass
         except Exception as e:
-            logger.error(f"Ping error: {str(e)}")
+            logger.error(f"Ping error: {e!s}")
 
     async def _wait_for_token_creation(self, websocket) -> TokenInfo | None:
         """Wait for token creation event.
@@ -176,12 +176,12 @@ class BlockListener(BaseTokenListener):
                 if token_info:
                     return token_info
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.debug("No data received for 30 seconds")
         except websockets.exceptions.ConnectionClosed:
             logger.warning("WebSocket connection closed")
             raise
         except Exception as e:
-            logger.error(f"Error processing WebSocket message: {str(e)}")
+            logger.error(f"Error processing WebSocket message: {e!s}")
 
         return None

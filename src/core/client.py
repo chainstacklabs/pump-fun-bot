@@ -64,7 +64,7 @@ class SolanaClient:
             ValueError: If account doesn't exist or has no data
         """
         client = await self.get_client()
-        response = await client.get_account_info(pubkey)
+        response = await client.get_account_info(pubkey, encoding="base64") # base64 encoding for account data by default
         if not response.value:
             raise ValueError(f"Account {pubkey} not found")
         return response.value
@@ -149,7 +149,7 @@ class SolanaClient:
 
                 wait_time = 2**attempt
                 logger.warning(
-                    f"Transaction attempt {attempt + 1} failed: {str(e)}, retrying in {wait_time}s"
+                    f"Transaction attempt {attempt + 1} failed: {e!s}, retrying in {wait_time}s"
                 )
                 await asyncio.sleep(wait_time)
 
@@ -170,7 +170,7 @@ class SolanaClient:
             await client.confirm_transaction(signature, commitment=commitment)
             return True
         except Exception as e:
-            logger.error(f"Failed to confirm transaction {signature}: {str(e)}")
+            logger.error(f"Failed to confirm transaction {signature}: {e!s}")
             return False
 
     async def post_rpc(self, body: dict[str, Any]) -> dict[str, Any] | None:
@@ -193,8 +193,8 @@ class SolanaClient:
                     response.raise_for_status()
                     return await response.json()
         except aiohttp.ClientError as e:
-            logger.error(f"RPC request failed: {str(e)}", exc_info=True)
+            logger.error(f"RPC request failed: {e!s}", exc_info=True)
             return None
         except json.JSONDecodeError as e:
-            logger.error(f"Failed to decode RPC response: {str(e)}", exc_info=True)
+            logger.error(f"Failed to decode RPC response: {e!s}", exc_info=True)
             return None

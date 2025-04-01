@@ -63,7 +63,7 @@ class BondingCurveState:
 async def get_pump_curve_state(
     conn: AsyncClient, curve_address: Pubkey
 ) -> BondingCurveState:
-    response = await conn.get_account_info(curve_address)
+    response = await conn.get_account_info(curve_address, encoding="base64")
     if not response.value or not response.value.data:
         raise ValueError("Invalid curve state: No data")
 
@@ -109,7 +109,7 @@ async def buy_token(
         # Create associated token account with retries
         for ata_attempt in range(max_retries):
             try:
-                account_info = await client.get_account_info(associated_token_account)
+                account_info = await client.get_account_info(associated_token_account, encoding="base64")
                 if account_info.value is None:
                     print(
                         f"Creating associated token account (Attempt {ata_attempt + 1})..."

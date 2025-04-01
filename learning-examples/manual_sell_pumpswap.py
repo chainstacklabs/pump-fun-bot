@@ -19,7 +19,7 @@ load_dotenv()
 
 # Configuration constants
 RPC_ENDPOINT = os.environ.get("SOLANA_NODE_RPC_ENDPOINT")
-TOKEN_MINT = Pubkey.from_string("35ySx7Rt3RqeTp75QB81FgRvPT5yDY2m5BupsUYDpump")
+TOKEN_MINT = Pubkey.from_string("8XNrSusWrzYpizYXJb5yeB66AWX1cfQ86SBJFqVTpump")
 PRIVATE_KEY = base58.b58decode(os.environ.get("SOLANA_PRIVATE_KEY"))
 PAYER = Keypair.from_bytes(PRIVATE_KEY)
 SLIPPAGE = 0.25  # Slippage tolerance (25%) - the maximum price movement you'll accept
@@ -63,7 +63,7 @@ async def get_market_address_by_base_mint(client: AsyncClient, base_mint_address
         
     response = await client.get_program_accounts(
         amm_program_id,
-        encoding="jsonParsed",
+        encoding="base64",
         filters=filters
     )
 
@@ -82,7 +82,7 @@ async def get_market_data(client: AsyncClient, market_address: Pubkey) -> dict:
     Returns:
         Dictionary containing the parsed market data
     """
-    response = await client.get_account_info_json_parsed(market_address)
+    response = await client.get_account_info(market_address, encoding="base64")
     data = response.value.data
     parsed_data: dict = {}
 

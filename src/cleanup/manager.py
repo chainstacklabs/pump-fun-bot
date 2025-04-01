@@ -45,7 +45,7 @@ class AccountCleanupManager:
         )
 
         try:
-            info = await solana_client.get_account_info(ata)
+            info = await solana_client.get_account_info(ata, encoding="base64")
             if not info.value:
                 logger.info(f"ATA {ata} does not exist or already closed.")
                 return

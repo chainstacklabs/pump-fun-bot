@@ -121,7 +121,7 @@ class TokenBuyer(Trader):
                 )
 
         except Exception as e:
-            logger.error(f"Buy operation failed: {str(e)}")
+            logger.error(f"Buy operation failed: {e!s}")
             return TradeResult(success=False, error_message=str(e))
 
     async def _ensure_associated_token_account(
@@ -136,7 +136,7 @@ class TokenBuyer(Trader):
         try:
             solana_client = await self.client.get_client()
             account_info = await solana_client.get_account_info(
-                associated_token_account
+                associated_token_account, encoding="base64"
             )
 
             if account_info.value is None:
@@ -166,7 +166,7 @@ class TokenBuyer(Trader):
                 )
 
         except Exception as e:
-            logger.error(f"Error creating associated token account: {str(e)}")
+            logger.error(f"Error creating associated token account: {e!s}")
             raise
 
     async def _send_buy_transaction(
@@ -245,5 +245,5 @@ class TokenBuyer(Trader):
                 ),
             )
         except Exception as e:
-            logger.error(f"Buy transaction failed: {str(e)}")
+            logger.error(f"Buy transaction failed: {e!s}")
             raise

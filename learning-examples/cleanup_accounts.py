@@ -24,7 +24,7 @@ async def close_account_if_exists(client: SolanaClient, wallet: Wallet, account:
     """Safely close a token account if it exists and reclaim rent."""
     try:
         solana_client = await client.get_client()
-        info = await solana_client.get_account_info(account)
+        info = await solana_client.get_account_info(account, encoding="base64") # base64 encoding for account data by deafult
 
         # WARNING: This will permanently burn all tokens in the account before closing it
         # Closing account is impossible if balance is positive

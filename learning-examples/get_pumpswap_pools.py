@@ -39,7 +39,7 @@ async def get_market_address_by_base_mint(base_mint_address: Pubkey, amm_program
     
 async def get_market_data(market_address: Pubkey):
     async with AsyncClient(RPC_ENDPOINT) as client:
-        response = await client.get_account_info_json_parsed(market_address)
+        response = await client.get_account_info(market_address, encoding="base64")
         data = response.value.data
         parsed_data = {}
 

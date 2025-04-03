@@ -51,6 +51,8 @@ class AccountCleanupManager:
                 return
 
             balance = await self.client.get_token_account_balance(ata)
+            instructions = []
+
             if balance > 0 and CLEANUP_FORCE_CLOSE_WITH_BURN:
                 logger.info(f"Burning {balance} tokens from ATA {ata} (mint: {mint})...")
                 burn_ix = burn(
@@ -62,13 +64,8 @@ class AccountCleanupManager:
                         program_id=SystemAddresses.TOKEN_PROGRAM,
                     )
                 )
-                await self.client.build_and_send_transaction(
-                    [burn_ix],
-                    self.wallet.keypair,
-                    skip_preflight=True,
-                    priority_fee=priority_fee,
-                )
-                logger.info(f"✅ Burned successfully from ATA {ata}")
+                instructions.append(burn_ix)
+
             elif balance > 0:
                 logger.info(
                     f"Skipping ATA {ata} with non-zero balance ({balance} tokens) "
@@ -76,6 +73,7 @@ class AccountCleanupManager:
                 )
                 return
 
+            # Include close account instruction
             logger.info(f"Closing ATA: {ata}")
             close_ix = close_account(
                 CloseAccountParams(
@@ -85,14 +83,18 @@ class AccountCleanupManager:
                     program_id=SystemAddresses.TOKEN_PROGRAM,
                 )
             )
-            tx_sig = await self.client.build_and_send_transaction(
-                [close_ix],
-                self.wallet.keypair,
-                skip_preflight=True,
-                priority_fee=priority_fee,
-            )
-            await self.client.confirm_transaction(tx_sig)
-            logger.info(f"Closed successfully: {ata}")
+            instructions.append(close_ix)
+
+            # Send both burn and close instructions in the same transaction
+            if instructions:
+                tx_sig = await self.client.build_and_send_transaction(
+                    instructions,
+                    self.wallet.keypair,
+                    skip_preflight=True,
+                    priority_fee=priority_fee,
+                )
+                await self.client.confirm_transaction(tx_sig)
+                logger.info(f"Closed successfully: {ata}")
 
         except Exception as e:
             logger.warning(f"Cleanup failed for ATA {ata}: {e!s}")

@@ -36,8 +36,7 @@ class SolanaClient:
         self._client = None
         self._cached_blockhash: Hash | None = None
         self._blockhash_lock = asyncio.Lock()
-
-        asyncio.create_task(self.start_blockhash_updater())
+        self._blockhash_updater_task = asyncio.create_task(self.start_blockhash_updater())
 
     async def start_blockhash_updater(self, interval: float = 5.0):
         """Start background task to update recent blockhash."""
@@ -68,7 +67,14 @@ class SolanaClient:
         return self._client
 
     async def close(self):
-        """Close the client connection if open."""
+        """Close the client connection and stop the blockhash updater."""
+        if self._blockhash_updater_task:
+            self._blockhash_updater_task.cancel()
+            try:
+                await self._blockhash_updater_task
+            except asyncio.CancelledError:
+                pass
+
         if self._client:
             await self._client.close()
             self._client = None

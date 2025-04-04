@@ -78,6 +78,8 @@ class PumpTrader:
             buy_amount,
             buy_slippage,
             max_retries,
+            config.EXTREME_FAST_TOKEN_AMOUNT,
+            config.EXTREME_FAST_MODE
         )
 
         self.seller = TokenSeller(
@@ -212,10 +214,11 @@ class PumpTrader:
         try:
             await self._save_token_info(token_info)
 
-            logger.info(
-                f"Waiting for {config.WAIT_TIME_AFTER_CREATION} seconds for the bonding curve to stabilize..."
-            )
-            await asyncio.sleep(config.WAIT_TIME_AFTER_CREATION)
+            if not config.EXTREME_FAST_MODE:
+                logger.info(
+                    f"Waiting for {config.WAIT_TIME_AFTER_CREATION} seconds for the bonding curve to stabilize..."
+                )
+                await asyncio.sleep(config.WAIT_TIME_AFTER_CREATION)
 
             logger.info(
                 f"Buying {self.buy_amount:.6f} SOL worth of {token_info.symbol}..."

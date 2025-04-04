@@ -12,6 +12,14 @@ BUY_SLIPPAGE: float = 0.4  # Maximum acceptable price deviation (0.4 = 40%)
 SELL_SLIPPAGE: float = 0.4  # Consistent slippage tolerance to maintain trading strategy
 
 
+# EXTREME FAST Mode configuration
+# When enabled, skips waiting for the bonding curve to stabilize and RPC price check.
+# The bot buys the specified number of tokens directly, making the process faster but less precise.
+EXTREME_FAST_MODE: bool = False
+# Amount of tokens to buy in EXTREME FAST mode. No price calculation is done; the bot buys exactly this amount.
+EXTREME_FAST_TOKEN_AMOUNT: int = 30
+
+
 # Priority fee configuration
 # Manage transaction speed and cost on the Solana network
 ENABLE_DYNAMIC_PRIORITY_FEE: bool = False  # Adaptive fee calculation

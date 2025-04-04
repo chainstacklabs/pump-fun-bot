@@ -40,6 +40,8 @@ class TokenBuyer(Trader):
         amount: float,
         slippage: float = 0.01,
         max_retries: int = 5,
+        extreme_fast_token_amount: int = 0,
+        extreme_fast_mode: bool = False,
     ):
         """Initialize token buyer.
 
@@ -50,6 +52,8 @@ class TokenBuyer(Trader):
             amount: Amount of SOL to spend
             slippage: Slippage tolerance (0.01 = 1%)
             max_retries: Maximum number of retry attempts
+            extreme_fast_token_amount: Amount of token to buy if extreme fast mode is enabled
+            extreme_fast_mode: If enabled, avoid fetching associated bonding curve state
         """
         self.client = client
         self.wallet = wallet
@@ -58,6 +62,8 @@ class TokenBuyer(Trader):
         self.amount = amount
         self.slippage = slippage
         self.max_retries = max_retries
+        self.extreme_fast_mode = extreme_fast_mode
+        self.extreme_fast_token_amount = extreme_fast_token_amount
 
     async def execute(self, token_info: TokenInfo, *args, **kwargs) -> TradeResult:
         """Execute buy operation.
@@ -72,12 +78,16 @@ class TokenBuyer(Trader):
             # Convert amount to lamports
             amount_lamports = int(self.amount * LAMPORTS_PER_SOL)
 
-            # Fetch token price
-            curve_state = await self.curve_manager.get_curve_state(
-                token_info.bonding_curve
-            )
-            token_price_sol = curve_state.calculate_price()
-            token_amount = self.amount / token_price_sol
+            if self.extreme_fast_mode:
+                # Skip the wait and directly calculate the amount
+                token_amount = self.extreme_fast_token_amount
+                token_price_sol = self.amount / token_amount
+                logger.info(f"EXTREME FAST Mode: Buying {token_amount} tokens.")
+            else:
+                # Regular behavior with RPC call
+                curve_state = await self.curve_manager.get_curve_state(token_info.bonding_curve)
+                token_price_sol = curve_state.calculate_price()
+                token_amount = self.amount / token_price_sol
 
             # Calculate maximum SOL to spend with slippage
             max_amount_lamports = int(amount_lamports * (1 + self.slippage))

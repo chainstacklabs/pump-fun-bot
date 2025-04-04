@@ -7,7 +7,7 @@ from typing import Final
 
 from solders.instruction import AccountMeta, Instruction
 from solders.pubkey import Pubkey
-from spl.token.instructions import create_associated_token_account
+from spl.token.instructions import create_idempotent_associated_token_account
 
 from core.client import SolanaClient
 from core.curve import BondingCurveManager
@@ -93,10 +93,6 @@ class TokenBuyer(Trader):
                 token_info.mint
             )
 
-            await self._ensure_associated_token_account(
-                token_info.mint, associated_token_account
-            )
-
             tx_signature = await self._send_buy_transaction(
                 token_info,
                 associated_token_account,
@@ -123,51 +119,6 @@ class TokenBuyer(Trader):
         except Exception as e:
             logger.error(f"Buy operation failed: {e!s}")
             return TradeResult(success=False, error_message=str(e))
-
-    async def _ensure_associated_token_account(
-        self, mint: Pubkey, associated_token_account: Pubkey
-    ) -> None:
-        """Ensure associated token account exists, else create it.
-
-        Args:
-            mint: Token mint
-            associated_token_account: Associated token account address
-        """
-        try:
-            solana_client = await self.client.get_client()
-            account_info = await solana_client.get_account_info(
-                associated_token_account, encoding="base64"
-            )
-
-            if account_info.value is None:
-                logger.info(f"Creating associated token account for {mint}...")
-
-                create_ata_ix = create_associated_token_account(
-                    payer=self.wallet.pubkey, owner=self.wallet.pubkey, mint=mint
-                )
-
-                tx_sig = await self.client.build_and_send_transaction(
-                    [create_ata_ix],
-                    self.wallet.keypair,
-                    skip_preflight=True,
-                    max_retries=self.max_retries,
-                    priority_fee=await self.priority_fee_manager.calculate_priority_fee(
-                        [mint, SystemAddresses.PROGRAM, SystemAddresses.TOKEN_PROGRAM]
-                    ),
-                )
-
-                await self.client.confirm_transaction(tx_sig)
-                logger.info(
-                    f"Associated token account created: {associated_token_account}"
-                )
-            else:
-                logger.info(
-                    f"Associated token account already exists: {associated_token_account}"
-                )
-
-        except Exception as e:
-            logger.error(f"Error creating associated token account: {e!s}")
-            raise
 
     async def _send_buy_transaction(
         self,
@@ -225,6 +176,14 @@ class TokenBuyer(Trader):
             ),
         ]
 
+        # Prepare idempotent create ATA instruction: it will not fail if ATA already exists
+        idempotent_ata_ix = create_idempotent_associated_token_account(
+            self.wallet.pubkey,
+            self.wallet.pubkey,
+            token_info.mint,
+            SystemAddresses.TOKEN_PROGRAM
+        )
+
         # Prepare buy instruction data
         token_amount_raw = int(token_amount * 10**TOKEN_DECIMALS)
         data = (
@@ -236,7 +195,7 @@ class TokenBuyer(Trader):
 
         try:
             return await self.client.build_and_send_transaction(
-                [buy_ix],
+                [idempotent_ata_ix, buy_ix],
                 self.wallet.keypair,
                 skip_preflight=True,
                 max_retries=self.max_retries,

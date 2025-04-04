@@ -34,6 +34,28 @@ class SolanaClient:
         """
         self.rpc_endpoint = rpc_endpoint
         self._client = None
+        self._cached_blockhash: Hash | None = None
+        self._blockhash_lock = asyncio.Lock()
+
+        asyncio.create_task(self.start_blockhash_updater())
+
+    async def start_blockhash_updater(self, interval: float = 5.0):
+        """Start background task to update recent blockhash."""
+        while True:
+            try:
+                blockhash = await self.get_latest_blockhash()
+                async with self._blockhash_lock:
+                    self._cached_blockhash = blockhash
+            except Exception as e:
+                logger.warning(f"Blockhash fetch failed: {e!s}")
+            await asyncio.sleep(interval)
+
+    async def get_cached_blockhash(self) -> Hash:
+        """Return the most recently cached blockhash."""
+        async with self._blockhash_lock:
+            if self._cached_blockhash is None:
+                raise RuntimeError("No cached blockhash available yet")
+            return self._cached_blockhash
 
     async def get_client(self) -> AsyncClient:
         """Get or create the AsyncClient instance.
@@ -128,7 +150,7 @@ class SolanaClient:
             ]
             instructions = fee_instructions + instructions
 
-        recent_blockhash = await self.get_latest_blockhash()
+        recent_blockhash = await self.get_cached_blockhash()
         message = Message(instructions, signer_keypair.pubkey())
         transaction = Transaction([signer_keypair], message, recent_blockhash)
 

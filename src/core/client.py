@@ -8,7 +8,7 @@ from typing import Any
 
 import aiohttp
 from solana.rpc.async_api import AsyncClient
-from solana.rpc.commitment import Confirmed
+from solana.rpc.commitment import Processed
 from solana.rpc.types import TxOpts
 from solders.compute_budget import set_compute_unit_limit, set_compute_unit_price
 from solders.hash import Hash
@@ -163,7 +163,7 @@ class SolanaClient:
         for attempt in range(max_retries):
             try:
                 tx_opts = TxOpts(
-                    skip_preflight=skip_preflight, preflight_commitment=Confirmed
+                    skip_preflight=skip_preflight, preflight_commitment=Processed
                 )
                 response = await client.send_transaction(transaction, tx_opts)
                 return response.value

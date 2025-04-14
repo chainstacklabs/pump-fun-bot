@@ -9,11 +9,15 @@ import os
 import sys
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 sys.path.append(str(Path(__file__).parent.parent / "src"))
 
 from core.pubkeys import PumpAddresses
 from monitoring.logs_listener import LogsListener
 from trading.base import TokenInfo
+
+load_dotenv()
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -91,7 +95,7 @@ async def test_logs_listener(
 if __name__ == "__main__":
     match_string = None  # Update if you want to filter tokens by name/symbol
     creator_address = None  # Update if you want to filter tokens by creator address
-    test_duration = 15
+    test_duration = 30
 
     logger.info("Starting logs listener test (using logsSubscribe)")
     asyncio.run(test_logs_listener(match_string, creator_address, test_duration))

@@ -15,6 +15,9 @@ dependencies = [
     "websockets>=15.0",
     "python-dotenv>=1.0.1",
     "aiohttp>=3.11.13",
+    "grpcio>=1.71.0",
+    "grpcio-tools>=1.71.0",
+    "protobuf>=5.29.4",
 ]
 
 [project.optional-dependencies]

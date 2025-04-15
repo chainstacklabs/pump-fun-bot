@@ -47,7 +47,7 @@ We assume no responsibility for the code or its usage. This is our public servic
 | | Copy trading | Enable copy trading functionality | Not started |
 | | Token analysis script | Script for basic token analysis (market cap, creator investment, liquidity, token age) | Not started |
 | | Archive node integration | Use Solana archive nodes for historical analysis (accounts that consistently print tokens, average mint to raydium time) | Not started |
-| | Geyser implementation | Leverage Solana Geyser for real-time data stream processing | Not started |
+| | Geyser implementation | Leverage Solana Geyser for real-time data stream processing | ✅ |
 | **Stage 4: Minting experience** | Token minting | Ability to mint tokens (based on user request - someone minted 18k tokens) | FAFO |
 
 

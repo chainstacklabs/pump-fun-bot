@@ -8,9 +8,13 @@ import asyncio
 import os
 import sys
 
+from dotenv import load_dotenv
+
 import config
 from trading.trader import PumpTrader
 from utils.logger import get_logger, setup_file_logging
+
+load_dotenv()
 
 logger = get_logger(__name__)
 

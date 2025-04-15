@@ -1,6 +1,6 @@
 """
-Test script for BlockListener
-Tests websocket monitoring for new pump.fun tokens using blockSubscribe
+Test script for GeyserListener
+Tests gRPC monitoring for new pump.fun tokens using Geyser
 """
 
 import asyncio
@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 sys.path.append(str(Path(__file__).parent.parent / "src"))
 
 from core.pubkeys import PumpAddresses
-from monitoring.block_listener import BlockListener
+from monitoring.geyser_listener import GeyserListener
 from trading.base import TokenInfo
 
 load_dotenv()
@@ -22,7 +22,7 @@ load_dotenv()
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
-logger = logging.getLogger("block-listener-test")
+logger = logging.getLogger("geyser-listener-test")
 
 
 class TestTokenCallback:
@@ -45,19 +45,25 @@ class TestTokenCallback:
         print(f"{'=' * 50}\n")
 
 
-async def test_block_listener(
+async def test_geyser_listener(
     match_string: str | None = None,
     creator_address: str | None = None,
     test_duration: int = 60,
 ):
-    """Test the block listener functionality"""
-    wss_endpoint = os.environ.get("SOLANA_NODE_WSS_ENDPOINT")
-    if not wss_endpoint:
-        logger.error("SOLANA_NODE_WSS_ENDPOINT environment variable is not set")
+    """Test the Geyser listener functionality"""
+    geyser_endpoint = os.environ.get("GEYSER_ENDPOINT")
+    geyser_api_token = os.environ.get("GEYSER_API_TOKEN")
+    
+    if not geyser_endpoint:
+        logger.error("GEYSER_ENDPOINT environment variable is not set")
+        return []
+        
+    if not geyser_api_token:
+        logger.error("GEYSER_API_TOKEN environment variable is not set")
         return []
     
-    logger.info(f"Connecting to WebSocket: {wss_endpoint}")
-    listener = BlockListener(wss_endpoint, PumpAddresses.PROGRAM)
+    logger.info(f"Connecting to Geyser API: {geyser_endpoint}")
+    listener = GeyserListener(geyser_endpoint, geyser_api_token, PumpAddresses.PROGRAM)
     callback = TestTokenCallback()
 
     if match_string:
@@ -97,5 +103,5 @@ if __name__ == "__main__":
     creator_address = None  # Update if you want to filter tokens by creator address
     test_duration = 30
 
-    logger.info("Starting block listener test (using blockSubscribe)")
-    asyncio.run(test_block_listener(match_string, creator_address, test_duration))
+    logger.info("Starting Geyser listener test (using Geyser API)")
+    asyncio.run(test_geyser_listener(match_string, creator_address, test_duration))

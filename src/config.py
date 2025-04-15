@@ -15,7 +15,7 @@ SELL_SLIPPAGE: float = 0.4  # Consistent slippage tolerance to maintain trading 
 # EXTREME FAST Mode configuration
 # When enabled, skips waiting for the bonding curve to stabilize and RPC price check.
 # The bot buys the specified number of tokens directly, making the process faster but less precise.
-EXTREME_FAST_MODE: bool = False
+EXTREME_FAST_MODE: bool = True
 # Amount of tokens to buy in EXTREME FAST mode. No price calculation is done; the bot buys exactly this amount.
 EXTREME_FAST_TOKEN_AMOUNT: int = 30
 
@@ -24,15 +24,16 @@ EXTREME_FAST_TOKEN_AMOUNT: int = 30
 # Manage transaction speed and cost on the Solana network
 ENABLE_DYNAMIC_PRIORITY_FEE: bool = False  # Adaptive fee calculation
 ENABLE_FIXED_PRIORITY_FEE: bool = True  # Use consistent, predictable fee
-FIXED_PRIORITY_FEE: int = 2_000  # Base fee in microlamports
+FIXED_PRIORITY_FEE: int = 500_000  # Base fee in microlamports
 EXTRA_PRIORITY_FEE: float = 0.0  # Percentage increase on priority fee (0.1 = 10%)
-HARD_CAP_PRIOR_FEE: int = 200_000  # Maximum allowable fee to prevent excessive spending in microlamports
+HARD_CAP_PRIOR_FEE: int = 500_000  # Maximum allowable fee to prevent excessive spending in microlamports
 
 
 # Listener configuration
 # Choose method for detecting new tokens on the network
 # "logs": Recommended for more stable token detection
 # "blocks": Unstable method, potentially less reliable
+# "geyser": The fastest way for getting updates, requires Geyser endpoint
 LISTENER_TYPE = "logs"
 
 
@@ -48,7 +49,7 @@ WAIT_TIME_BEFORE_NEW_TOKEN: int | float = 15  # Pause between token trades
 
 # Token and account management
 # Control token processing and account cleanup strategies
-MAX_TOKEN_AGE: int | float = 0.1  # Maximum token age in seconds for processing
+MAX_TOKEN_AGE: int | float = 0.001  # Maximum token age in seconds for processing
 
 # Cleanup mode determines when to manage token accounts. Options:
 # "disabled": No cleanup will occur.
@@ -98,7 +99,7 @@ def validate_configuration() -> None:
         raise ValueError("Cannot enable both dynamic and fixed priority fees simultaneously")
 
     # Validate listener type
-    if LISTENER_TYPE not in ["logs", "blocks"]:
+    if LISTENER_TYPE not in ["logs", "blocks", "geyser"]:
         raise ValueError("LISTENER_TYPE must be either 'logs' or 'blocks'")
 
     # Validate cleanup mode

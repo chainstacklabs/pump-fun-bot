@@ -22,6 +22,7 @@ from core.priority_fee.manager import PriorityFeeManager
 from core.pubkeys import PumpAddresses
 from core.wallet import Wallet
 from monitoring.block_listener import BlockListener
+from monitoring.geyser_listener import GeyserListener
 from monitoring.logs_listener import LogsListener
 from trading.base import TokenInfo, TradeResult
 from trading.buyer import TokenBuyer
@@ -43,7 +44,9 @@ class PumpTrader:
         buy_slippage: float,
         sell_slippage: float,
         max_retries: int = 5,
-        listener_type: str = "block",  # Add this parameter
+        listener_type: str = "logs",
+        geyser_endpoint: str | None = None,
+        geyser_api_token: str | None = None,
     ):
         """Initialize the pump trader.
 
@@ -55,7 +58,9 @@ class PumpTrader:
             buy_slippage: Slippage tolerance for buys
             sell_slippage: Slippage tolerance for sells
             max_retries: Maximum number of retry attempts
-            listener_type: Type of listener to use ('block' or 'logs')
+            listener_type: Type of listener to use ('logs', 'blocks', or 'geyser')
+            geyser_endpoint: Geyser endpoint URL (required for geyser listener)
+            geyser_api_token: Geyser API token (required for geyser listener)
         """
         self.solana_client = SolanaClient(rpc_endpoint)
         self.wallet = Wallet(private_key)
@@ -92,7 +97,18 @@ class PumpTrader:
         )
 
         # Initialize the appropriate listener type
-        if listener_type.lower() == "logs":
+        listener_type = listener_type.lower()
+        if listener_type == "geyser":
+            if not geyser_endpoint or not geyser_api_token:
+                raise ValueError("Geyser endpoint and API token are required for geyser listener")
+                
+            self.token_listener = GeyserListener(
+                geyser_endpoint, 
+                geyser_api_token, 
+                PumpAddresses.PROGRAM
+            )
+            logger.info("Using Geyser listener for token monitoring")
+        elif listener_type == "logs":
             self.token_listener = LogsListener(wss_endpoint, PumpAddresses.PROGRAM)
             logger.info("Using logsSubscribe listener for token monitoring")
         else:

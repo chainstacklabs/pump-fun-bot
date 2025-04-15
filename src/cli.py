@@ -65,6 +65,9 @@ async def main() -> None:
     rpc_endpoint: str | None = os.environ.get("SOLANA_NODE_RPC_ENDPOINT")
     wss_endpoint: str | None = os.environ.get("SOLANA_NODE_WSS_ENDPOINT")
     private_key: str | None = os.environ.get("SOLANA_PRIVATE_KEY")
+    geyser_endpoint: str | None = os.environ.get("GEYSER_ENDPOINT")
+    geyser_api_token: str | None = os.environ.get("GEYSER_API_TOKEN")
+
 
     # Validate configuration values
     if not rpc_endpoint or not rpc_endpoint.startswith(("http://", "https://")):
@@ -78,6 +81,14 @@ async def main() -> None:
     if not private_key or len(private_key) < 80:
         logger.error("Invalid private key. Key appears to be missing or too short")
         sys.exit(1)
+
+    if config.LISTENER_TYPE.lower() == "geyser":
+        if not geyser_endpoint:
+            logger.error("GEYSER_ENDPOINT environment variable is not set")
+            sys.exit(1)
+        if not geyser_api_token:
+            logger.error("GEYSER_API_TOKEN environment variable is not set")
+            sys.exit(1)
 
     # Get trading parameters
     buy_amount: float = args.amount if args.amount is not None else config.BUY_AMOUNT
@@ -97,6 +108,8 @@ async def main() -> None:
         sell_slippage=sell_slippage,
         max_retries=config.MAX_RETRIES,
         listener_type=config.LISTENER_TYPE,
+        geyser_endpoint=geyser_endpoint,
+        geyser_api_token=geyser_api_token,  
     )
 
     try:

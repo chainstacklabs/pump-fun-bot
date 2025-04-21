@@ -1,3 +1,9 @@
+"""
+This module provides functionality to:
+1. Find market addresses by base mint
+2. Fetch and parse market data (including pool addresses) from Pump AMM program accounts
+"""
+
 import asyncio
 import os
 import struct

@@ -1,15 +1,15 @@
 import asyncio
 import json
 import os
-import sys
 
 import websockets
+from dotenv import load_dotenv
+from solders.pubkey import Pubkey
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-from core.pubkeys import PumpAddresses
+load_dotenv()
 
 WSS_ENDPOINT = os.environ.get("SOLANA_NODE_WSS_ENDPOINT")
+PUMP_MIGRATOR_ID = Pubkey.from_string("39azUYFWPz3VHgKCf3VChUwbpURdCHRxjWVowf5jUJjg")
 
 
 def process_initialize2_transaction(data):
@@ -48,7 +48,7 @@ async def listen_for_events():
                         "params": [
                             {
                                 "mentionsAccountOrProgram": str(
-                                    PumpAddresses.LIQUIDITY_MIGRATOR
+                                    PUMP_MIGRATOR_ID
                                 )
                             },
                             {

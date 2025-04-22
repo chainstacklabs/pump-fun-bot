@@ -1,3 +1,7 @@
+"""
+Listens for new Pump.fun token creations via PumpPortal WebSocket.
+"""
+
 import asyncio
 import json
 from datetime import datetime

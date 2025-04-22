@@ -1,3 +1,12 @@
+"""
+This module provides functionality to:
+- Find market addresses by token mint.
+- Fetch and parse market data from PUMP AMM pools.
+- Calculate token prices in AMM pools.
+- Create associated token accounts (ATAs) idempotently.
+- Sell tokens on the PUMP AMM with slippage protection.
+"""
+
 import asyncio
 import os
 import struct

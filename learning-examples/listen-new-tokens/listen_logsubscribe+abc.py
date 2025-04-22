@@ -1,19 +1,28 @@
+"""
+Listens for new Pump.fun token creations via Solana WebSocket.
+Monitors logs for 'Create' instructions, decodes and prints token details (name, symbol, mint, etc.).
+Additionally, calculates an associated bonding curve address for each token.
+
+It is usually faster than blockSubscribe, but slower than Geyser.
+"""
+
 import asyncio
 import base64
 import json
 import os
 import struct
-import sys
 
 import base58
 import websockets
+from dotenv import load_dotenv
 from solders.pubkey import Pubkey
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from core.pubkeys import PumpAddresses, SystemAddresses
+load_dotenv()
 
 WSS_ENDPOINT = os.environ.get("SOLANA_NODE_WSS_ENDPOINT")
-
+PUMP_PROGRAM_ID = Pubkey.from_string("6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P")
+TOKEN_PROGRAM_ID = Pubkey.from_string("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
+ASSOCIATED_TOKEN_PROGRAM_ID = Pubkey.from_string("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL")
 
 def find_associated_bonding_curve(mint: Pubkey, bonding_curve: Pubkey) -> Pubkey:
     """
@@ -23,22 +32,12 @@ def find_associated_bonding_curve(mint: Pubkey, bonding_curve: Pubkey) -> Pubkey
     derived_address, _ = Pubkey.find_program_address(
         [
             bytes(bonding_curve),
-            bytes(SystemAddresses.TOKEN_PROGRAM),
+            bytes(TOKEN_PROGRAM_ID),
             bytes(mint),
         ],
-        SystemAddresses.ASSOCIATED_TOKEN_PROGRAM,
+        ASSOCIATED_TOKEN_PROGRAM_ID,
     )
     return derived_address
-
-
-# Load the IDL JSON file
-with open("idl/pump_fun_idl.json") as f:
-    idl = json.load(f)
-
-# Extract the "create" instruction definition
-create_instruction = next(
-    instr for instr in idl["instructions"] if instr["name"] == "create"
-)
 
 
 def parse_create_instruction(data):
@@ -75,18 +74,6 @@ def parse_create_instruction(data):
         return None
 
 
-def print_transaction_details(log_data):
-    print(f"Signature: {log_data.get('signature')}")
-
-    for log in log_data.get("logs", []):
-        if log.startswith("Program data:"):
-            try:
-                data = base58.b58decode(log.split(": ")[1]).decode("utf-8")
-                print(f"Data: {data}")
-            except:
-                pass
-
-
 async def listen_for_new_tokens():
     while True:
         try:
@@ -97,14 +84,14 @@ async def listen_for_new_tokens():
                         "id": 1,
                         "method": "logsSubscribe",
                         "params": [
-                            {"mentions": [str(PumpAddresses.PROGRAM)]},
+                            {"mentions": [str(PUMP_PROGRAM_ID)]},
                             {"commitment": "processed"},
                         ],
                     }
                 )
                 await websocket.send(subscription_message)
                 print(
-                    f"Listening for new token creations from program: {PumpAddresses.PROGRAM}"
+                    f"Listening for new token creations from program: {PUMP_PROGRAM_ID}"
                 )
 
                 # Wait for subscription confirmation

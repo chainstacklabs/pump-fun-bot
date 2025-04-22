@@ -1,17 +1,25 @@
+"""
+Listens to Solana blocks for Pump.fun 'create' instructions via WebSocket.
+Decodes transaction data to extract mint, bonding curve, and user details.
+
+It is usually slower than other listeners.
+"""
+
 import asyncio
 import base64
 import json
 import os
 import struct
-import sys
 
 import websockets
+from dotenv import load_dotenv
+from solders.pubkey import Pubkey
 from solders.transaction import VersionedTransaction
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from core.pubkeys import PumpAddresses
+load_dotenv()
 
 WSS_ENDPOINT = os.environ.get("SOLANA_NODE_WSS_ENDPOINT")
+PUMP_PROGRAM_ID = Pubkey.from_string("6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P")
 
 
 def load_idl(file_path):
@@ -58,7 +66,7 @@ async def listen_and_decode_create():
                 "id": 1,
                 "method": "blockSubscribe",
                 "params": [
-                    {"mentionsAccountOrProgram": str(PumpAddresses.PROGRAM)},
+                    {"mentionsAccountOrProgram": str(PUMP_PROGRAM_ID)},
                     {
                         "commitment": "confirmed",
                         "encoding": "base64",
@@ -70,7 +78,7 @@ async def listen_and_decode_create():
             }
         )
         await websocket.send(subscription_message)
-        print(f"Subscribed to blocks mentioning program: {PumpAddresses.PROGRAM}")
+        print(f"Subscribed to blocks mentioning program: {PUMP_PROGRAM_ID}")
 
         while True:
             try:
@@ -97,7 +105,7 @@ async def listen_and_decode_create():
                                                 transaction.message.account_keys[
                                                     ix.program_id_index
                                                 ]
-                                            ) == str(PumpAddresses.PROGRAM):
+                                            ) == str(PUMP_PROGRAM_ID):
                                                 ix_data = bytes(ix.data)
                                                 discriminator = struct.unpack(
                                                     "<Q", ix_data[:8]

@@ -1,3 +1,11 @@
+"""
+Listens for 'Migrate' instructions from a Solana migration program via WebSocket.
+Parses and logs transaction details (e.g., mint, liquidity, token accounts) for successful migrations.
+
+Note: skips transactions with truncated logs (no Program data in the logs -> no parsed data).
+To cover those cases, please use an additional RPC call (get transaction data) or additional listener not based on logs.
+"""
+
 import asyncio
 import base64
 import json
@@ -6,7 +14,10 @@ import struct
 
 import base58
 import websockets
+from dotenv import load_dotenv
 from solders.pubkey import Pubkey
+
+load_dotenv()
 
 WSS_ENDPOINT = os.environ.get("SOLANA_NODE_WSS_ENDPOINT")
 MIGRATION_PROGRAM_ID = Pubkey.from_string("39azUYFWPz3VHgKCf3VChUwbpURdCHRxjWVowf5jUJjg")
@@ -77,9 +88,8 @@ def is_transaction_successful(logs):
 
 
 def print_transaction_details(log_data):
-    signature = log_data.get('signature', 'N/A')
-    print(f"\n[INFO] Transaction Signature: {signature}")
     logs = log_data.get("logs", [])
+    parsed_data = {}
 
     for log in logs:
         if log.startswith("Program data:"):
@@ -87,16 +97,14 @@ def print_transaction_details(log_data):
                 data = base64.b64decode(log.split(": ")[1])
                 parsed_data = parse_migrate_instruction(data)
                 if parsed_data:
-                    print("\n[INFO] Parsed Migration Instruction Data:")
+                    print("[INFO] Parsed from Program data:")
                     for key, value in parsed_data.items():
                         print(f"  {key}: {value}")
             except Exception as e:
-                print(f"[ERROR] Base64 decode failed: {log}, Error: {e}")
+                print(f"[ERROR] Failed to decode Program data: {e}")
 
-def print_log_details(logs):
-    print("\n[INFO] Processing logs:")
-    for log in logs:
-        print(f"  Log: {log}")
+    if not parsed_data:
+        print("[ERROR] Failed to parse migration data: parsed data is empty")
 
 
 async def listen_for_migrations():
@@ -130,16 +138,19 @@ async def listen_for_migrations():
                             log_data = data["params"]["result"]["value"]
                             logs = log_data.get("logs", [])
 
+                            signature = log_data.get('signature', 'N/A')
+                            print(f"\n[INFO] Transaction signature: {signature}")
+
                             if is_transaction_successful(logs):
                                 if not any("Program log: Instruction: Migrate" in log for log in logs):
-                                    print("[INFO] Skipping: No Migrate instruction")
+                                    print("[INFO] Skipping: no migrate instruction")
                                     continue
 
                                 if any("Program log: Bonding curve already migrated" in log for log in logs):
-                                    print("[INFO] Skipping: Bonding curve already migrated")
+                                    print("[INFO] Skipping: bonding curve already migrated")
                                     continue
 
-                                print("[INFO] Processing migration instruction!")
+                                print("[INFO] Processing migration instruction...")
                                 print_transaction_details(log_data)
                             else:
                                 print("[INFO] Skipping failed transaction.")

@@ -1,3 +1,11 @@
+"""
+Monitors Solana for new Pump.fun token creations using Geyser gRPC.
+Decodes 'create' instructions to extract and display token details (name, symbol, mint, bonding curve).
+Requires a Geyser API token for access.
+
+It is proven to be the fastest listener.
+"""
+
 import asyncio
 import os
 import struct
@@ -6,6 +14,7 @@ import base58
 import grpc
 from dotenv import load_dotenv
 from generated import geyser_pb2, geyser_pb2_grpc
+from solders.pubkey import Pubkey
 
 load_dotenv()
 
@@ -13,14 +22,14 @@ load_dotenv()
 GEYSER_ENDPOINT = os.getenv("GEYSER_ENDPOINT")
 GEYSER_API_TOKEN = os.getenv("GEYSER_API_TOKEN")
 
-PUMP_PROGRAM = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
+PUMP_PROGRAM_ID = Pubkey.from_string("6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P")
 PUMP_CREATE_PREFIX = struct.pack("<Q", 8576854823835016728)
 
 
 async def create_geyser_connection():
     """Establish a secure connection to the Geyser endpoint."""
     auth = grpc.metadata_call_credentials(
-        lambda context, callback: callback((("authorization", f"Basic {GEYSER_API_TOKEN}"),), None)
+        lambda _, callback: callback((("authorization", f"Basic {GEYSER_API_TOKEN}"),), None)
     )
     creds = grpc.composite_channel_credentials(grpc.ssl_channel_credentials(), auth)
     channel = grpc.aio.secure_channel(GEYSER_ENDPOINT, creds)
@@ -30,7 +39,7 @@ async def create_geyser_connection():
 def create_subscription_request():
     """Create a subscription request for Pump.fun transactions."""
     request = geyser_pb2.SubscribeRequest()
-    request.transactions["pump_filter"].account_include.append(PUMP_PROGRAM)
+    request.transactions["pump_filter"].account_include.append(str(PUMP_PROGRAM_ID))
     request.transactions["pump_filter"].failed = False
     request.commitment = geyser_pb2.CommitmentLevel.PROCESSED
     return request

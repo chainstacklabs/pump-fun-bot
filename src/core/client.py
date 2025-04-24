@@ -47,7 +47,8 @@ class SolanaClient:
                     self._cached_blockhash = blockhash
             except Exception as e:
                 logger.warning(f"Blockhash fetch failed: {e!s}")
-            await asyncio.sleep(interval)
+            finally:
+                await asyncio.sleep(interval)
 
     async def get_cached_blockhash(self) -> Hash:
         """Return the most recently cached blockhash."""
@@ -195,7 +196,7 @@ class SolanaClient:
         """
         client = await self.get_client()
         try:
-            await client.confirm_transaction(signature, commitment=commitment)
+            await client.confirm_transaction(signature, commitment=commitment, sleep_seconds=1)
             return True
         except Exception as e:
             logger.error(f"Failed to confirm transaction {signature}: {e!s}")

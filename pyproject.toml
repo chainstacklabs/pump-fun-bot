@@ -18,6 +18,7 @@ dependencies = [
     "grpcio>=1.71.0",
     "grpcio-tools>=1.71.0",
     "protobuf>=5.29.4",
+    "pyyaml>=6.0.2",
 ]
 
 [project.optional-dependencies]
@@ -26,7 +27,7 @@ dev = [
 ]
 
 [project.scripts]
-pump_bot = "cli:sync_main"
+pump_bot = "bot_runner:main"
 
 [tool.ruff]
 exclude = [

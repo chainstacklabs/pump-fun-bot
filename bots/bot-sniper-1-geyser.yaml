@@ -1,0 +1,71 @@
+# This file defines comprehensive parameters and settings for the trading bot.
+# Carefully review and adjust values to match your trading strategy and risk tolerance.
+
+# Bot identification and connection settings
+name: "bot-sniper-1"
+env_file: ".env"
+rpc_endpoint: "${SOLANA_NODE_RPC_ENDPOINT}"
+wss_endpoint: "${SOLANA_NODE_WSS_ENDPOINT}"
+private_key: "${SOLANA_PRIVATE_KEY}"
+
+enabled: true # You can turn off the bot w/o removing its config
+separate_process: true
+
+# Geyser configuration (fastest method for getting updates)
+geyser:
+  endpoint: "${GEYSER_ENDPOINT}"
+  api_token: "${GEYSER_API_TOKEN}"
+
+# Trading parameters
+# Control trade execution: amount of SOL per trade and acceptable price deviation
+trade:
+  buy_amount: 0.0001 # Amount of SOL to spend when buying (in SOL)
+  buy_slippage: 0.3 # Maximum acceptable price deviation (0.3 = 30%)
+  sell_slippage: 0.3
+
+  # EXTREME FAST mode configuration
+  # When enabled, skips waiting for the bonding curve to stabilize and RPC price check.
+  # The bot buys the specified number of tokens directly, making the process faster but less precise.
+  extreme_fast_mode: true
+  extreme_fast_token_amount: 20 # Amount of tokens to buy
+
+# Priority fee configuration
+# Manage transaction speed and cost on the Solana network.
+# Note: dynamic mode requires an additional RPC call, which slows down the buying process.
+priority_fees:
+  enable_dynamic: false # Use latest transactions to estimate required fee (getRecentPrioritizationFees)
+  enable_fixed: true # Use fixed amount below
+  fixed_amount: 1_000_000 # Base fee in microlamports
+  extra_percentage: 0.0 # Percentage increase on riority fee regardless of the calculation method (0.1 = 10%)
+  hard_cap: 1_000_000 # Maximum allowable fee in microlamports to prevent excessive spending
+
+# Filters for token selection
+filters:
+  match_string: null # Only process tokens with this string in name/symbol
+  bro_address: null # Only trade tokens created by this user address
+  listener_type: "geyser" # Method for detecting new tokens: "logs", "blocks", or "geyser"
+  max_token_age: 0.001 # Maximum token age in seconds for processing
+  marry_mode: false # Only buy tokens, skip selling
+  yolo_mode: false # Continuously trade tokens
+
+# Retry and timeout settings
+retries:
+  max_attempts: 1 # Number of attempts for transaction submission
+  wait_after_creation: 15 # Seconds to wait after token creation (only if EXTREME FAST is disabled)
+  wait_after_buy: 15 # Holding period after buy transaction
+  wait_before_new_token: 15 # Pause between token trades
+
+# Token and account management
+cleanup:
+  # Cleanup mode determines when to manage token accounts. Options:
+  # "disabled": no cleanup will occur.
+  # "on_fail": only clean up if a buy transaction fails.
+  # "after_sell": clean up after selling.
+  # "post_session": clean up all empty accounts after a trading session ends.
+  mode: "post_session"
+  force_close_with_burn: false # Force burning remaining tokens before closing account
+  with_priority_fee: false # Use priority fees for cleanup transactions
+
+# Node provider configuration (not implemented)
+node:
+  max_rps: 25 # Maximum requests per second

@@ -3,7 +3,6 @@ Logging utilities for the pump.fun trading bot.
 """
 
 import logging
-import sys
 
 # Global dict to store loggers
 _loggers: dict[str, logging.Logger] = {}
@@ -27,16 +26,6 @@ def get_logger(name: str, level: int = logging.INFO) -> logging.Logger:
     logger = logging.getLogger(name)
     logger.setLevel(level)
 
-    if not logger.handlers:
-        formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
-        )
-
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setFormatter(formatter)
-        logger.addHandler(console_handler)
-
     _loggers[name] = logger
     return logger
 
@@ -51,6 +40,11 @@ def setup_file_logging(
         level: Logging level for file handler
     """
     root_logger = logging.getLogger()
+
+    # Check if file handler with same filename already exists
+    for handler in root_logger.handlers:
+        if isinstance(handler, logging.FileHandler) and handler.baseFilename == filename:
+            return  # File handler already added
 
     formatter = logging.Formatter(
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s",

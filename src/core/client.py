@@ -120,7 +120,7 @@ class SolanaClient:
             Recent blockhash as string
         """
         client = await self.get_client()
-        response = await client.get_latest_blockhash()
+        response = await client.get_latest_blockhash(commitment="processed")
         return response.value.blockhash
 
     async def build_and_send_transaction(
@@ -152,7 +152,7 @@ class SolanaClient:
         # Add priority fee instructions if applicable
         if priority_fee is not None:
             fee_instructions = [
-                set_compute_unit_limit(100_000),  # Default compute unit limit
+                set_compute_unit_limit(75_000),  # Default compute unit limit
                 set_compute_unit_price(priority_fee),
             ]
             instructions = fee_instructions + instructions

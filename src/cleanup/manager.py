@@ -1,7 +1,8 @@
+import asyncio
+
 from solders.pubkey import Pubkey
 from spl.token.instructions import BurnParams, CloseAccountParams, burn, close_account
 
-from config import CLEANUP_FORCE_CLOSE_WITH_BURN
 from core.client import SolanaClient
 from core.priority_fee.manager import PriorityFeeManager
 from core.pubkeys import SystemAddresses
@@ -19,6 +20,7 @@ class AccountCleanupManager:
         wallet: Wallet,
         priority_fee_manager: PriorityFeeManager,
         use_priority_fee: bool = False,
+        force_burn: bool = False,
     ):
         """
         Args:
@@ -29,6 +31,7 @@ class AccountCleanupManager:
         self.wallet = wallet
         self.priority_fee_manager = priority_fee_manager
         self.use_priority_fee = use_priority_fee
+        self.close_with_force_burn = force_burn
 
     async def cleanup_ata(self, mint: Pubkey) -> None:
         """
@@ -44,6 +47,9 @@ class AccountCleanupManager:
             else None
         )
 
+        logger.info("Waiting for 15 seconds for RPC node to synchronize...")
+        await asyncio.sleep(15)
+
         try:
             info = await solana_client.get_account_info(ata, encoding="base64")
             if not info.value:
@@ -53,7 +59,7 @@ class AccountCleanupManager:
             balance = await self.client.get_token_account_balance(ata)
             instructions = []
 
-            if balance > 0 and CLEANUP_FORCE_CLOSE_WITH_BURN:
+            if balance > 0 and self.close_with_force_burn:
                 logger.info(f"Burning {balance} tokens from ATA {ata} (mint: {mint})...")
                 burn_ix = burn(
                     BurnParams(

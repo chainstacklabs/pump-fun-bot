@@ -92,13 +92,6 @@ class TokenBuyer(Trader):
             # Calculate maximum SOL to spend with slippage
             max_amount_lamports = int(amount_lamports * (1 + self.slippage))
 
-            logger.info(
-                f"Buying {token_amount:.6f} tokens at {token_price_sol:.8f} SOL per token"
-            )
-            logger.info(
-                f"Total cost: {self.amount:.6f} SOL (max: {max_amount_lamports / LAMPORTS_PER_SOL:.6f} SOL)"
-            )
-
             associated_token_account = self.wallet.get_associated_token_address(
                 token_info.mint
             )
@@ -108,6 +101,13 @@ class TokenBuyer(Trader):
                 associated_token_account,
                 token_amount,
                 max_amount_lamports,
+            )
+
+            logger.info(
+                f"Buying {token_amount:.6f} tokens at {token_price_sol:.8f} SOL per token"
+            )
+            logger.info(
+                f"Total cost: {self.amount:.6f} SOL (max: {max_amount_lamports / LAMPORTS_PER_SOL:.6f} SOL)"
             )
 
             success = await self.client.confirm_transaction(tx_signature)

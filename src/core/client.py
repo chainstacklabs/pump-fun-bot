@@ -80,6 +80,17 @@ class SolanaClient:
             await self._client.close()
             self._client = None
 
+    async def get_health(self) -> str | None:
+        body = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "getHealth",
+        }
+        result = await self.post_rpc(body)
+        if result and "result" in result:
+            return result["result"]
+        return None
+
     async def get_account_info(self, pubkey: Pubkey) -> dict[str, Any]:
         """Get account info from the blockchain.
 
@@ -152,7 +163,7 @@ class SolanaClient:
         # Add priority fee instructions if applicable
         if priority_fee is not None:
             fee_instructions = [
-                set_compute_unit_limit(75_000),  # Default compute unit limit
+                set_compute_unit_limit(70_000),  # Default compute unit limit
                 set_compute_unit_price(priority_fee),
             ]
             instructions = fee_instructions + instructions

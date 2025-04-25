@@ -7,6 +7,7 @@ import asyncio
 import json
 import os
 from datetime import datetime
+from time import monotonic
 
 from solders.pubkey import Pubkey
 
@@ -205,6 +206,12 @@ class PumpTrader:
         logger.info(f"Max token age: {self.max_token_age} seconds")
 
         try:
+            health_resp = await self.solana_client.get_health()
+            logger.info(f"RPC warm-up successful (getHealth passed: {health_resp})")
+        except Exception as e:
+            logger.warning(f"RPC warm-up failed: {e!s}")
+
+        try:
             # Choose operating mode based on yolo_mode
             if not self.yolo_mode:
                 # Single token mode: process one token and exit
@@ -261,7 +268,7 @@ class PumpTrader:
             # Only process if not already processed and fresh
             if token_key not in self.processed_tokens:
                 # Record when the token was discovered
-                self.token_timestamps[token_key] = asyncio.get_event_loop().time()
+                self.token_timestamps[token_key] = monotonic()
                 found_token = token
                 self.processed_tokens.add(token_key)
                 token_found.set()
@@ -328,7 +335,7 @@ class PumpTrader:
             return
 
         # Record timestamp when token was discovered
-        self.token_timestamps[token_key] = asyncio.get_event_loop().time()
+        self.token_timestamps[token_key] = monotonic()
 
         await self.token_queue.put(token_info)
         logger.info(f"Queued new token: {token_info.symbol} ({token_info.mint})")
@@ -341,7 +348,7 @@ class PumpTrader:
                 token_key = str(token_info.mint)
 
                 # Check if token is still "fresh"
-                current_time = asyncio.get_event_loop().time()
+                current_time = monotonic()
                 token_age = current_time - self.token_timestamps.get(
                     token_key, current_time
                 )
@@ -378,11 +385,10 @@ class PumpTrader:
             token_info: Token information
         """
         try:
-            # Save token info to file
-            await self._save_token_info(token_info)
-
             # Wait for bonding curve to stabilize (unless in extreme fast mode)
             if not self.extreme_fast_mode:
+                # Save token info to file
+                # await self._save_token_info(token_info)
                 logger.info(
                     f"Waiting for {self.wait_time_after_creation} seconds for the bonding curve to stabilize..."
                 )

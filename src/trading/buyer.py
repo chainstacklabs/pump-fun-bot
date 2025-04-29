@@ -82,7 +82,7 @@ class TokenBuyer(Trader):
                 # Skip the wait and directly calculate the amount
                 token_amount = self.extreme_fast_token_amount
                 token_price_sol = self.amount / token_amount
-                logger.info(f"EXTREME FAST Mode: Buying {token_amount} tokens.")
+                #logger.info(f"EXTREME FAST Mode: Buying {token_amount} tokens.")
             else:
                 # Regular behavior with RPC call
                 curve_state = await self.curve_manager.get_curve_state(token_info.bonding_curve)

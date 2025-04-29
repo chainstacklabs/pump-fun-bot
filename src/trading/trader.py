@@ -9,6 +9,7 @@ import os
 from datetime import datetime
 from time import monotonic
 
+import uvloop
 from solders.pubkey import Pubkey
 
 from cleanup.modes import (
@@ -28,6 +29,8 @@ from trading.base import TokenInfo, TradeResult
 from trading.buyer import TokenBuyer
 from trading.seller import TokenSeller
 from utils.logger import get_logger
+
+asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 logger = get_logger(__name__)
 
@@ -357,7 +360,6 @@ class PumpTrader:
                     logger.info(
                         f"Skipping token {token_info.symbol} - too old ({token_age:.1f}s > {self.max_token_age}s)"
                     )
-                    #self.token_queue.task_done()
                     continue
 
                 self.processed_tokens.add(token_key)

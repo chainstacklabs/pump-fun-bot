@@ -50,10 +50,10 @@ def load_bot_config(path: str) -> dict:
     if env_file:
         env_path = os.path.join(os.path.dirname(path), env_file)
         if os.path.exists(env_path):
-            load_dotenv(env_path)
+            load_dotenv(env_path, override=True)
         else:
             # If not found relative to config, try relative to current working directory
-            load_dotenv(env_file)
+            load_dotenv(env_file, override=True)
     
     resolve_env_vars(config)
     validate_config(config)

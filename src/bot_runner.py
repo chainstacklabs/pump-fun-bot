@@ -60,6 +60,7 @@ async def start_bot(config_path: str):
         # Geyser configuration (if applicable)
         geyser_endpoint=cfg.get("geyser", {}).get("endpoint"),
         geyser_api_token=cfg.get("geyser", {}).get("api_token"),
+        geyser_auth_type=cfg.get("geyser", {}).get("auth_type"),
         
         # Priority fee configuration
         enable_dynamic_priority_fee=cfg.get("priority_fees", {}).get("enable_dynamic", False),

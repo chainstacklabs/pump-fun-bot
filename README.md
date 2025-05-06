@@ -13,57 +13,19 @@ Not everyone is a scammer though, sometimes there are helpful outside devs who c
 
 **>>END OF WARNING<<**
 
-Development ongoing in the [refactored/main-v2](https://github.com/chainstacklabs/pump-fun-bot/commits/refactored/main-v2/) branch.
+A word warning: **Not For Production (NFP)**
 
-~~As of March 21, 2025, the bot from the **refactored/main-v2** branch is signficantly better over the **main** version, so the suggestion is to FAFO with v2.~~
-
-As of April 30, 2025, all changes from **refactored/main-v2** are merged into the **main** version.
-
-Leave your feedback by opening **Issues**.
-
-A word warning:
-
-**Not For Production (NFP)**
-
-This code is not intended for production use. Feel free to take the source, modify it to your needs, and most importantly, **learn from it**.
+This code is not intended for production use. Feel free to take the source, modify it to your needs, and most importantly, **learn from it** (learning examples, issues, PRs contain a lot of useful insights).
 
 We assume no responsibility for the code or its usage. This is our public service contribution to the community and Web3.
-
-# Pump.fun bot development roadmap
-
-| Stage | Feature | Comments | Implementation status
-|-------|---------|----------|---------------------|
-| **Stage 1: General updates & QoL** | Lib updates | Updating to the latest libraries | ✅ |
-| | Error handling | Improving error handling | ✅ | 
-| | Configurable RPS | Ability to set RPS in the config to match your provider's and plan RPS (preferably [Chainstack](https://console.chainstack.com/) 🤩) | WIP |
-| | Dynamic priority fees | Ability to set dynamic priority fees | ✅ |
-| | Review & optimize `json`, `jsonParsed`, `base64` | Improve speed and traffic for calls, not just `getBlock`. [Helpful overview](https://docs.chainstack.com/docs/solana-optimize-your-getblock-performance#json-jsonparsed-base58-base64).| ✅ | 
-| **Stage 2: Bonding curve and migration management** | `logsSubscribe` integration | Integrate `logsSubscribe` instead of `blockSubscribe` for sniping minted tokens into the main bot | ✅ |
-| | Dual subscription methods | Keep both `logsSubscribe` & `blockSubscribe` in the main bot for flexibility and adapting to Solana node architecture changes | ✅ |
-| | Transaction retries | Do retries instead of cooldown and/or keep the cooldown | WIP |
-| | Bonding curve status tracking | Checking a bonding curve status progress. Predict how soon a token will start the migration process | ✅ | 
-| | Account closure script | Script to close the associated bonding curve account if the rest of the flow txs fails | ✅ |
-| | PumpSwap migration listening | pump_fun migrated to their own DEX — [PumpSwap](https://x.com/pumpdotfun/status/1902762309950292010), so we need to FAFO with that instead of Raydium (and attempt `logSubscribe` implementation) | ✅ |
-| **Stage 3: Trading experience** | Take profit/stop loss | Implement take profit, stop loss exit strategies | FAFO |
-| | Market cap-based selling | Sell when a specific market cap has been reached | Not started |
-| | Copy trading | Enable copy trading functionality | Not started |
-| | Token analysis script | Script for basic token analysis (market cap, creator investment, liquidity, token age) | Not started |
-| | Archive node integration | Use Solana archive nodes for historical analysis (accounts that consistently print tokens, average mint to raydium time) | Not started |
-| | Geyser implementation | Leverage Solana Geyser for real-time data stream processing | ✅ |
-| **Stage 4: Minting experience** | Token minting | Ability to mint tokens (based on user request - someone minted 18k tokens) | FAFO |
-
-
-## Development Timeline
-- Development begins: Week of March 10, 2025
-- Implementation approach: Gradual rollout in separate branch
-- Priority: Stages progress from simple to complex features
-- Completion guarantee: Full completion of Stage 1, other stages dependent on feedback and feasibility
 
 For the full walkthrough, see [Solana: Creating a trading and sniping pump.fun bot](https://docs.chainstack.com/docs/solana-creating-a-pumpfun-bot).
 
 For near-instantaneous transaction propagation, you can use the [Chainstack Solana Trader nodes](https://docs.chainstack.com/docs/trader-nodes).
 
 [Sign up with Chainstack](https://console.chainstack.com).
+
+Leave your feedback by opening **Issues**.
 
 
 ## 🚀 Getting started
@@ -116,17 +78,20 @@ copy .env.example .env
 ```
 Edit the `.env` file and add your **Solana RPC endpoints** and **private key**.
 
+Edit `.yaml` templates in `bots` folder. Each file is a separate instance of a trading bot. Examine its parameters and apply your preferred strategy.
+
+
 ### Running the bot
 
 ```bash
 # Option 1: run as installed package
-pump_bot --help
+pump_bot
 
 # Option 2: run directly
-python -m src.cli --help
+python -m src.bot_runner
 ```
 
-> **You're all set! 🎉**  Now you can start using the bot. Check `--help` for available commands. 🚀
+> **You're all set! 🎉**  Now you can start using the bot.
 
 ## Note on limits
 
@@ -204,3 +169,38 @@ To run:
 So now you can run `listen_create_from_blocksubscribe.py` and `listen_new_direct_full_details.py` at the same time and see which one is faster.
 
 Also here's a doc on this: [Solana: Listening to pump.fun token mint using only logsSubscribe](https://docs.chainstack.com/docs/solana-listening-to-pumpfun-token-mint-using-only-logssubscribe)
+
+# Pump.fun bot development roadmap
+
+~~As of March 21, 2025, the bot from the **refactored/main-v2** branch is signficantly better over the **main** version, so the suggestion is to FAFO with v2.~~
+
+As of April 30, 2025, all changes from **refactored/main-v2** are merged into the **main** version.
+
+| Stage | Feature | Comments | Implementation status
+|-------|---------|----------|---------------------|
+| **Stage 1: General updates & QoL** | Lib updates | Updating to the latest libraries | ✅ |
+| | Error handling | Improving error handling | ✅ | 
+| | Configurable RPS | Ability to set RPS in the config to match your provider's and plan RPS (preferably [Chainstack](https://console.chainstack.com/) 🤩) | Not started |
+| | Dynamic priority fees | Ability to set dynamic priority fees | ✅ |
+| | Review & optimize `json`, `jsonParsed`, `base64` | Improve speed and traffic for calls, not just `getBlock`. [Helpful overview](https://docs.chainstack.com/docs/solana-optimize-your-getblock-performance#json-jsonparsed-base58-base64).| ✅ | 
+| **Stage 2: Bonding curve and migration management** | `logsSubscribe` integration | Integrate `logsSubscribe` instead of `blockSubscribe` for sniping minted tokens into the main bot | ✅ |
+| | Dual subscription methods | Keep both `logsSubscribe` & `blockSubscribe` in the main bot for flexibility and adapting to Solana node architecture changes | ✅ |
+| | Transaction retries | Do retries instead of cooldown and/or keep the cooldown | ✅ |
+| | Bonding curve status tracking | Checking a bonding curve status progress. Predict how soon a token will start the migration process | ✅ | 
+| | Account closure script | Script to close the associated bonding curve account if the rest of the flow txs fails | ✅ |
+| | PumpSwap migration listening | pump_fun migrated to their own DEX — [PumpSwap](https://x.com/pumpdotfun/status/1902762309950292010), so we need to FAFO with that instead of Raydium (and attempt `logSubscribe` implementation) | ✅ |
+| **Stage 3: Trading experience** | Take profit/stop loss | Implement take profit, stop loss exit strategies | FAFO |
+| | Market cap-based selling | Sell when a specific market cap has been reached | Not started |
+| | Copy trading | Enable copy trading functionality | Not started |
+| | Token analysis script | Script for basic token analysis (market cap, creator investment, liquidity, token age) | Not started |
+| | Archive node integration | Use Solana archive nodes for historical analysis (accounts that consistently print tokens, average mint to raydium time) | Not started |
+| | Geyser implementation | Leverage Solana Geyser for real-time data stream processing | ✅ |
+| **Stage 4: Minting experience** | Token minting | Ability to mint tokens (based on user request - someone minted 18k tokens) | FAFO |
+
+
+## Development timeline (closed)
+- Development begins: Week of March 10, 2025
+- Implementation approach: Gradual rollout in separate branch
+- Priority: Stages progress from simple to complex features
+- Completion guarantee: Full completion of Stage 1, other stages dependent on feedback and feasibility
+

@@ -15,6 +15,7 @@ separate_process: true
 geyser:
   endpoint: "${GEYSER_ENDPOINT}"
   api_token: "${GEYSER_API_TOKEN}"
+  auth_type: "basic" # or "x-token"
 
 # Trading parameters
 # Control trade execution: amount of SOL per trade and acceptable price deviation

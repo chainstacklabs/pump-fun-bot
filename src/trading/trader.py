@@ -48,6 +48,7 @@ class PumpTrader:
         listener_type: str = "logs",
         geyser_endpoint: str | None = None,
         geyser_api_token: str | None = None,
+        geyser_auth_type: str = "x-token",
 
         extreme_fast_mode: bool = False,
         extreme_fast_token_amount: int = 30,
@@ -90,6 +91,7 @@ class PumpTrader:
             listener_type: Type of listener to use ('logs', 'blocks', or 'geyser')
             geyser_endpoint: Geyser endpoint URL (required for geyser listener)
             geyser_api_token: Geyser API token (required for geyser listener)
+            geyser_auth_type: Geyser authentication type ('x-token' or 'basic')
 
             extreme_fast_mode: Whether to enable extreme fast mode
             extreme_fast_token_amount: Maximum token amount for extreme fast mode
@@ -155,7 +157,8 @@ class PumpTrader:
                 
             self.token_listener = GeyserListener(
                 geyser_endpoint, 
-                geyser_api_token, 
+                geyser_api_token,
+                geyser_auth_type, 
                 PumpAddresses.PROGRAM
             )
             logger.info("Using Geyser listener for token monitoring")

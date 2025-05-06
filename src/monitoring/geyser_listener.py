@@ -20,26 +20,37 @@ logger = get_logger(__name__)
 class GeyserListener(BaseTokenListener):
     """Geyser listener for pump.fun token creation events."""
 
-    def __init__(self, geyser_endpoint: str, geyser_api_token: str, pump_program: Pubkey):
+    def __init__(self, geyser_endpoint: str, geyser_api_token: str, geyser_auth_type: str, pump_program: Pubkey):
         """Initialize token listener.
         
         Args:
             geyser_endpoint: Geyser gRPC endpoint URL
             geyser_api_token: API token for authentication
+            geyser_auth_type: authentication type ('x-token' or 'basic')
             pump_program: Pump.fun program address
         """
         self.geyser_endpoint = geyser_endpoint
         self.geyser_api_token = geyser_api_token
+        valid_auth_types = {"x-token", "basic"}
+        self.auth_type: str = (geyser_auth_type or "x-token").lower()
+        if self.auth_type not in valid_auth_types:
+            raise ValueError(
+                f"Unsupported auth_type={self.auth_type!r}. "
+                f"Expected one of {valid_auth_types}"
+            )
         self.pump_program = pump_program
         self.event_processor = GeyserEventProcessor(pump_program)
         
     async def _create_geyser_connection(self):
         """Establish a secure connection to the Geyser endpoint."""
-        auth = grpc.metadata_call_credentials(
-            lambda context, callback: callback(
-                (("authorization", f"Basic {self.geyser_api_token}"),), None
+        if self.auth_type == "x-token":
+            auth = grpc.metadata_call_credentials(
+                lambda _, callback: callback((("x-token", self.geyser_api_token),), None)
             )
-        )
+        else:  # Default to basic auth
+            auth = grpc.metadata_call_credentials(
+                lambda _, callback: callback((("authorization", f"Basic {self.geyser_api_token}"),), None)
+            )
         creds = grpc.composite_channel_credentials(
             grpc.ssl_channel_credentials(), auth
         )

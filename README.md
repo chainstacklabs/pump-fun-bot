@@ -1,31 +1,32 @@
+<img width="1200" alt="Labs" src="https://user-images.githubusercontent.com/99700157/213291931-5a822628-5b8a-4768-980d-65f324985d32.png">
 
-**>>WARNNING ON SCAMS IN ISSUES COMMENT SECTION<<**
+<p>
+ <h3 align="center">Chainstack is the leading suite of services connecting developers with Web3 infrastructure</h3>
+</p>
 
-The issues comment section is often targeted by scam bots willing to redirect you to an external resource and drain your funds.
+<p align="center">
+  • <a target="_blank" href="https://chainstack.com/">Homepage</a> •
+  <a target="_blank" href="https://chainstack.com/protocols/">Supported protocols</a> •
+  <a target="_blank" href="https://chainstack.com/blog/">Chainstack blog</a> •
+  <a target="_blank" href="https://docs.chainstack.com/quickstart/">Blockchain API reference</a> • <br> 
+  • <a target="_blank" href="https://console.chainstack.com/user/account/create">Start for free</a> •
+</p>
 
-I have enabled a GitHub actions script to detect the common patterns and tag them, which obviously is not 100% accurate.
-
-This is also why you will see deleted comments in the issues—I only delete the scam bot comments targeting your private keys.
-
-The official maintainers are in the [MAINTAINERS.md](MAINTAINERS.md) file.
-
-Not everyone is a scammer though, sometimes there are helpful outside devs who comment and I absolutely appreciate it.
-
-**>>END OF WARNING<<**
-
-A word warning: **Not For Production (NFP)**
-
-This code is not intended for production use. Feel free to take the source, modify it to your needs, and most importantly, **learn from it** (learning examples, issues, PRs contain a lot of useful insights).
-
-We assume no responsibility for the code or its usage. This is our public service contribution to the community and Web3.
+The project allows you to create bots for trading on pump.fun. Its core feature is to snipe new tokens. Besides that, learning examples contain a lot of useful scripts for different types of listeners (new tokens, migrations) and deep dive into calculations required for trading.
 
 For the full walkthrough, see [Solana: Creating a trading and sniping pump.fun bot](https://docs.chainstack.com/docs/solana-creating-a-pumpfun-bot).
 
 For near-instantaneous transaction propagation, you can use the [Chainstack Solana Trader nodes](https://docs.chainstack.com/docs/trader-nodes).
 
-[Sign up with Chainstack](https://console.chainstack.com).
+The official maintainers are in the [MAINTAINERS.md](MAINTAINERS.md) file. Leave your feedback by opening **Issues**.
 
-Leave your feedback by opening **Issues**.
+---
+
+**🚨 SCAM ALERT**: Issues section is often targeted by scam bots willing to redirect you to an external resource and drain your funds. I have enabled a GitHub actions script to detect the common patterns and tag them, which obviously is not 100% accurate. This is also why you will see deleted comments in the issues—I only delete the scam bot comments targeting your private keys. Not everyone is a scammer though, sometimes there are helpful outside devs who comment and I absolutely appreciate it.
+
+**⚠️ NOT FOR PRODUCTION**: This code is for learning purposes only. We assume no responsibility for the code or its usage. Modify for your needs and learn from it (examples, issues, and PRs contain valuable insights).
+
+---
 
 
 ## 🚀 Getting started
@@ -91,7 +92,9 @@ pump_bot
 python -m src.bot_runner
 ```
 
-> **You're all set! 🎉**  Now you can start using the bot.
+> **You're all set! 🎉** 
+
+---
 
 ## Note on limits
 
@@ -170,7 +173,9 @@ So now you can run `listen_create_from_blocksubscribe.py` and `listen_new_direct
 
 Also here's a doc on this: [Solana: Listening to pump.fun token mint using only logsSubscribe](https://docs.chainstack.com/docs/solana-listening-to-pumpfun-token-mint-using-only-logssubscribe)
 
-# Pump.fun bot development roadmap
+---
+
+# Pump.fun bot development roadmap (March - April 2025, mostly completed)
 
 ~~As of March 21, 2025, the bot from the **refactored/main-v2** branch is signficantly better over the **main** version, so the suggestion is to FAFO with v2.~~
 
@@ -198,7 +203,7 @@ As of April 30, 2025, all changes from **refactored/main-v2** are merged into th
 | **Stage 4: Minting experience** | Token minting | Ability to mint tokens (based on user request - someone minted 18k tokens) | FAFO |
 
 
-## Development timeline (closed)
+## Development timeline
 - Development begins: Week of March 10, 2025
 - Implementation approach: Gradual rollout in separate branch
 - Priority: Stages progress from simple to complex features

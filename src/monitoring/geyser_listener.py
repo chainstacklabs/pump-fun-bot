@@ -31,7 +31,13 @@ class GeyserListener(BaseTokenListener):
         """
         self.geyser_endpoint = geyser_endpoint
         self.geyser_api_token = geyser_api_token
-        self.auth_type = geyser_auth_type or "x-token"
+        valid_auth_types = {"x-token", "basic"}
+        self.auth_type: str = (geyser_auth_type or "x-token").lower()
+        if self.auth_type not in valid_auth_types:
+            raise ValueError(
+                f"Unsupported auth_type={self.auth_type!r}. "
+                f"Expected one of {valid_auth_types}"
+            )
         self.pump_program = pump_program
         self.event_processor = GeyserEventProcessor(pump_program)
         

@@ -74,6 +74,7 @@ async def run_comparison(test_duration: int = 300):
     wss_endpoint = os.environ.get("SOLANA_NODE_WSS_ENDPOINT")
     geyser_endpoint = os.environ.get("GEYSER_ENDPOINT")
     geyser_api_token = os.environ.get("GEYSER_API_TOKEN")
+    geyser_auth_type = os.environ.get("GEYSER_AUTH_TYPE", "x-token")
     
     if not wss_endpoint:
         logger.error("SOLANA_NODE_WSS_ENDPOINT environment variable is not set")
@@ -98,7 +99,7 @@ async def run_comparison(test_duration: int = 300):
     # Initialize Geyser listener if credentials are available
     if geyser_endpoint and geyser_api_token:
         logger.info(f"Connecting to Geyser API: {geyser_endpoint}")
-        geyser_listener = GeyserListener(geyser_endpoint, geyser_api_token, PumpAddresses.PROGRAM)
+        geyser_listener = GeyserListener(geyser_endpoint, geyser_api_token, geyser_auth_type, PumpAddresses.PROGRAM)
         geyser_callback = TimingTokenCallback("GeyserListener")
         
         listener_tasks.append(

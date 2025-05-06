@@ -53,6 +53,7 @@ async def test_geyser_listener(
     """Test the Geyser listener functionality"""
     geyser_endpoint = os.environ.get("GEYSER_ENDPOINT")
     geyser_api_token = os.environ.get("GEYSER_API_TOKEN")
+    geyser_auth_type = os.environ.get("GEYSER_AUTH_TYPE", "x-token")
     
     if not geyser_endpoint:
         logger.error("GEYSER_ENDPOINT environment variable is not set")
@@ -61,9 +62,9 @@ async def test_geyser_listener(
     if not geyser_api_token:
         logger.error("GEYSER_API_TOKEN environment variable is not set")
         return []
-    
+
     logger.info(f"Connecting to Geyser API: {geyser_endpoint}")
-    listener = GeyserListener(geyser_endpoint, geyser_api_token, PumpAddresses.PROGRAM)
+    listener = GeyserListener(geyser_endpoint, geyser_api_token, geyser_auth_type, PumpAddresses.PROGRAM)
     callback = TestTokenCallback()
 
     if match_string:

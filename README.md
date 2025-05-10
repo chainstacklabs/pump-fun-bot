@@ -96,7 +96,7 @@ python -m src.bot_runner
 
 ---
 
-## Note on limits
+## Note on throughput & limits
 
 Solana is an amazing piece of web3 architecture, but it's also very complex to maintain.
 
@@ -106,7 +106,7 @@ That said, all node providers have their own setup recommendations & limits, lik
 
 So please make sure you consult the docs of the node provider you are going to use for the bot here. And obviously the public RPC nodes won't work for the heavier use case scenarios like this bot.
 
-For Chainstack, all of the details and limits you need to be aware of are consolidated here: [Limits](https://docs.chainstack.com/docs/limits) <— we are _always_ keeping this piece up to date so you can rely on it.
+For Chainstack, all of the details and limits you need to be aware of are consolidated here: [Throughput guidelines](https://docs.chainstack.com/docs/limits) <— we are _always_ keeping this piece up to date so you can rely on it.
 
 ## Changelog
 

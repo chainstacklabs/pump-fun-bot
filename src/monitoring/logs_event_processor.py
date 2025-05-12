@@ -9,7 +9,7 @@ from typing import Final
 import base58
 from solders.pubkey import Pubkey
 
-from core.pubkeys import SystemAddresses
+from core.pubkeys import PumpAddresses, SystemAddresses
 from trading.base import TokenInfo
 from utils.logger import get_logger
 
@@ -62,6 +62,8 @@ class LogsEventProcessor:
                         associated_curve = self._find_associated_bonding_curve(
                             mint, bonding_curve
                         )
+                        creator = Pubkey.from_string(parsed_data["creator"])
+                        creator_vault = self._find_creator_vault(creator)
                         
                         return TokenInfo(
                             name=parsed_data["name"],
@@ -71,6 +73,8 @@ class LogsEventProcessor:
                             bonding_curve=bonding_curve,
                             associated_bonding_curve=associated_curve,
                             user=Pubkey.from_string(parsed_data["user"]),
+                            creator=creator,
+                            creator_vault=creator_vault,
                         )
                 except Exception as e:
                     logger.error(f"Failed to process log data: {e}")
@@ -106,6 +110,7 @@ class LogsEventProcessor:
             ("mint", "publicKey"),
             ("bondingCurve", "publicKey"),
             ("user", "publicKey"),
+            ("creator", "publicKey"),
         ]
 
         try:
@@ -147,5 +152,24 @@ class LogsEventProcessor:
                 bytes(mint),
             ],
             SystemAddresses.ASSOCIATED_TOKEN_PROGRAM,
+        )
+        return derived_address
+    
+    def _find_creator_vault(self, creator: Pubkey) -> Pubkey:
+        """
+        Find the creator vault for a creator.
+
+        Args:
+            creator: Creator address
+
+        Returns:
+            Creator vault address
+        """
+        derived_address, _ = Pubkey.find_program_address(
+            [
+                b"creator-vault",
+                bytes(creator)
+            ],
+            PumpAddresses.PROGRAM,
         )
         return derived_address

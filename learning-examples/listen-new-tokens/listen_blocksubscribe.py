@@ -11,6 +11,7 @@ import json
 import os
 import struct
 
+import base58
 import websockets
 from dotenv import load_dotenv
 from solders.pubkey import Pubkey
@@ -37,8 +38,8 @@ def decode_create_instruction(ix_data, ix_def, accounts):
             offset += 4
             value = ix_data[offset : offset + length].decode("utf-8")
             offset += length
-        elif arg["type"] == "publicKey":
-            value = base64.b64encode(ix_data[offset : offset + 32]).decode("utf-8")
+        elif arg["type"] == "pubkey":
+            value = base58.b58encode(ix_data[offset : offset + 32]).decode("utf-8")
             offset += 32
         else:
             raise ValueError(f"Unsupported type: {arg['type']}")

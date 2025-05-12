@@ -5,7 +5,7 @@ Bonding curve operations for pump.fun tokens.
 import struct
 from typing import Final
 
-from construct import Flag, Int64ul, Struct
+from construct import Bytes, Flag, Int64ul, Struct
 from solders.pubkey import Pubkey
 
 from core.client import SolanaClient
@@ -28,6 +28,7 @@ class BondingCurveState:
         "real_sol_reserves" / Int64ul,
         "token_total_supply" / Int64ul,
         "complete" / Flag,
+        "creator" / Bytes(32),  # Added new creator field - 32 bytes for Pubkey
     )
 
     def __init__(self, data: bytes) -> None:
@@ -44,6 +45,10 @@ class BondingCurveState:
 
         parsed = self._STRUCT.parse(data[8:])
         self.__dict__.update(parsed)
+        
+        # Convert raw bytes to Pubkey for creator field
+        if hasattr(self, 'creator') and isinstance(self.creator, bytes):
+            self.creator = Pubkey.from_bytes(self.creator)
 
     def calculate_price(self) -> float:
         """Calculate token price in SOL.
@@ -103,8 +108,8 @@ class BondingCurveManager:
             return BondingCurveState(account.data)
 
         except Exception as e:
-            logger.error(f"Failed to get curve state: {str(e)}")
-            raise ValueError(f"Invalid curve state: {str(e)}")
+            logger.error(f"Failed to get curve state: {e!s}")
+            raise ValueError(f"Invalid curve state: {e!s}")
 
     async def calculate_price(self, curve_address: Pubkey) -> float:
         """Calculate the current price of a token.

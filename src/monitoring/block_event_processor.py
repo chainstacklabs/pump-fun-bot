@@ -7,9 +7,11 @@ import json
 import struct
 from typing import Any
 
+import base58
 from solders.pubkey import Pubkey
 from solders.transaction import VersionedTransaction
 
+from core.pubkeys import PumpAddresses
 from trading.base import TokenInfo
 from utils.logger import get_logger
 
@@ -41,7 +43,7 @@ class PumpEventProcessor:
             with open("idl/pump_fun_idl.json") as f:
                 return json.load(f)
         except Exception as e:
-            logger.error(f"Failed to load IDL: {str(e)}")
+            logger.error(f"Failed to load IDL: {e!s}")
             # Create a minimal IDL with just what we need
             return {
                 "instructions": [
@@ -111,6 +113,8 @@ class PumpEventProcessor:
                 decoded_args = self._decode_create_instruction(
                     ix_data, create_ix, account_keys
                 )
+                creator = Pubkey.from_string(decoded_args["creator"])
+                creator_vault = self._find_creator_vault(creator)
 
                 return TokenInfo(
                     name=decoded_args["name"],
@@ -122,10 +126,12 @@ class PumpEventProcessor:
                         decoded_args["associatedBondingCurve"]
                     ),
                     user=Pubkey.from_string(decoded_args["user"]),
+                    creator=creator,
+                    creator_vault=creator_vault,
                 )
 
         except Exception as e:
-            logger.error(f"Error processing transaction: {str(e)}")
+            logger.error(f"Error processing transaction: {e!s}")
 
         return None
 
@@ -151,8 +157,8 @@ class PumpEventProcessor:
                 offset += 4
                 value = ix_data[offset : offset + length].decode("utf-8")
                 offset += length
-            elif arg["type"] == "publicKey":
-                value = base64.b64encode(ix_data[offset : offset + 32]).decode("utf-8")
+            elif arg["type"] == "pubkey":
+                value = base58.b58encode(ix_data[offset : offset + 32]).decode("utf-8")
                 offset += 32
             else:
                 logger.warning(f"Unsupported type: {arg['type']}")
@@ -166,3 +172,22 @@ class PumpEventProcessor:
         args["user"] = str(accounts[7])
 
         return args
+    
+    def _find_creator_vault(self, creator: Pubkey) -> Pubkey:
+        """
+        Find the creator vault for a creator.
+
+        Args:
+            creator: Creator address
+
+        Returns:
+            Creator vault address
+        """
+        derived_address, _ = Pubkey.find_program_address(
+            [
+                b"creator-vault",
+                bytes(creator)
+            ],
+            PumpAddresses.PROGRAM,
+        )
+        return derived_address

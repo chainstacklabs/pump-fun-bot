@@ -54,6 +54,7 @@ def parse_create_instruction(data):
         ("mint", "publicKey"),
         ("bondingCurve", "publicKey"),
         ("user", "publicKey"),
+        ("creator", "publicKey"),
     ]
 
     try:

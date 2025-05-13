@@ -128,7 +128,7 @@ class TokenSeller(Trader):
                 )
 
         except Exception as e:
-            logger.error(f"Sell operation failed: {str(e)}")
+            logger.error(f"Sell operation failed: {e!s}")
             return TradeResult(success=False, error_message=str(e))
 
     async def _send_sell_transaction(
@@ -175,9 +175,7 @@ class TokenSeller(Trader):
                 pubkey=SystemAddresses.PROGRAM, is_signer=False, is_writable=False
             ),
             AccountMeta(
-                pubkey=SystemAddresses.ASSOCIATED_TOKEN_PROGRAM,
-                is_signer=False,
-                is_writable=False,
+                pubkey=token_info.creator_vault, is_signer=False, is_writable=True,
             ),
             AccountMeta(
                 pubkey=SystemAddresses.TOKEN_PROGRAM, is_signer=False, is_writable=False
@@ -209,5 +207,5 @@ class TokenSeller(Trader):
                 ),
             )
         except Exception as e:
-            logger.error(f"Sell transaction failed: {str(e)}")
+            logger.error(f"Sell transaction failed: {e!s}")
             raise

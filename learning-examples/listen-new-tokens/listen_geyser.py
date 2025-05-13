@@ -77,14 +77,22 @@ def decode_create_instruction(ix_data: bytes, keys, accounts) -> dict:
         offset += length
         return value
     
+    def read_pubkey():
+        nonlocal offset
+        value = base58.b58encode(ix_data[offset : offset + 32]).decode("utf-8")
+        offset += 32
+        return value
+    
     name = read_string()
     symbol = read_string()
     uri = read_string()
+    creator = read_pubkey()
     
     token_info = {
         "name": name,
         "symbol": symbol,
         "uri": uri,
+        "creator": creator,
         "mint": get_account_key(0),
         "metadata": get_account_key(1),
         "bonding_curve": get_account_key(2),
@@ -105,6 +113,7 @@ def print_token_info(info, signature):
     print(f"Mint: {info['mint']}")
     print(f"Bonding curve: {info['bonding_curve']}")
     print(f"Associated bonding curve: {info['associated_bonding_curve']}")
+    print(f"Creator: {info['creator']}")
     print(f"Signature: {signature}")
 
 

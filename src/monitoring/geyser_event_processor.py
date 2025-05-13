@@ -5,8 +5,10 @@ Event processing for pump.fun tokens using Geyser data.
 import struct
 from typing import Final
 
+import base58
 from solders.pubkey import Pubkey
 
+from core.pubkeys import PumpAddresses
 from trading.base import TokenInfo
 from utils.logger import get_logger
 
@@ -55,6 +57,12 @@ class GeyserEventProcessor:
                 offset += length
                 return value
             
+            def read_pubkey():
+                nonlocal offset
+                value = base58.b58encode(instruction_data[offset : offset + 32]).decode("utf-8")
+                offset += 32
+                return Pubkey.from_string(value)
+            
             # Helper to get account key
             def get_account_key(index):
                 if index >= len(accounts):
@@ -67,11 +75,14 @@ class GeyserEventProcessor:
             name = read_string()
             symbol = read_string()
             uri = read_string()
+            creator = read_pubkey()
 
             mint = get_account_key(0)
             bonding_curve = get_account_key(2)
             associated_bonding_curve = get_account_key(3)
             user = get_account_key(7)
+
+            creator_vault = self._find_creator_vault(creator)
             
             if not all([mint, bonding_curve, associated_bonding_curve, user]):
                 logger.warning("Missing required account keys in token creation")
@@ -85,8 +96,29 @@ class GeyserEventProcessor:
                 bonding_curve=bonding_curve,
                 associated_bonding_curve=associated_bonding_curve,
                 user=user,
+                creator=creator,
+                creator_vault=creator_vault,
             )
             
         except Exception as e:
             logger.error(f"Failed to process transaction data: {e}")
             return None
+    
+    def _find_creator_vault(self, creator: Pubkey) -> Pubkey:
+        """
+        Find the creator vault for a creator.
+
+        Args:
+            creator: Creator address
+
+        Returns:
+            Creator vault address
+        """
+        derived_address, _ = Pubkey.find_program_address(
+            [
+                b"creator-vault",
+                bytes(creator)
+            ],
+            PumpAddresses.PROGRAM,
+        )
+        return derived_address

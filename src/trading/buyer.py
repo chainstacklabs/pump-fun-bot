@@ -176,7 +176,7 @@ class TokenBuyer(Trader):
                 pubkey=SystemAddresses.TOKEN_PROGRAM, is_signer=False, is_writable=False
             ),
             AccountMeta(
-                pubkey=SystemAddresses.RENT, is_signer=False, is_writable=False
+                pubkey=token_info.creator_vault, is_signer=False, is_writable=True
             ),
             AccountMeta(
                 pubkey=PumpAddresses.EVENT_AUTHORITY, is_signer=False, is_writable=False

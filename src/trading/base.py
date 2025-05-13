@@ -22,6 +22,8 @@ class TokenInfo:
     bonding_curve: Pubkey
     associated_bonding_curve: Pubkey
     user: Pubkey
+    creator: Pubkey
+    creator_vault: Pubkey
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "TokenInfo":
@@ -41,6 +43,8 @@ class TokenInfo:
             bonding_curve=Pubkey.from_string(data["bondingCurve"]),
             associated_bonding_curve=Pubkey.from_string(data["associatedBondingCurve"]),
             user=Pubkey.from_string(data["user"]),
+            creator=Pubkey.from_string(data["creator"]),
+            creator_vault=Pubkey.from_string(data["creator_vault"]),
         )
 
     def to_dict(self) -> dict[str, str]:
@@ -57,6 +61,8 @@ class TokenInfo:
             "bondingCurve": str(self.bonding_curve),
             "associatedBondingCurve": str(self.associated_bonding_curve),
             "user": str(self.user),
+            "creator": str(self.creator),
+            "creatorVault": str(self.creator_vault),
         }
 
 

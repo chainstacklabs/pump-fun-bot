@@ -69,6 +69,7 @@ def parse_market_account_data(data):
         ("pool_base_token_account", "pubkey"),
         ("pool_quote_token_account", "pubkey"),
         ("lp_supply", "u64"),
+        ("coin_creator", "pubkey")
     ]
 
     try:

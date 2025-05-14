@@ -2,14 +2,11 @@ import asyncio
 import hashlib
 import json
 import os
-import sys
 
 import websockets
+from solders.pubkey import Pubkey
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-from core.pubkeys import PumpAddresses
-
+PUMP_PROGRAM = Pubkey.from_string("6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P")
 WSS_ENDPOINT = os.environ.get("SOLANA_NODE_WSS_ENDPOINT")
 
 
@@ -30,7 +27,7 @@ async def listen_for_transactions():
                 "id": 1,
                 "method": "blockSubscribe",
                 "params": [
-                    {"mentionsAccountOrProgram": str(PumpAddresses.PROGRAM)},
+                    {"mentionsAccountOrProgram": str(PUMP_PROGRAM)},
                     {
                         "commitment": "confirmed",
                         "encoding": "base64",
@@ -42,7 +39,7 @@ async def listen_for_transactions():
             },
         )
         await websocket.send(subscription_message)
-        print(f"Subscribed to blocks mentioning program: {PumpAddresses.PROGRAM}")
+        print(f"Subscribed to blocks mentioning program: {PUMP_PROGRAM}")
 
         while True:
             try:

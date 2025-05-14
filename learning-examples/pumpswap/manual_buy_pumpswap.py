@@ -1,4 +1,6 @@
 """
+WORK IN PROGRESS
+
 This module provides functionality to:
 - Find market addresses by token mint.
 - Fetch and parse market data from PUMP AMM pools.
@@ -34,7 +36,7 @@ PAYER = Keypair.from_bytes(PRIVATE_KEY)
 SLIPPAGE = 0.25  # Slippage tolerance (25%) - the maximum price movement you'll accept
 
 TOKEN_DECIMALS = 6
-SELL_DISCRIMINATOR = bytes.fromhex("33e685a4017f83ad")  # Program instruction identifier for the sell function
+BUY_DISCRIMINATOR = bytes.fromhex("66063d1201daebea28")  # Program instruction identifier for the sell function
 
 # Solana system addresses and program IDs
 SOL = Pubkey.from_string("So11111111111111111111111111111111111111112")
@@ -217,14 +219,6 @@ async def sell_pump_swap(client: AsyncClient, pump_fun_amm_market: Pubkey, payer
     Returns:
         Transaction signature if successful, None otherwise
     """
-    # Get token balance
-    token_balance = int((await client.get_token_account_balance(user_base_token_account)).value.amount)
-    token_balance_decimal = token_balance / 10**TOKEN_DECIMALS
-    print(f"Token balance: {token_balance_decimal}")
-    if token_balance == 0:
-        print("No tokens to sell.")
-        return None
-    
     # Calculate token price
     token_price_sol = await calculate_token_pool_price(client, pool_base_token_account, pool_quote_token_account)
     print(f"Price per Token: {token_price_sol:.20f} SOL")
@@ -261,7 +255,7 @@ async def sell_pump_swap(client: AsyncClient, pump_fun_amm_market: Pubkey, payer
             AccountMeta(pubkey=coin_creator_vault_authority, is_signer=False, is_writable=False),
     ]
     
-    data = SELL_DISCRIMINATOR + struct.pack("<Q", amount) + struct.pack("<Q", min_sol_output)
+    data = BUY_DISCRIMINATOR + struct.pack("<Q", amount) + struct.pack("<Q", min_sol_output)
 
     compute_limit_ix = set_compute_unit_limit(COMPUTE_UNIT_BUDGET)
     compute_price_ix = set_compute_unit_price(COMPUTE_UNIT_PRICE)

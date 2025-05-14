@@ -1,12 +1,11 @@
-import os
-import sys
-
 from solders.pubkey import Pubkey
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-from core.pubkeys import PumpAddresses, SystemAddresses
-
+# Global constants
+PUMP_PROGRAM = Pubkey.from_string("6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P")
+SYSTEM_TOKEN_PROGRAM = Pubkey.from_string("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
+SYSTEM_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM = Pubkey.from_string(
+    "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+)
 
 def get_bonding_curve_address(mint: Pubkey, program_id: Pubkey) -> tuple[Pubkey, int]:
     """
@@ -24,10 +23,10 @@ def find_associated_bonding_curve(mint: Pubkey, bonding_curve: Pubkey) -> Pubkey
     derived_address, _ = Pubkey.find_program_address(
         [
             bytes(bonding_curve),
-            bytes(SystemAddresses.TOKEN_PROGRAM),
+            bytes(SYSTEM_TOKEN_PROGRAM),
             bytes(mint),
         ],
-        SystemAddresses.ASSOCIATED_TOKEN_PROGRAM,
+        SYSTEM_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM,
     )
     return derived_address
 
@@ -39,7 +38,7 @@ def main():
         mint = Pubkey.from_string(mint_address)
 
         bonding_curve_address, bump = get_bonding_curve_address(
-            mint, PumpAddresses.PROGRAM
+            mint, PUMP_PROGRAM
         )
 
         # Calculate the associated bonding curve
@@ -56,7 +55,7 @@ def main():
         print("-" * 50)
 
     except ValueError as e:
-        print(f"Error: Invalid address format - {str(e)}")
+        print(f"Error: Invalid address format - {e!s}")
 
 
 if __name__ == "__main__":

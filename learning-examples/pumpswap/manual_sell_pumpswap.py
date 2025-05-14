@@ -28,7 +28,7 @@ load_dotenv()
 
 # Configuration constants
 RPC_ENDPOINT = os.environ.get("SOLANA_NODE_RPC_ENDPOINT")
-TOKEN_MINT = Pubkey.from_string("8XNrSusWrzYpizYXJb5yeB66AWX1cfQ86SBJFqVTpump")
+TOKEN_MINT = Pubkey.from_string("...")
 PRIVATE_KEY = base58.b58decode(os.environ.get("SOLANA_PRIVATE_KEY"))
 PAYER = Keypair.from_bytes(PRIVATE_KEY)
 SLIPPAGE = 0.25  # Slippage tolerance (25%) - the maximum price movement you'll accept
@@ -132,6 +132,20 @@ async def get_market_data(client: AsyncClient, market_address: Pubkey) -> dict:
     return parsed_data
 
 def find_coin_creator_vault(coin_creator: Pubkey) -> Pubkey:
+    """Derive the Program Derived Address (PDA) for a coin creator's vault.
+    
+    Calculates the deterministic PDA that serves as the vault authority
+    for a specific coin creator in the PUMP AMM protocol.
+    
+    Args:
+        coin_creator: Pubkey of the coin creator account
+        
+    Returns:
+        Pubkey of the derived coin creator vault authority
+        
+    Note:
+        This vault is used to collect creator fees from token transactions
+    """
     derived_address, _ = Pubkey.find_program_address(
         [
             b"creator_vault",
@@ -198,7 +212,7 @@ async def sell_pump_swap(client: AsyncClient, pump_fun_amm_market: Pubkey, payer
                           base_mint: Pubkey, user_base_token_account: Pubkey, 
                           user_quote_token_account: Pubkey, pool_base_token_account: Pubkey, 
                           pool_quote_token_account: Pubkey, coin_creator_vault_authority: Pubkey,
-                          coin_creator_vault_ata: Pubkey,slippage: float = 0.25) -> str | None:
+                          coin_creator_vault_ata: Pubkey, slippage: float = 0.25) -> str | None:
     """Sell tokens on the PUMP AMM.
     
     This function sells all tokens in the user's token account with the specified slippage tolerance.
@@ -212,6 +226,8 @@ async def sell_pump_swap(client: AsyncClient, pump_fun_amm_market: Pubkey, payer
         user_quote_token_account: Address of the user's SOL token account
         pool_base_token_account: Address of the pool's token account for the token being sold
         pool_quote_token_account: Address of the pool's SOL token account
+        coin_creator_vault_authority: Address of the coin creator's vault authority
+        coin_creator_vault_ata: Address of the coin creator's associated token account for fees
         slippage: Maximum acceptable price slippage, as a decimal (0.25 = 25%)
         
     Returns:

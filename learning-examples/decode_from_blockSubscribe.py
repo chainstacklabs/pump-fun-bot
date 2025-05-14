@@ -26,7 +26,7 @@ def decode_instruction(ix_data, ix_def):
         if arg["type"] == "u64":
             value = struct.unpack_from("<Q", ix_data, offset)[0]
             offset += 8
-        elif arg["type"] == "publicKey":
+        elif arg["type"] == "pubkey":
             value = ix_data[offset : offset + 32].hex()
             offset += 32
         elif arg["type"] == "string":
@@ -76,9 +76,8 @@ def decode_transaction(tx_data, idl):
         program_id = str(account_keys[ix.program_id_index])
         print(f"\nInstruction {idx}:")
         print(f"Program ID: {program_id}")
-        print(f"IDL program address: {idl['metadata']['address']}")
 
-        if program_id == idl["metadata"]["address"]:
+        if program_id == "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P": # Pump Fun Program
             ix_data = bytes(ix.data)
             discriminator = struct.unpack("<Q", ix_data[:8])[0]
 

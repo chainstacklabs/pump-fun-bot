@@ -60,6 +60,7 @@ async def get_market_data(market_address: Pubkey):
             ("pool_base_token_account", "pubkey"),
             ("pool_quote_token_account", "pubkey"),
             ("lp_supply", "u64"),
+            ("coin_creator", "pubkey"),
         ]
 
         for field_name, field_type in fields:

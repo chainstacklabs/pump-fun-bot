@@ -76,7 +76,7 @@ for ix in instructions:
     if "parsed" in ix:
         print(f"Parsed instruction: {ix['program']} - {ix['parsed']['type']}")
         print(f"Info: {json.dumps(ix['parsed']['info'], indent=2)}")
-    elif program_id == idl["metadata"]["address"]:
+    elif program_id == "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P": # Pump Fun Program
         matching_instruction = find_matching_instruction(accounts, data)
         if matching_instruction:
             decoded_data = decode_instruction_data(

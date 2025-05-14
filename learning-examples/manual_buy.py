@@ -8,7 +8,7 @@ import struct
 import base58
 import spl.token.instructions as spl_token
 import websockets
-from construct import Flag, Int64ul, Struct
+from construct import Bytes, Flag, Int64ul, Struct
 from solana.rpc.async_api import AsyncClient
 from solana.rpc.commitment import Confirmed
 from solana.rpc.types import TxOpts
@@ -36,7 +36,6 @@ SYSTEM_TOKEN_PROGRAM = Pubkey.from_string("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss62
 SYSTEM_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM = Pubkey.from_string(
     "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
 )
-SYSTEM_RENT = Pubkey.from_string("SysvarRent111111111111111111111111111111111")
 SOL = Pubkey.from_string("So11111111111111111111111111111111111111112")
 LAMPORTS_PER_SOL = 1_000_000_000
 
@@ -53,11 +52,20 @@ class BondingCurveState:
         "real_sol_reserves" / Int64ul,
         "token_total_supply" / Int64ul,
         "complete" / Flag,
+        "creator" / Bytes(32),  # Added new creator field - 32 bytes for Pubkey
     )
 
     def __init__(self, data: bytes) -> None:
+        """Parse bonding curve data."""
+        if data[:8] != EXPECTED_DISCRIMINATOR:
+            raise ValueError("Invalid curve state discriminator")
+
         parsed = self._STRUCT.parse(data[8:])
         self.__dict__.update(parsed)
+        
+        # Convert raw bytes to Pubkey for creator field
+        if hasattr(self, 'creator') and isinstance(self.creator, bytes):
+            self.creator = Pubkey.from_bytes(self.creator)
 
 
 async def get_pump_curve_state(
@@ -83,10 +91,22 @@ def calculate_pump_curve_price(curve_state: BondingCurveState) -> float:
     )
 
 
+def _find_creator_vault(creator: Pubkey) -> Pubkey:
+    derived_address, _ = Pubkey.find_program_address(
+        [
+            b"creator-vault",
+            bytes(creator)
+        ],
+        PUMP_PROGRAM,
+        )
+    return derived_address
+
+
 async def buy_token(
     mint: Pubkey,
     bonding_curve: Pubkey,
     associated_bonding_curve: Pubkey,
+    creator_vault: Pubkey,
     amount: float,
     slippage: float = 0.25,
     max_retries=5,
@@ -188,7 +208,7 @@ async def buy_token(
                     AccountMeta(
                         pubkey=SYSTEM_TOKEN_PROGRAM, is_signer=False, is_writable=False
                     ),
-                    AccountMeta(pubkey=SYSTEM_RENT, is_signer=False, is_writable=False),
+                    AccountMeta(pubkey=creator_vault, is_signer=False, is_writable=True),
                     AccountMeta(
                         pubkey=PUMP_EVENT_AUTHORITY, is_signer=False, is_writable=False
                     ),
@@ -254,8 +274,8 @@ def decode_create_instruction(ix_data, ix_def, accounts):
             offset += 4
             value = ix_data[offset : offset + length].decode("utf-8")
             offset += length
-        elif arg["type"] == "publicKey":
-            value = base64.b64encode(ix_data[offset : offset + 32]).decode("utf-8")
+        elif arg["type"] == "pubkey":
+            value = base58.b58encode(ix_data[offset : offset + 32]).decode("utf-8")
             offset += 32
         else:
             raise ValueError(f"Unsupported type: {arg['type']}")
@@ -362,6 +382,7 @@ async def main():
     mint = Pubkey.from_string(token_data["mint"])
     bonding_curve = Pubkey.from_string(token_data["bondingCurve"])
     associated_bonding_curve = Pubkey.from_string(token_data["associatedBondingCurve"])
+    creator_vault = _find_creator_vault(Pubkey.from_string(token_data["creator"]))
 
     # Fetch the token price
     async with AsyncClient(RPC_ENDPOINT) as client:
@@ -377,7 +398,7 @@ async def main():
     print(
         f"Buying {amount:.6f} SOL worth of the new token with {slippage * 100:.1f}% slippage tolerance..."
     )
-    await buy_token(mint, bonding_curve, associated_bonding_curve, amount, slippage)
+    await buy_token(mint, bonding_curve, associated_bonding_curve, creator_vault, amount, slippage)
 
 
 if __name__ == "__main__":

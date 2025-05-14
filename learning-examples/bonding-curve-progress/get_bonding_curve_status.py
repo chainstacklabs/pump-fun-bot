@@ -1,6 +1,9 @@
 """
 Module for checking the status of a token's bonding curve on the Solana network using
 the Pump.fun program. It allows querying the bonding curve state and completion status.
+
+Note: creator fee upgrade introduced updates in bonding curve structure.
+https://github.com/pump-fun/pump-public-docs/blob/main/docs/PUMP_CREATOR_FEE_README.md
 """
 
 import asyncio
@@ -8,7 +11,7 @@ import os
 import struct
 from typing import Final
 
-from construct import Flag, Int64ul, Struct
+from construct import Bytes, Flag, Int64ul, Struct
 from dotenv import load_dotenv
 from solana.rpc.async_api import AsyncClient
 from solders.pubkey import Pubkey
@@ -37,7 +40,7 @@ class BondingCurveState:
         token_total_supply: Total token supply in the curve
         complete: Whether the curve has completed and liquidity migrated
     """
-    _STRUCT = Struct(
+    _STRUCT_1 = Struct(
         "virtual_token_reserves" / Int64ul,
         "virtual_sol_reserves" / Int64ul,
         "real_token_reserves" / Int64ul,
@@ -46,9 +49,33 @@ class BondingCurveState:
         "complete" / Flag,
     )
 
+    # Struct after creator fee update has been introduced
+    # https://github.com/pump-fun/pump-public-docs/blob/main/docs/PUMP_CREATOR_FEE_README.md
+    _STRUCT_2 = Struct(
+        "virtual_token_reserves" / Int64ul,
+        "virtual_sol_reserves" / Int64ul,
+        "real_token_reserves" / Int64ul,
+        "real_sol_reserves" / Int64ul,
+        "token_total_supply" / Int64ul,
+        "complete" / Flag,
+        "creator" / Bytes(32),  # Added new creator field - 32 bytes for Pubkey
+    )
+
     def __init__(self, data: bytes) -> None:
-        parsed = self._STRUCT.parse(data[8:])
-        self.__dict__.update(parsed)
+        """Parse bonding curve data."""
+        if data[:8] != EXPECTED_DISCRIMINATOR:
+            raise ValueError("Invalid curve state discriminator")
+
+        if len(data) < 150:
+            parsed = self._STRUCT_1.parse(data[8:])
+            self.__dict__.update(parsed)
+
+        else:
+            parsed = self._STRUCT_1.parse(data[8:])
+            self.__dict__.update(parsed) 
+            # Convert raw bytes to Pubkey for creator field
+            if hasattr(self, 'creator') and isinstance(self.creator, bytes):
+                self.creator = Pubkey.from_bytes(self.creator)
 
 
 def get_associated_bonding_curve_address(

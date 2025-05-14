@@ -1,10 +1,12 @@
 """
-This module provides functionality to:
-- Find market addresses by token mint.
-- Fetch and parse market data from PUMP AMM pools.
-- Calculate token prices in AMM pools.
-- Create associated token accounts (ATAs) idempotently.
-- Sell tokens on the PUMP AMM with slippage protection.
+Solana PUMP AMM Interface
+
+This module provides functionality to interact with the PUMP AMM program on Solana, enabling:
+- Finding market addresses by token mint
+- Fetching and parsing market data from PUMP AMM pools
+- Calculating token prices in AMM pools
+- Creating associated token accounts (ATAs) idempotently
+- Buying tokens on the PUMP AMM with slippage protection
 """
 
 import asyncio
@@ -22,7 +24,10 @@ from solders.keypair import Keypair
 from solders.message import Message
 from solders.pubkey import Pubkey
 from solders.transaction import VersionedTransaction
-from spl.token.instructions import get_associated_token_address
+from spl.token.instructions import (
+    create_idempotent_associated_token_account,
+    get_associated_token_address,
+)
 
 load_dotenv()
 
@@ -31,10 +36,10 @@ RPC_ENDPOINT = os.environ.get("SOLANA_NODE_RPC_ENDPOINT")
 TOKEN_MINT = Pubkey.from_string("...")
 PRIVATE_KEY = base58.b58decode(os.environ.get("SOLANA_PRIVATE_KEY"))
 PAYER = Keypair.from_bytes(PRIVATE_KEY)
-SLIPPAGE = 0.25  # Slippage tolerance (25%) - the maximum price movement you'll accept
+SLIPPAGE = 0.3  # Slippage tolerance (30%) - the maximum price movement you'll accept
 
 TOKEN_DECIMALS = 6
-SELL_DISCRIMINATOR = bytes.fromhex("33e685a4017f83ad")  # Program instruction identifier for the sell function
+BUY_DISCRIMINATOR = bytes.fromhex("66063d1201daebea")  # Program instruction identifier for the buy function
 
 # Solana system addresses and program IDs
 SOL = Pubkey.from_string("So11111111111111111111111111111111111111112")
@@ -54,7 +59,8 @@ COMPUTE_UNIT_BUDGET = 100_000  # Maximum compute units to use
 async def get_market_address_by_base_mint(client: AsyncClient, base_mint_address: Pubkey, amm_program_id: Pubkey) -> Pubkey:
     """Find the market address for a given token mint.
     
-    Searches for the AMM pool that contains the specified token as its base token.
+    Searches for the AMM pool that contains the specified token mint as its base token
+    by querying program accounts with a filter for the base_mint field.
     
     Args:
         client: Solana RPC client instance
@@ -82,7 +88,8 @@ async def get_market_address_by_base_mint(client: AsyncClient, base_mint_address
 async def get_market_data(client: AsyncClient, market_address: Pubkey) -> dict:
     """Fetch and parse market data from the blockchain.
     
-    Retrieves and deserializes the data stored in the market account.
+    Retrieves and deserializes the binary data stored in the market account
+    into a structured dictionary containing key market information.
     
     Args:
         client: Solana RPC client instance
@@ -156,9 +163,10 @@ def find_coin_creator_vault(coin_creator: Pubkey) -> Pubkey:
     return derived_address
 
 async def calculate_token_pool_price(client: AsyncClient, pool_base_token_account: Pubkey, pool_quote_token_account: Pubkey) -> float:
-    """Calculate the price of tokens in the pool.
+    """Calculate the current price of tokens in an AMM pool.
     
-    Fetches the balance of tokens in the pool and calculates the price ratio.
+    Fetches the balance of tokens in the pool and calculates the price ratio
+    between the base token and quote token (typically SOL).
     
     Args:
         client: Solana RPC client instance
@@ -166,7 +174,7 @@ async def calculate_token_pool_price(client: AsyncClient, pool_base_token_accoun
         pool_quote_token_account: Address of the pool's quote token account (SOL)
         
     Returns:
-        The price of the base token in terms of the quote token (usually SOL)
+        The price of the base token in terms of the quote token (SOL per token)
     """
     base_balance_resp = await client.get_token_account_balance(pool_base_token_account)
     quote_balance_resp = await client.get_token_account_balance(pool_quote_token_account)
@@ -179,82 +187,46 @@ async def calculate_token_pool_price(client: AsyncClient, pool_base_token_accoun
     
     return token_price
 
-def create_ata_idempotent_ix(payer_pubkey: Pubkey) -> Instruction:
-    """Create an instruction to create an Associated Token Account (ATA) if it doesn't exist.
-    
-    This creates an instruction that will create an Associated Token Account for SOL
-    if it doesn't already exist.
-    
-    Args:
-        payer_pubkey: The public key of the account that will pay for the creation
-        
-    Returns:
-        An instruction to create the ATA
-    """
-    associated_token_address = get_associated_token_address(payer_pubkey, SOL)
-
-    instruction_accounts = [
-        AccountMeta(pubkey=payer_pubkey, is_signer=True, is_writable=True),
-        AccountMeta(pubkey=associated_token_address, is_signer=False, is_writable=True),
-        AccountMeta(pubkey=payer_pubkey, is_signer=True, is_writable=True),
-        AccountMeta(pubkey=SOL, is_signer=False, is_writable=False),
-        AccountMeta(pubkey=SYSTEM_PROGRAM, is_signer=False, is_writable=False),
-        AccountMeta(pubkey=SYSTEM_TOKEN_PROGRAM, is_signer=False, is_writable=False),
-    ]
-    
-    # The data for creating an ATA idempotently is just a single byte with value 1
-    # Check the details here:
-    # https://github.com/solana-program/associated-token-account/blob/main/program/src/instruction.rs
-    data = bytes([1])
-    return Instruction(SYSTEM_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM, data, instruction_accounts)
-
-async def sell_pump_swap(client: AsyncClient, pump_fun_amm_market: Pubkey, payer: Keypair,
+async def buy_pump_swap(client: AsyncClient, pump_fun_amm_market: Pubkey, payer: Keypair,
                           base_mint: Pubkey, user_base_token_account: Pubkey, 
                           user_quote_token_account: Pubkey, pool_base_token_account: Pubkey, 
                           pool_quote_token_account: Pubkey, coin_creator_vault_authority: Pubkey,
-                          coin_creator_vault_ata: Pubkey, slippage: float = 0.25) -> str | None:
-    """Sell tokens on the PUMP AMM.
+                          coin_creator_vault_ata: Pubkey, sol_amount_to_spend: int, slippage: float = 0.25) -> str | None:
+    """Buy tokens on the PUMP AMM with slippage protection.
     
-    This function sells all tokens in the user's token account with the specified slippage tolerance.
+    Executes a token purchase on the PUMP AMM protocol, calculating the expected
+    token amount based on the current pool price and applying slippage protection.
     
     Args:
         client: Solana RPC client instance
         pump_fun_amm_market: Address of the AMM market
-        payer: Keypair of the transaction signer and token seller
-        base_mint: Address of the token mint being sold
-        user_base_token_account: Address of the user's token account for the token being sold
+        payer: Keypair of the transaction signer and token buyer
+        base_mint: Address of the token mint being purchased
+        user_base_token_account: Address of the user's token account for receiving purchased tokens
         user_quote_token_account: Address of the user's SOL token account
-        pool_base_token_account: Address of the pool's token account for the token being sold
+        pool_base_token_account: Address of the pool's token account for the token being purchased
         pool_quote_token_account: Address of the pool's SOL token account
         coin_creator_vault_authority: Address of the coin creator's vault authority
         coin_creator_vault_ata: Address of the coin creator's associated token account for fees
+        sol_amount_to_spend: Amount of SOL to spend on the purchase (in SOL, not lamports)
         slippage: Maximum acceptable price slippage, as a decimal (0.25 = 25%)
         
     Returns:
         Transaction signature if successful, None otherwise
     """
-    # Get token balance
-    token_balance = int((await client.get_token_account_balance(user_base_token_account)).value.amount)
-    token_balance_decimal = token_balance / 10**TOKEN_DECIMALS
-    print(f"Token balance: {token_balance_decimal}")
-    if token_balance == 0:
-        print("No tokens to sell.")
-        return None
-    
     # Calculate token price
     token_price_sol = await calculate_token_pool_price(client, pool_base_token_account, pool_quote_token_account)
-    print(f"Price per Token: {token_price_sol:.20f} SOL")
+    print(f"Token price in SOL: {token_price_sol:.10f} SOL")
 
-    # Calculate minimum SOL output with slippage protection
-    amount = token_balance
-    min_sol_output = float(token_balance_decimal) * float(token_price_sol)
-    slippage_factor = 1 - slippage
-    min_sol_output = int((min_sol_output * slippage_factor) * LAMPORTS_PER_SOL)
+    # Calculate maximum SOL input with slippage protection
+    base_amount_out = int((sol_amount_to_spend / token_price_sol) * 10**TOKEN_DECIMALS)
+    slippage_factor = 1 + slippage
+    max_sol_input = int((sol_amount_to_spend * slippage_factor) * LAMPORTS_PER_SOL)
 
-    print(f"Selling {token_balance_decimal} tokens")
-    print(f"Minimum SOL output: {min_sol_output / LAMPORTS_PER_SOL:.10f} SOL")
+    print(f"Buying {base_amount_out / (10**TOKEN_DECIMALS):.10f} tokens")
+    print(f"Maximum SOL input: {max_sol_input / LAMPORTS_PER_SOL:.10f} SOL")
 
-    # Define all accounts needed for the sell instruction
+    # Define all accounts needed for the buy instruction
     accounts = [
             AccountMeta(pubkey=pump_fun_amm_market, is_signer=False, is_writable=False),
             AccountMeta(pubkey=payer.pubkey(), is_signer=True, is_writable=True),
@@ -277,34 +249,37 @@ async def sell_pump_swap(client: AsyncClient, pump_fun_amm_market: Pubkey, payer
             AccountMeta(pubkey=coin_creator_vault_authority, is_signer=False, is_writable=False),
     ]
     
-    data = SELL_DISCRIMINATOR + struct.pack("<Q", amount) + struct.pack("<Q", min_sol_output)
+    data = BUY_DISCRIMINATOR + struct.pack("<Q", base_amount_out) + struct.pack("<Q", max_sol_input)
 
     compute_limit_ix = set_compute_unit_limit(COMPUTE_UNIT_BUDGET)
     compute_price_ix = set_compute_unit_price(COMPUTE_UNIT_PRICE)
 
-    create_ata_ix = create_ata_idempotent_ix(
-        payer_pubkey=payer.pubkey(),
+    idempotent_ata_ix = create_idempotent_associated_token_account(
+        payer.pubkey(),
+        payer.pubkey(),
+        base_mint,
+        SYSTEM_TOKEN_PROGRAM
     )
     
-    sell_ix = Instruction(PUMP_AMM_PROGRAM_ID, data, accounts)
+    buy_ix = Instruction(PUMP_AMM_PROGRAM_ID, data, accounts)
     
     blockhash_resp = await client.get_latest_blockhash()
     recent_blockhash = blockhash_resp.value.blockhash
 
     msg = Message.new_with_blockhash(
-        [compute_limit_ix, compute_price_ix, create_ata_ix, sell_ix],
+        [compute_limit_ix, compute_price_ix, idempotent_ata_ix, buy_ix],
         payer.pubkey(),
         recent_blockhash
     )
 
-    tx_sell = VersionedTransaction(
+    tx_buy = VersionedTransaction(
         message=msg,
         keypairs=[payer]
     )
     
     try:
         tx_sig = await client.send_transaction(
-            tx_sell,
+            tx_buy,
             opts=TxOpts(skip_preflight=True, preflight_commitment=Confirmed),
         )
         
@@ -320,14 +295,16 @@ async def sell_pump_swap(client: AsyncClient, pump_fun_amm_market: Pubkey, payer
 
 
 async def main():
-    """Main function to execute the token selling process."""
+    """Main function to execute the token buying process."""
+    sol_amount_to_spend = 0.000001
+
     async with AsyncClient(RPC_ENDPOINT) as client:
         market_address = await get_market_address_by_base_mint(client, TOKEN_MINT, PUMP_AMM_PROGRAM_ID)
         market_data = await get_market_data(client, market_address)
         coin_creator_vault_authority = find_coin_creator_vault(Pubkey.from_string(market_data["coin_creator"]))
         coin_creator_vault_ata = get_associated_token_address(coin_creator_vault_authority, SOL)
 
-        await sell_pump_swap(
+        await buy_pump_swap(
             client,
             market_address,
             PAYER,
@@ -338,7 +315,8 @@ async def main():
             Pubkey.from_string(market_data["pool_quote_token_account"]),
             coin_creator_vault_authority,
             coin_creator_vault_ata,
-            SLIPPAGE
+            sol_amount_to_spend,
+            SLIPPAGE,
         )
 
 if __name__ == "__main__":

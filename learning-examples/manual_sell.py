@@ -3,7 +3,7 @@ import os
 import struct
 
 import base58
-from construct import Flag, Int64ul, Struct
+from construct import Bytes, Flag, Int64ul, Struct
 from solana.rpc.async_api import AsyncClient
 from solana.rpc.commitment import Confirmed
 from solana.rpc.types import TxOpts
@@ -37,7 +37,6 @@ LAMPORTS_PER_SOL = 1_000_000_000
 UNIT_PRICE = 10_000_000
 UNIT_BUDGET = 100_000
 
-# RPC endpoint
 RPC_ENDPOINT = os.environ.get("SOLANA_NODE_RPC_ENDPOINT")
 
 
@@ -49,11 +48,20 @@ class BondingCurveState:
         "real_sol_reserves" / Int64ul,
         "token_total_supply" / Int64ul,
         "complete" / Flag,
+        "creator" / Bytes(32),  # Added new creator field - 32 bytes for Pubkey
     )
 
     def __init__(self, data: bytes) -> None:
+        """Parse bonding curve data."""
+        if data[:8] != EXPECTED_DISCRIMINATOR:
+            raise ValueError("Invalid curve state discriminator")
+
         parsed = self._STRUCT.parse(data[8:])
         self.__dict__.update(parsed)
+        
+        # Convert raw bytes to Pubkey for creator field
+        if hasattr(self, 'creator') and isinstance(self.creator, bytes):
+            self.creator = Pubkey.from_bytes(self.creator)
 
 
 async def get_pump_curve_state(
@@ -68,6 +76,33 @@ async def get_pump_curve_state(
         raise ValueError("Invalid curve state discriminator")
 
     return BondingCurveState(data)
+
+
+def get_bonding_curve_address(mint: Pubkey) -> tuple[Pubkey, int]:
+    return Pubkey.find_program_address([b"bonding-curve", bytes(mint)], PUMP_PROGRAM)
+
+
+def find_associated_bonding_curve(mint: Pubkey, bonding_curve: Pubkey) -> Pubkey:
+    derived_address, _ = Pubkey.find_program_address(
+        [
+            bytes(bonding_curve),
+            bytes(SYSTEM_TOKEN_PROGRAM),
+            bytes(mint),
+        ],
+        SYSTEM_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM,
+    )
+    return derived_address
+
+
+def find_creator_vault(creator: Pubkey) -> Pubkey:
+    derived_address, _ = Pubkey.find_program_address(
+        [
+            b"creator-vault",
+            bytes(creator)
+        ],
+        PUMP_PROGRAM,
+    )
+    return derived_address
 
 
 def calculate_pump_curve_price(curve_state: BondingCurveState) -> float:
@@ -90,6 +125,7 @@ async def sell_token(
     mint: Pubkey,
     bonding_curve: Pubkey,
     associated_bonding_curve: Pubkey,
+    creator_vault: Pubkey,
     slippage: float = 0.25,
     max_retries=5,
 ):
@@ -148,9 +184,9 @@ async def sell_token(
                         pubkey=SYSTEM_PROGRAM, is_signer=False, is_writable=False
                     ),
                     AccountMeta(
-                        pubkey=SYSTEM_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM,
+                        pubkey=creator_vault,
                         is_signer=False,
-                        is_writable=False,
+                        is_writable=True,
                     ),
                     AccountMeta(
                         pubkey=SYSTEM_TOKEN_PROGRAM, is_signer=False, is_writable=False
@@ -199,17 +235,20 @@ async def sell_token(
 
 async def main():
     # Replace these with the actual values for the token you want to sell
-    mint = Pubkey.from_string("7aXYndxpkHRU9xg1hyAE6z3X3KYPc2LR3dJMzYTSpump")
-    bonding_curve = Pubkey.from_string("5UYdCZigGDyAh1doCW8FdnA7VwJTJePayTLCyZkAWMxg")
-    associated_bonding_curve = Pubkey.from_string(
-        "BS2RUaPXjQpfzncizvmEfnARZG6SNp1imXnv5USA7PMA"
-    )
+    mint = Pubkey.from_string("5GkGpfvRLusWGqxSkwk7uEs6mHzNxH8QaZD6uPvYpump")
+    bonding_curve, _ = get_bonding_curve_address(mint)
+    associated_bonding_curve = find_associated_bonding_curve(mint, bonding_curve)
+
+    async with AsyncClient(RPC_ENDPOINT) as client:
+        curve_state = await get_pump_curve_state(client, bonding_curve)
+
+    creator_vault = find_creator_vault(curve_state.creator)
 
     slippage = 0.25  # 25% slippage tolerance
 
     print(f"Bonding curve address: {bonding_curve}")
     print(f"Selling tokens with {slippage * 100:.1f}% slippage tolerance...")
-    await sell_token(mint, bonding_curve, associated_bonding_curve, slippage)
+    await sell_token(mint, bonding_curve, associated_bonding_curve, creator_vault, slippage)
 
 
 if __name__ == "__main__":

@@ -42,7 +42,7 @@ class BondingCurveState:
             self.__dict__.update(parsed)
 
         else:
-            parsed = self._STRUCT_1.parse(data[8:])
+            parsed = self._STRUCT_2.parse(data[8:])
             self.__dict__.update(parsed) 
             # Convert raw bytes to Pubkey for creator field
             if hasattr(self, 'creator') and isinstance(self.creator, bytes):

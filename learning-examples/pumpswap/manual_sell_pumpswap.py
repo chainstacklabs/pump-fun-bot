@@ -258,7 +258,7 @@ async def sell_pump_swap(client: AsyncClient, pump_fun_amm_market: Pubkey, payer
     accounts = [
             AccountMeta(pubkey=pump_fun_amm_market, is_signer=False, is_writable=False),
             AccountMeta(pubkey=payer.pubkey(), is_signer=True, is_writable=True),
-            AccountMeta(pubkey=PUMP_SWAP_GLOBAL_CONFIG, is_signer=False, is_writable=True),
+            AccountMeta(pubkey=PUMP_SWAP_GLOBAL_CONFIG, is_signer=False, is_writable=False),
             AccountMeta(pubkey=base_mint, is_signer=False, is_writable=False),
             AccountMeta(pubkey=SOL, is_signer=False, is_writable=False),
             AccountMeta(pubkey=user_base_token_account, is_signer=False, is_writable=True),

@@ -1,0 +1,23 @@
+{
+  "name": "solana-trading-bot-typescript",
+  "version": "0.1.0",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "generate-proto": "npx grpc_tools_node_protoc --plugin=protoc-gen-ts=./node_modules/.bin/protoc-gen-ts --ts_out=grpc_js:./src/geyser/generated --js_out=import_style=commonjs,binary:./src/geyser/generated --grpc_out=grpc_js:./src/geyser/generated -I ./proto ./proto/*.proto"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.13.4",
+    "@grpc/proto-loader": "^0.7.15",
+    "@solana/web3.js": "^1.91.8",
+    "ws": "^8.18.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.12",
+    "@types/ws": "^8.18.1",
+    "grpc_tools_node_protoc_ts": "^5.3.3",
+    "grpc-tools": "^1.13.0",
+    "typescript": "^5.4.5"
+  }
+}

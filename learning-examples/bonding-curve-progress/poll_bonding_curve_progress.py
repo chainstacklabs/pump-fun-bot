@@ -94,8 +94,18 @@ def print_curve_status(state: dict) -> None:
         state: The parsed bonding curve state dictionary
     """
     progress = 0
-    if state["token_total_supply"]:
-        progress = 100 - (100 * state["real_token_reserves"] / state["token_total_supply"])
+    if state["complete"]:
+        progress = 100.0
+    else:
+        # Pump.fun constants (already converted to human-readable format)
+        TOTAL_SUPPLY = 1_000_000_000  # 1B tokens 
+        RESERVED_TOKENS = 206_900_000  # 206.9M tokens reserved for migration
+        
+        initial_real_token_reserves = TOTAL_SUPPLY - RESERVED_TOKENS  # 793.1M tokens
+        
+        if initial_real_token_reserves > 0:
+            left_tokens = state["real_token_reserves"]
+            progress = 100 - (left_tokens * 100) / initial_real_token_reserves
 
     print("=" * 30)
     print(f"Complete: {'✅' if state['complete'] else '❌'}")

@@ -20,7 +20,7 @@ from solders.pubkey import Pubkey
 from solders.transaction import Transaction, VersionedTransaction
 from spl.token.instructions import get_associated_token_address
 
-# Here and later all the discriminators are precalculated. See learning-examples/discriminator.py
+# Here and later all the discriminators are precalculated. See learning-examples/calculate_discriminator.py
 EXPECTED_DISCRIMINATOR = struct.pack("<Q", 6966180631402821399)
 TOKEN_DECIMALS = 6
 

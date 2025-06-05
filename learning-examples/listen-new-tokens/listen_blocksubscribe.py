@@ -55,7 +55,7 @@ def decode_create_instruction(ix_data, ix_def, accounts):
     return args
 
 
-# Here and later all the discriminators are precalculated. See learning-examples/discriminator.py
+# Here and later all the discriminators are precalculated. See learning-examples/calculate_discriminator.py
 async def listen_and_decode_create():
     idl = load_idl("idl/pump_fun_idl.json")
     create_discriminator = 8576854823835016728

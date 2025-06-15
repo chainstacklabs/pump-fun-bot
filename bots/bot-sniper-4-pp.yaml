@@ -2,20 +2,18 @@
 # Carefully review and adjust values to match your trading strategy and risk tolerance.
 
 # Bot identification and connection settings
-name: "bot-sniper-2"
+name: "bot-sniper-pumpportal"
 env_file: ".env"
 rpc_endpoint: "${SOLANA_NODE_RPC_ENDPOINT}"
 wss_endpoint: "${SOLANA_NODE_WSS_ENDPOINT}"
 private_key: "${SOLANA_PRIVATE_KEY}"
 
-enabled: false # You can turn off the bot w/o removing its config
+enabled: true # You can turn off the bot w/o removing its config
 separate_process: true
 
-# Geyser configuration (fastest method for getting updates)
-geyser:
-  endpoint: "${GEYSER_ENDPOINT}"
-  api_token: "${GEYSER_API_TOKEN}"
-  auth_type: "basic" # or "x-token"
+# PumpPortal configuration (optional - uses default URL if not specified)
+pumpportal:
+  url: "wss://pumpportal.fun/api/data" # Default PumpPortal WebSocket URL
 
 # Trading parameters
 # Control trade execution: amount of SOL per trade and acceptable price deviation
@@ -44,7 +42,7 @@ priority_fees:
 filters:
   match_string: null # Only process tokens with this string in name/symbol
   bro_address: null # Only trade tokens created by this user address
-  listener_type: "blocks" # Method for detecting new tokens: "logs", "blocks", or "geyser"
+  listener_type: "pumpportal" # Method for detecting new tokens: "logs", "blocks", "geyser", or "pumpportal"
   max_token_age: 0.001 # Maximum token age in seconds for processing
   marry_mode: false # Only buy tokens, skip selling
   yolo_mode: false # Continuously trade tokens

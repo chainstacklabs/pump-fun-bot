@@ -25,6 +25,7 @@ from core.wallet import Wallet
 from monitoring.block_listener import BlockListener
 from monitoring.geyser_listener import GeyserListener
 from monitoring.logs_listener import LogsListener
+from monitoring.pumpportal_listener import PumpPortalListener
 from trading.base import TokenInfo, TradeResult
 from trading.buyer import TokenBuyer
 from trading.seller import TokenSeller
@@ -49,6 +50,7 @@ class PumpTrader:
         geyser_endpoint: str | None = None,
         geyser_api_token: str | None = None,
         geyser_auth_type: str = "x-token",
+        pumpportal_url: str = "wss://pumpportal.fun/api/data",
 
         extreme_fast_mode: bool = False,
         extreme_fast_token_amount: int = 30,
@@ -88,10 +90,11 @@ class PumpTrader:
             buy_slippage: Slippage tolerance for buys
             sell_slippage: Slippage tolerance for sells
 
-            listener_type: Type of listener to use ('logs', 'blocks', or 'geyser')
+            listener_type: Type of listener to use ('logs', 'blocks', 'geyser', or 'pumpportal')
             geyser_endpoint: Geyser endpoint URL (required for geyser listener)
             geyser_api_token: Geyser API token (required for geyser listener)
             geyser_auth_type: Geyser authentication type ('x-token' or 'basic')
+            pumpportal_url: PumpPortal WebSocket URL (default: wss://pumpportal.fun/api/data)
 
             extreme_fast_mode: Whether to enable extreme fast mode
             extreme_fast_token_amount: Maximum token amount for extreme fast mode
@@ -165,6 +168,9 @@ class PumpTrader:
         elif listener_type == "logs":
             self.token_listener = LogsListener(wss_endpoint, PumpAddresses.PROGRAM)
             logger.info("Using logsSubscribe listener for token monitoring")
+        elif listener_type == "pumpportal":
+            self.token_listener = PumpPortalListener(PumpAddresses.PROGRAM, pumpportal_url)
+            logger.info("Using PumpPortal listener for token monitoring")
         else:
             self.token_listener = BlockListener(wss_endpoint, PumpAddresses.PROGRAM)
             logger.info("Using blockSubscribe listener for token monitoring")

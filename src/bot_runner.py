@@ -62,6 +62,9 @@ async def start_bot(config_path: str):
         geyser_api_token=cfg.get("geyser", {}).get("api_token"),
         geyser_auth_type=cfg.get("geyser", {}).get("auth_type"),
         
+        # PumpPortal configuration (if applicable)
+        pumpportal_url=cfg.get("pumpportal", {}).get("url", "wss://pumpportal.fun/api/data"),
+        
         # Priority fee configuration
         enable_dynamic_priority_fee=cfg.get("priority_fees", {}).get("enable_dynamic", False),
         enable_fixed_priority_fee=cfg.get("priority_fees", {}).get("enable_fixed", True),

@@ -24,6 +24,13 @@ trade:
   buy_slippage: 0.3 # Maximum acceptable price deviation (0.3 = 30%)
   sell_slippage: 0.3
 
+  # Exit strategy configuration
+  exit_strategy: "time_based" # Options: "time_based", "tp_sl", "manual"
+  #take_profit_percentage: 0.1 # Take profit at 10% gain (0.1 = 10%)
+  #stop_loss_percentage: 0.1 # Stop loss at 10% loss (0.1 = 10%)
+  max_hold_time: 15 # Maximum hold time in seconds
+  #price_check_interval: 2 # Check price every 2 seconds
+
   # EXTREME FAST mode configuration
   # When enabled, skips waiting for the bonding curve to stabilize and RPC price check.
   # The bot buys the specified number of tokens directly, making the process faster but less precise.

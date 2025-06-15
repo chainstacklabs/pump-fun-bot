@@ -54,6 +54,13 @@ async def start_bot(config_path: str):
         extreme_fast_mode=cfg["trade"].get("extreme_fast_mode", False),
         extreme_fast_token_amount=cfg["trade"].get("extreme_fast_token_amount", 30),
         
+        # Exit strategy configuration
+        exit_strategy=cfg["trade"].get("exit_strategy", "time_based"),
+        take_profit_percentage=cfg["trade"].get("take_profit_percentage"),
+        stop_loss_percentage=cfg["trade"].get("stop_loss_percentage"),
+        max_hold_time=cfg["trade"].get("max_hold_time"),
+        price_check_interval=cfg["trade"].get("price_check_interval", 10),
+        
         # Listener configuration
         listener_type=cfg["filters"]["listener_type"],
         

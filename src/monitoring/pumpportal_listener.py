@@ -83,13 +83,17 @@ class PumpPortalListener(BaseTokenListener):
 
                     except websockets.exceptions.ConnectionClosed:
                         logger.warning("PumpPortal WebSocket connection closed. Reconnecting...")
+                    finally:
                         ping_task.cancel()
+                        try:
+                            await ping_task
+                        except asyncio.CancelledError:
+                            pass
 
-            except Exception as e:
-                logger.error(f"PumpPortal WebSocket connection error: {e}")
+            except Exception:
+                logger.exception("PumpPortal WebSocket connection error")
                 logger.info("Reconnecting in 5 seconds...")
                 await asyncio.sleep(5)
-
     async def _subscribe_to_new_tokens(self, websocket) -> None:
         """Subscribe to new token events from PumpPortal.
 

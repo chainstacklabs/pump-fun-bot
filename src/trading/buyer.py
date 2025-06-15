@@ -341,6 +341,10 @@ class TokenBuyer(Trader):
         if tokens_received_raw <= 0:
             logger.warning("Token balance search failed. Using fallback from EXTREME_FAST estimate.")
             # Fallback: use the amount we know we bought
-            return self.extreme_fast_token_amount if self.extreme_fast_mode else 20.0
-            
+            if self.extreme_fast_mode and self.extreme_fast_token_amount > 0:
+                return self.extreme_fast_token_amount
+            else:
+                logger.error("Cannot determine tokens received from transaction")
+                return 0.0
+
         return tokens_received_raw / 10**TOKEN_DECIMALS

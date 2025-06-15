@@ -25,8 +25,10 @@ from core.wallet import Wallet
 from monitoring.block_listener import BlockListener
 from monitoring.geyser_listener import GeyserListener
 from monitoring.logs_listener import LogsListener
+from monitoring.pumpportal_listener import PumpPortalListener
 from trading.base import TokenInfo, TradeResult
 from trading.buyer import TokenBuyer
+from trading.position import Position
 from trading.seller import TokenSeller
 from utils.logger import get_logger
 
@@ -49,9 +51,17 @@ class PumpTrader:
         geyser_endpoint: str | None = None,
         geyser_api_token: str | None = None,
         geyser_auth_type: str = "x-token",
+        pumpportal_url: str = "wss://pumpportal.fun/api/data",
 
         extreme_fast_mode: bool = False,
         extreme_fast_token_amount: int = 30,
+        
+        # Exit strategy configuration
+        exit_strategy: str = "time_based",
+        take_profit_percentage: float | None = None,
+        stop_loss_percentage: float | None = None,
+        max_hold_time: int | None = None,
+        price_check_interval: int = 10,
         
         # Priority fee configuration
         enable_dynamic_priority_fee: bool = False,
@@ -88,13 +98,20 @@ class PumpTrader:
             buy_slippage: Slippage tolerance for buys
             sell_slippage: Slippage tolerance for sells
 
-            listener_type: Type of listener to use ('logs', 'blocks', or 'geyser')
+            listener_type: Type of listener to use ('logs', 'blocks', 'geyser', or 'pumpportal')
             geyser_endpoint: Geyser endpoint URL (required for geyser listener)
             geyser_api_token: Geyser API token (required for geyser listener)
             geyser_auth_type: Geyser authentication type ('x-token' or 'basic')
+            pumpportal_url: PumpPortal WebSocket URL (default: wss://pumpportal.fun/api/data)
 
             extreme_fast_mode: Whether to enable extreme fast mode
             extreme_fast_token_amount: Maximum token amount for extreme fast mode
+
+            exit_strategy: Exit strategy ("time_based", "tp_sl", or "manual")
+            take_profit_percentage: Take profit percentage (0.5 = 50% profit)
+            stop_loss_percentage: Stop loss percentage (0.2 = 20% loss)
+            max_hold_time: Maximum hold time in seconds
+            price_check_interval: How often to check price for TP/SL (seconds)
 
             enable_dynamic_priority_fee: Whether to enable dynamic priority fees
             enable_fixed_priority_fee: Whether to enable fixed priority fees
@@ -165,6 +182,9 @@ class PumpTrader:
         elif listener_type == "logs":
             self.token_listener = LogsListener(wss_endpoint, PumpAddresses.PROGRAM)
             logger.info("Using logsSubscribe listener for token monitoring")
+        elif listener_type == "pumpportal":
+            self.token_listener = PumpPortalListener(PumpAddresses.PROGRAM, pumpportal_url)
+            logger.info("Using PumpPortal listener for token monitoring")
         else:
             self.token_listener = BlockListener(wss_endpoint, PumpAddresses.PROGRAM)
             logger.info("Using blockSubscribe listener for token monitoring")
@@ -176,6 +196,13 @@ class PumpTrader:
         self.max_retries = max_retries
         self.extreme_fast_mode = extreme_fast_mode
         self.extreme_fast_token_amount = extreme_fast_token_amount
+        
+        # Exit strategy parameters
+        self.exit_strategy = exit_strategy.lower()
+        self.take_profit_percentage = take_profit_percentage
+        self.stop_loss_percentage = stop_loss_percentage
+        self.max_hold_time = max_hold_time
+        self.price_check_interval = price_check_interval
         
         # Timing parameters
         self.wait_time_after_creation = wait_time_after_creation
@@ -209,6 +236,11 @@ class PumpTrader:
         logger.info(f"Creator filter: {self.bro_address if self.bro_address else 'None'}")
         logger.info(f"Marry mode: {self.marry_mode}")
         logger.info(f"YOLO mode: {self.yolo_mode}")
+        logger.info(f"Exit strategy: {self.exit_strategy}")
+        if self.exit_strategy == "tp_sl":
+            logger.info(f"Take profit: {self.take_profit_percentage * 100 if self.take_profit_percentage else 'None'}%")
+            logger.info(f"Stop loss: {self.stop_loss_percentage * 100 if self.stop_loss_percentage else 'None'}%")
+            logger.info(f"Max hold time: {self.max_hold_time if self.max_hold_time else 'None'} seconds")
         logger.info(f"Max token age: {self.max_token_age} seconds")
 
         try:
@@ -439,39 +471,14 @@ class PumpTrader:
         )
         self.traded_mints.add(token_info.mint)
         
-        # Sell token if not in marry mode
+        # Choose exit strategy
         if not self.marry_mode:
-            logger.info(
-                f"Waiting for {self.wait_time_after_buy} seconds before selling..."
-            )
-            await asyncio.sleep(self.wait_time_after_buy)
-
-            logger.info(f"Selling {token_info.symbol}...")
-            sell_result: TradeResult = await self.seller.execute(token_info)
-
-            if sell_result.success:
-                logger.info(f"Successfully sold {token_info.symbol}")
-                self._log_trade(
-                    "sell",
-                    token_info,
-                    sell_result.price,  # type: ignore
-                    sell_result.amount,  # type: ignore
-                    sell_result.tx_signature,
-                )
-                # Close ATA if enabled
-                await handle_cleanup_after_sell(
-                    self.solana_client, 
-                    self.wallet, 
-                    token_info.mint, 
-                    self.priority_fee_manager,
-                    self.cleanup_mode,
-                    self.cleanup_with_priority_fee,
-                    self.cleanup_force_close_with_burn
-                )
-            else:
-                logger.error(
-                    f"Failed to sell {token_info.symbol}: {sell_result.error_message}"
-                )
+            if self.exit_strategy == "tp_sl":
+                await self._handle_tp_sl_exit(token_info, buy_result)
+            elif self.exit_strategy == "time_based":
+                await self._handle_time_based_exit(token_info)
+            elif self.exit_strategy == "manual":
+                logger.info("Manual exit strategy - position will remain open")
         else:
             logger.info("Marry mode enabled. Skipping sell operation.")
 
@@ -497,6 +504,143 @@ class PumpTrader:
             self.cleanup_with_priority_fee,
             self.cleanup_force_close_with_burn
         )
+
+    async def _handle_tp_sl_exit(self, token_info: TokenInfo, buy_result: TradeResult) -> None:
+        """Handle take profit/stop loss exit strategy.
+        
+        Args:
+            token_info: Token information
+            buy_result: Result from the buy operation
+        """
+        # Create position
+        position = Position.create_from_buy_result(
+            mint=token_info.mint,
+            symbol=token_info.symbol,
+            entry_price=buy_result.price,  # type: ignore
+            quantity=buy_result.amount,    # type: ignore
+            take_profit_percentage=self.take_profit_percentage,
+            stop_loss_percentage=self.stop_loss_percentage,
+            max_hold_time=self.max_hold_time,
+        )
+        
+        logger.info(f"Created position: {position}")
+        if position.take_profit_price:
+            logger.info(f"Take profit target: {position.take_profit_price:.8f} SOL")
+        if position.stop_loss_price:
+            logger.info(f"Stop loss target: {position.stop_loss_price:.8f} SOL")
+        
+        # Monitor position until exit condition is met
+        await self._monitor_position_until_exit(token_info, position)
+
+    async def _handle_time_based_exit(self, token_info: TokenInfo) -> None:
+        """Handle legacy time-based exit strategy.
+        
+        Args:
+            token_info: Token information
+        """
+        logger.info(
+            f"Waiting for {self.wait_time_after_buy} seconds before selling..."
+        )
+        await asyncio.sleep(self.wait_time_after_buy)
+
+        logger.info(f"Selling {token_info.symbol}...")
+        sell_result: TradeResult = await self.seller.execute(token_info)
+
+        if sell_result.success:
+            logger.info(f"Successfully sold {token_info.symbol}")
+            self._log_trade(
+                "sell",
+                token_info,
+                sell_result.price,  # type: ignore
+                sell_result.amount,  # type: ignore
+                sell_result.tx_signature,
+            )
+            # Close ATA if enabled
+            await handle_cleanup_after_sell(
+                self.solana_client, 
+                self.wallet, 
+                token_info.mint, 
+                self.priority_fee_manager,
+                self.cleanup_mode,
+                self.cleanup_with_priority_fee,
+                self.cleanup_force_close_with_burn
+            )
+        else:
+            logger.error(
+                f"Failed to sell {token_info.symbol}: {sell_result.error_message}"
+            )
+
+    async def _monitor_position_until_exit(self, token_info: TokenInfo, position: Position) -> None:
+        """Monitor a position until exit conditions are met.
+        
+        Args:
+            token_info: Token information
+            position: Position to monitor
+        """
+        logger.info(f"Starting position monitoring (check interval: {self.price_check_interval}s)")
+        
+        while position.is_active:
+            try:
+                # Get current price from bonding curve
+                current_price = await self.curve_manager.calculate_price(token_info.bonding_curve)
+                
+                # Check if position should be exited
+                should_exit, exit_reason = position.should_exit(current_price)
+                
+                if should_exit and exit_reason:
+                    logger.info(f"Exit condition met: {exit_reason.value}")
+                    logger.info(f"Current price: {current_price:.8f} SOL")
+                    
+                    # Log PnL before exit
+                    pnl = position.get_pnl(current_price)
+                    logger.info(f"Position PnL: {pnl['price_change_pct']:.2f}% ({pnl['unrealized_pnl_sol']:.6f} SOL)")
+                    
+                    # Execute sell
+                    sell_result = await self.seller.execute(token_info)
+                    
+                    if sell_result.success:
+                        # Close position with actual exit price
+                        position.close_position(sell_result.price, exit_reason)  # type: ignore
+                        
+                        logger.info(f"Successfully exited position: {exit_reason.value}")
+                        self._log_trade(
+                            "sell",
+                            token_info,
+                            sell_result.price,  # type: ignore
+                            sell_result.amount,  # type: ignore
+                            sell_result.tx_signature,
+                        )
+                        
+                        # Log final PnL
+                        final_pnl = position.get_pnl()
+                        logger.info(f"Final PnL: {final_pnl['price_change_pct']:.2f}% ({final_pnl['unrealized_pnl_sol']:.6f} SOL)")
+                        
+                        # Close ATA if enabled
+                        await handle_cleanup_after_sell(
+                            self.solana_client, 
+                            self.wallet, 
+                            token_info.mint, 
+                            self.priority_fee_manager,
+                            self.cleanup_mode,
+                            self.cleanup_with_priority_fee,
+                            self.cleanup_force_close_with_burn
+                        )
+                    else:
+                        logger.error(f"Failed to exit position: {sell_result.error_message}")
+                        # Keep monitoring in case sell can be retried
+                        
+                    break
+                else:
+                    # Log current status
+                    pnl = position.get_pnl(current_price)
+                    logger.debug(f"Position status: {current_price:.8f} SOL ({pnl['price_change_pct']:+.2f}%)")
+                
+                # Wait before next price check
+                await asyncio.sleep(self.price_check_interval)
+                
+            except Exception as e:
+                logger.error(f"Error monitoring position: {e}")
+                await asyncio.sleep(self.price_check_interval)  # Continue monitoring despite errors
 
     async def _save_token_info(
         self, token_info: TokenInfo

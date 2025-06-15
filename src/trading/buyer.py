@@ -280,6 +280,9 @@ class TokenBuyer(Trader):
             logger.warning(f"Failed to get actual execution price from bonding curve: {e}")
             # Fallback to EXTREME_FAST estimate
             tokens_received = self.extreme_fast_token_amount if self.extreme_fast_mode else self.amount / await self.curve_manager.calculate_price(token_info.bonding_curve)
++           if tokens_received == 0:
++               logger.error("Fallback failed – unable to determine tokens received")
++               return 0.0, 0.0
             return self.amount / tokens_received, tokens_received
 
 

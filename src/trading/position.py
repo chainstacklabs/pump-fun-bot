@@ -156,5 +156,10 @@ class Position:
     
     def __str__(self) -> str:
         """String representation of position."""
-        status = "ACTIVE" if self.is_active else f"CLOSED ({self.exit_reason.value})"
+        if self.is_active:
+            status = "ACTIVE"
+        elif self.exit_reason:
+            status = f"CLOSED ({self.exit_reason.value})"
+        else:
+            status = "CLOSED (UNKNOWN)"
         return f"Position({self.symbol}: {self.quantity:.6f} @ {self.entry_price:.8f} SOL - {status})"

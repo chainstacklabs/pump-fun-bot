@@ -268,6 +268,8 @@ class TokenBuyer(Trader):
             
             tokens_received = await self._get_tokens_received_from_tx(tx_response, token_info)
             
+            if tokens_received == 0:
+                raise ValueError("Cannot compute execution price: zero tokens received")
             actual_price = sol_sent_to_curve / tokens_received
             
             logger.info(f"Bonding curve received: {sol_sent_to_curve:.6f} SOL")

@@ -2,7 +2,7 @@
 # Carefully review and adjust values to match your trading strategy and risk tolerance.
 
 # Bot identification and connection settings
-name: "bot-sniper-1"
+name: "bot-sniper-pumpportal"
 env_file: ".env"
 rpc_endpoint: "${SOLANA_NODE_RPC_ENDPOINT}"
 wss_endpoint: "${SOLANA_NODE_WSS_ENDPOINT}"
@@ -11,11 +11,9 @@ private_key: "${SOLANA_PRIVATE_KEY}"
 enabled: false # You can turn off the bot w/o removing its config
 separate_process: true
 
-# Geyser configuration (fastest method for getting updates)
-geyser:
-  endpoint: "${GEYSER_ENDPOINT}"
-  api_token: "${GEYSER_API_TOKEN}"
-  auth_type: "x-token" # or "basic"
+# PumpPortal configuration (optional - uses default URL if not specified)
+pumpportal:
+  url: "wss://pumpportal.fun/api/data" # Default PumpPortal WebSocket URL
 
 # Trading parameters
 # Control trade execution: amount of SOL per trade and acceptable price deviation
@@ -25,11 +23,11 @@ trade:
   sell_slippage: 0.3
 
   # Exit strategy configuration
-  exit_strategy: "time_based" # Options: "time_based", "tp_sl", "manual"
-  #take_profit_percentage: 0.1 # Take profit at 10% gain (0.1 = 10%)
-  #stop_loss_percentage: 0.1 # Stop loss at 10% loss (0.1 = 10%)
-  max_hold_time: 15 # Maximum hold time in seconds
-  #price_check_interval: 2 # Check price every 2 seconds
+  exit_strategy: "tp_sl" # Options: "time_based", "tp_sl", "manual"
+  take_profit_percentage: 0.1 # Take profit at 10% gain (0.1 = 10%)
+  stop_loss_percentage: 0.1 # Stop loss at 10% loss (0.1 = 10%)
+  max_hold_time: 600 # Maximum hold time in seconds (600 = 10 minutes)
+  price_check_interval: 2 # Check price every 2 seconds
 
   # EXTREME FAST mode configuration
   # When enabled, skips waiting for the bonding curve to stabilize and RPC price check.
@@ -43,15 +41,15 @@ trade:
 priority_fees:
   enable_dynamic: false # Use latest transactions to estimate required fee (getRecentPrioritizationFees)
   enable_fixed: true # Use fixed amount below
-  fixed_amount: 1_000_000 # Base fee in microlamports
+  fixed_amount: 200_000 # Base fee in microlamports
   extra_percentage: 0.0 # Percentage increase on riority fee regardless of the calculation method (0.1 = 10%)
-  hard_cap: 1_000_000 # Maximum allowable fee in microlamports to prevent excessive spending
+  hard_cap: 200_000 # Maximum allowable fee in microlamports to prevent excessive spending
 
 # Filters for token selection
 filters:
   match_string: null # Only process tokens with this string in name/symbol
   bro_address: null # Only trade tokens created by this user address
-  listener_type: "geyser" # Method for detecting new tokens: "logs", "blocks", or "geyser"
+  listener_type: "pumpportal" # Method for detecting new tokens: "logs", "blocks", "geyser", or "pumpportal"
   max_token_age: 0.001 # Maximum token age in seconds for processing
   marry_mode: false # Only buy tokens, skip selling
   yolo_mode: false # Continuously trade tokens

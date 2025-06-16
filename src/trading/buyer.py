@@ -113,12 +113,17 @@ class TokenBuyer(Trader):
             success = await self.client.confirm_transaction(tx_signature)
 
             if success:
+                # Get actual execution data from bonding curve balance changes
+                actual_price, actual_tokens = await self._get_actual_execution_price(tx_signature, token_info)
+                
                 logger.info(f"Buy transaction confirmed: {tx_signature}")
+                logger.info(f"Actual price paid to bonding curve: {actual_price:.8f} SOL per token")
+                
                 return TradeResult(
                     success=True,
                     tx_signature=tx_signature,
-                    amount=token_amount,
-                    price=token_price_sol,
+                    amount=actual_tokens,      # Actual tokens received
+                    price=actual_price,        # Actual price based on bonding curve SOL flow
                 )
             else:
                 return TradeResult(
@@ -216,3 +221,135 @@ class TokenBuyer(Trader):
         except Exception as e:
             logger.error(f"Buy transaction failed: {e!s}")
             raise
+
+
+    async def _get_actual_execution_price(self, tx_signature: str, token_info: TokenInfo) -> tuple[float, float]:
+        """Get actual execution price from bonding curve SOL balance changes."""
+        try:
+            client = await self.client.get_client()
+
+            tx_response = await client.get_transaction(
+                tx_signature, 
+                encoding="jsonParsed",
+                commitment="confirmed",
+                max_supported_transaction_version=0
+            )
+            
+            if not tx_response.value or not tx_response.value.transaction:
+                raise ValueError("Transaction not found")
+                
+            meta = tx_response.value.transaction.meta
+            if not meta or not meta.pre_balances or not meta.post_balances:
+                raise ValueError("Transaction balance data not found")
+                
+            # Get accounts - they're ParsedAccountTxStatus objects, need to extract pubkey
+            accounts = tx_response.value.transaction.transaction.message.account_keys
+            
+            # Find bonding curve account index in the transaction
+            bonding_curve_index = None
+            for i, account in enumerate(accounts):
+                # Extract pubkey from ParsedAccountTxStatus object
+                account_pubkey = str(account.pubkey) if hasattr(account, 'pubkey') else str(account)
+                
+                if account_pubkey == str(token_info.bonding_curve):
+                    bonding_curve_index = i
+                    break
+                    
+            if bonding_curve_index is None:
+                raise ValueError("Bonding curve not found in transaction accounts")
+                
+            pre_balance_lamports = meta.pre_balances[bonding_curve_index]
+            post_balance_lamports = meta.post_balances[bonding_curve_index]
+
+            sol_sent_to_curve = (post_balance_lamports - pre_balance_lamports) / LAMPORTS_PER_SOL
+            
+            if sol_sent_to_curve <= 0:
+                raise ValueError(f"No SOL sent to bonding curve: {sol_sent_to_curve}")
+            
+            tokens_received = await self._get_tokens_received_from_tx(tx_response, token_info)
+            
+            if tokens_received == 0:
+                raise ValueError("Cannot compute execution price: zero tokens received")
+            actual_price = sol_sent_to_curve / tokens_received
+            
+            logger.info(f"Bonding curve received: {sol_sent_to_curve:.6f} SOL")
+            logger.info(f"We received: {tokens_received:.6f} tokens")
+            logger.info(f"Actual execution price: {actual_price:.8f} SOL per token")
+            
+            return actual_price, tokens_received
+            
+        except Exception as e:
+            logger.warning(f"Failed to get actual execution price from bonding curve: {e}")
+            # Fallback to EXTREME_FAST estimate
+            tokens_received = self.extreme_fast_token_amount if self.extreme_fast_mode else self.amount / await self.curve_manager.calculate_price(token_info.bonding_curve)
+            if tokens_received == 0:
+               logger.error("Fallback failed – unable to determine tokens received")
+               return 0.0, 0.0
+            return self.amount / tokens_received, tokens_received
+
+
+    async def _get_tokens_received_from_tx(self, tx_response, token_info: TokenInfo) -> float:
+        """Extract tokens received from transaction token balance changes."""
+        meta = tx_response.value.transaction.meta
+        
+        pre_token_balance = 0
+        post_token_balance = 0
+        
+        wallet_str = str(self.wallet.pubkey)
+        mint_str = str(token_info.mint)
+        
+        if meta.pre_token_balances:
+            for balance in meta.pre_token_balances:
+                # Convert to string for comparison
+                balance_owner = str(balance.owner) if hasattr(balance, 'owner') else str(getattr(balance, 'owner', ''))
+                balance_mint = str(balance.mint) if hasattr(balance, 'mint') else str(getattr(balance, 'mint', ''))
+                
+                if balance_owner == wallet_str and balance_mint == mint_str:
+                    try:
+                        # Try multiple ways to get the amount
+                        if hasattr(balance, 'ui_token_amount'):
+                            amount_obj = balance.ui_token_amount
+                            if hasattr(amount_obj, 'amount') and amount_obj.amount is not None:
+                                pre_token_balance = int(amount_obj.amount)
+                            elif hasattr(amount_obj, 'ui_amount') and amount_obj.ui_amount is not None:
+                                pre_token_balance = int(float(amount_obj.ui_amount) * (10**TOKEN_DECIMALS))
+                    except (ValueError, TypeError) as e:
+                        logger.warning(f"Error parsing pre-token balance: {e}")
+                    break
+                    
+        # Check post-token balances  
+        if meta.post_token_balances:
+            for balance in meta.post_token_balances:
+                # Convert to string for comparison
+                balance_owner = str(balance.owner) if hasattr(balance, 'owner') else str(getattr(balance, 'owner', ''))
+                balance_mint = str(balance.mint) if hasattr(balance, 'mint') else str(getattr(balance, 'mint', ''))
+                
+                if balance_owner == wallet_str and balance_mint == mint_str:
+                    try:
+                        # Try multiple ways to get the amount
+                        if hasattr(balance, 'ui_token_amount'):
+                            amount_obj = balance.ui_token_amount
+                            if hasattr(amount_obj, 'amount') and amount_obj.amount is not None:
+                                post_token_balance = int(amount_obj.amount)
+                            elif hasattr(amount_obj, 'ui_amount') and amount_obj.ui_amount is not None:
+                                post_token_balance = int(float(amount_obj.ui_amount) * (10**TOKEN_DECIMALS))
+                    except (ValueError, TypeError) as e:
+                        logger.warning(f"Error parsing post-token balance: {e}")
+                    break
+        
+        # Calculate tokens received
+        if pre_token_balance == 0 and post_token_balance > 0:
+            tokens_received_raw = post_token_balance
+        else:
+            tokens_received_raw = post_token_balance - pre_token_balance
+        
+        if tokens_received_raw <= 0:
+            logger.warning("Token balance search failed. Using fallback from EXTREME_FAST estimate.")
+            # Fallback: use the amount we know we bought
+            if self.extreme_fast_mode and self.extreme_fast_token_amount > 0:
+                return self.extreme_fast_token_amount
+            else:
+                logger.error("Cannot determine tokens received from transaction")
+                return 0.0
+
+        return tokens_received_raw / 10**TOKEN_DECIMALS

@@ -24,8 +24,9 @@ CONFIG_VALIDATION_RULES = [
 
 # Valid values for enum-like fields
 VALID_VALUES = {
-    "filters.listener_type": ["logs", "blocks", "geyser"],
-    "cleanup.mode": ["disabled", "on_fail", "after_sell", "post_session"]
+    "filters.listener_type": ["logs", "blocks", "geyser", "pumpportal"],
+    "cleanup.mode": ["disabled", "on_fail", "after_sell", "post_session"],
+    "trade.exit_strategy": ["time_based", "tp_sl", "manual"]
 }
 
 

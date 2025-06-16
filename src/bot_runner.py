@@ -54,6 +54,13 @@ async def start_bot(config_path: str):
         extreme_fast_mode=cfg["trade"].get("extreme_fast_mode", False),
         extreme_fast_token_amount=cfg["trade"].get("extreme_fast_token_amount", 30),
         
+        # Exit strategy configuration
+        exit_strategy=cfg["trade"].get("exit_strategy", "time_based"),
+        take_profit_percentage=cfg["trade"].get("take_profit_percentage"),
+        stop_loss_percentage=cfg["trade"].get("stop_loss_percentage"),
+        max_hold_time=cfg["trade"].get("max_hold_time"),
+        price_check_interval=cfg["trade"].get("price_check_interval", 10),
+        
         # Listener configuration
         listener_type=cfg["filters"]["listener_type"],
         
@@ -61,6 +68,9 @@ async def start_bot(config_path: str):
         geyser_endpoint=cfg.get("geyser", {}).get("endpoint"),
         geyser_api_token=cfg.get("geyser", {}).get("api_token"),
         geyser_auth_type=cfg.get("geyser", {}).get("auth_type"),
+        
+        # PumpPortal configuration (if applicable)
+        pumpportal_url=cfg.get("pumpportal", {}).get("url", "wss://pumpportal.fun/api/data"),
         
         # Priority fee configuration
         enable_dynamic_priority_fee=cfg.get("priority_fees", {}).get("enable_dynamic", False),

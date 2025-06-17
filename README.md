@@ -194,7 +194,7 @@ As of April 30, 2025, all changes from **refactored/main-v2** are merged into th
 | | Bonding curve status tracking | Checking a bonding curve status progress. Predict how soon a token will start the migration process | ✅ | 
 | | Account closure script | Script to close the associated bonding curve account if the rest of the flow txs fails | ✅ |
 | | PumpSwap migration listening | pump_fun migrated to their own DEX — [PumpSwap](https://x.com/pumpdotfun/status/1902762309950292010), so we need to FAFO with that instead of Raydium (and attempt `logSubscribe` implementation) | ✅ |
-| **Stage 3: Trading experience** | Take profit/stop loss | Implement take profit, stop loss exit strategies | FAFO |
+| **Stage 3: Trading experience** | Take profit/stop loss | Implement take profit, stop loss exit strategies | ✅ |
 | | Market cap-based selling | Sell when a specific market cap has been reached | Not started |
 | | Copy trading | Enable copy trading functionality | Not started |
 | | Token analysis script | Script for basic token analysis (market cap, creator investment, liquidity, token age) | Not started |

@@ -18,7 +18,7 @@ from solders.keypair import Keypair
 from solders.message import Message
 from solders.pubkey import Pubkey
 from solders.transaction import Transaction, VersionedTransaction
-from spl.token.instructions import get_associated_token_address
+from spl.token.instructions import create_idempotent_associated_token_account, get_associated_token_address
 
 # Here and later all the discriminators are precalculated. See learning-examples/calculate_discriminator.py
 EXPECTED_DISCRIMINATOR = struct.pack("<Q", 6966180631402821399)
@@ -125,61 +125,6 @@ async def buy_token(
 
         # Calculate maximum SOL to spend with slippage
         max_amount_lamports = int(amount_lamports * (1 + slippage))
-
-        # Create associated token account with retries
-        for ata_attempt in range(max_retries):
-            try:
-                account_info = await client.get_account_info(associated_token_account, encoding="base64")
-                if account_info.value is None:
-                    print(
-                        f"Creating associated token account (Attempt {ata_attempt + 1})..."
-                    )
-                    create_ata_ix = spl_token.create_associated_token_account(
-                        payer=payer.pubkey(), owner=payer.pubkey(), mint=mint
-                    )
-
-                    msg = Message([create_ata_ix], payer.pubkey())
-                    tx_ata = await client.send_transaction(
-                        Transaction(
-                            [payer],
-                            msg,
-                            (await client.get_latest_blockhash()).value.blockhash,
-                        ),
-                        opts=TxOpts(
-                            skip_preflight=True, preflight_commitment=Confirmed
-                        ),
-                    )
-
-                    await client.confirm_transaction(
-                        tx_ata.value, commitment="confirmed"
-                    )
-
-                    print("Associated token account created.")
-                    print(
-                        f"Associated token account address: {associated_token_account}"
-                    )
-                    break
-                else:
-                    print("Associated token account already exists.")
-                    print(
-                        f"Associated token account address: {associated_token_account}"
-                    )
-                    break
-            except Exception as e:
-                print(
-                    f"Attempt {ata_attempt + 1} to create associated token account failed: {e!s}"
-                )
-                if ata_attempt < max_retries - 1:
-                    wait_time = 2**ata_attempt
-                    print(f"Retrying in {wait_time} seconds...")
-                    await asyncio.sleep(wait_time)
-                else:
-                    print(
-                        "Max retries reached. Unable to create associated token account."
-                    )
-                    return
-
-        # Continue with the buy transaction
         for attempt in range(max_retries):
             try:
                 accounts = [
@@ -224,8 +169,13 @@ async def buy_token(
                     + struct.pack("<Q", max_amount_lamports)
                 )
                 buy_ix = Instruction(PUMP_PROGRAM, data, accounts)
-
-                msg = Message([set_compute_unit_price(1_000), buy_ix], payer.pubkey())
+                idempotent_ata_ix = create_idempotent_associated_token_account(
+                    payer.pubkey(), payer.pubkey(), mint
+                )
+                msg = Message(
+                    [set_compute_unit_price(1_000), idempotent_ata_ix, buy_ix],
+                    payer.pubkey(),
+                )
                 tx_buy = await client.send_transaction(
                     Transaction(
                         [payer],

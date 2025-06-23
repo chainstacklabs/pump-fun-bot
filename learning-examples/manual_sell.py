@@ -58,7 +58,7 @@ class BondingCurveState:
 
         parsed = self._STRUCT.parse(data[8:])
         self.__dict__.update(parsed)
-        
+
         # Convert raw bytes to Pubkey for creator field
         if hasattr(self, 'creator') and isinstance(self.creator, bytes):
             self.creator = Pubkey.from_bytes(self.creator)
@@ -157,72 +157,72 @@ async def sell_token(
         print(f"Selling {token_balance_decimal} tokens")
         print(f"Minimum SOL output: {min_sol_output / LAMPORTS_PER_SOL:.10f} SOL")
 
+        accounts = [
+            AccountMeta(pubkey=PUMP_GLOBAL, is_signer=False, is_writable=False),
+            AccountMeta(pubkey=PUMP_FEE, is_signer=False, is_writable=True),
+            AccountMeta(pubkey=mint, is_signer=False, is_writable=False),
+            AccountMeta(
+                pubkey=bonding_curve, is_signer=False, is_writable=True
+            ),
+            AccountMeta(
+                pubkey=associated_bonding_curve,
+                is_signer=False,
+                is_writable=True,
+            ),
+            AccountMeta(
+                pubkey=associated_token_account,
+                is_signer=False,
+                is_writable=True,
+            ),
+            AccountMeta(
+                pubkey=payer.pubkey(), is_signer=True, is_writable=True
+            ),
+            AccountMeta(
+                pubkey=SYSTEM_PROGRAM, is_signer=False, is_writable=False
+            ),
+            AccountMeta(
+                pubkey=creator_vault,
+                is_signer=False,
+                is_writable=True,
+            ),
+            AccountMeta(
+                pubkey=SYSTEM_TOKEN_PROGRAM, is_signer=False, is_writable=False
+            ),
+            AccountMeta(
+                pubkey=PUMP_EVENT_AUTHORITY, is_signer=False, is_writable=False
+            ),
+            AccountMeta(
+                pubkey=PUMP_PROGRAM, is_signer=False, is_writable=False
+            ),
+        ]
+
+        discriminator = struct.pack("<Q", 12502976635542562355)
+        data = (
+            discriminator
+            + struct.pack("<Q", amount)
+            + struct.pack("<Q", min_sol_output)
+        )
+        sell_ix = Instruction(PUMP_PROGRAM, data, accounts)
+
+        msg = Message([set_compute_unit_price(1_000), sell_ix], payer.pubkey())
+        recent_blockhash = await client.get_latest_blockhash()
+        opts = TxOpts(skip_preflight=True, preflight_commitment=Confirmed)
         # Continue with the sell transaction
         for attempt in range(max_retries):
             try:
-                accounts = [
-                    AccountMeta(pubkey=PUMP_GLOBAL, is_signer=False, is_writable=False),
-                    AccountMeta(pubkey=PUMP_FEE, is_signer=False, is_writable=True),
-                    AccountMeta(pubkey=mint, is_signer=False, is_writable=False),
-                    AccountMeta(
-                        pubkey=bonding_curve, is_signer=False, is_writable=True
-                    ),
-                    AccountMeta(
-                        pubkey=associated_bonding_curve,
-                        is_signer=False,
-                        is_writable=True,
-                    ),
-                    AccountMeta(
-                        pubkey=associated_token_account,
-                        is_signer=False,
-                        is_writable=True,
-                    ),
-                    AccountMeta(
-                        pubkey=payer.pubkey(), is_signer=True, is_writable=True
-                    ),
-                    AccountMeta(
-                        pubkey=SYSTEM_PROGRAM, is_signer=False, is_writable=False
-                    ),
-                    AccountMeta(
-                        pubkey=creator_vault,
-                        is_signer=False,
-                        is_writable=True,
-                    ),
-                    AccountMeta(
-                        pubkey=SYSTEM_TOKEN_PROGRAM, is_signer=False, is_writable=False
-                    ),
-                    AccountMeta(
-                        pubkey=PUMP_EVENT_AUTHORITY, is_signer=False, is_writable=False
-                    ),
-                    AccountMeta(
-                        pubkey=PUMP_PROGRAM, is_signer=False, is_writable=False
-                    ),
-                ]
-
-                discriminator = struct.pack("<Q", 12502976635542562355)
-                data = (
-                    discriminator
-                    + struct.pack("<Q", amount)
-                    + struct.pack("<Q", min_sol_output)
-                )
-                sell_ix = Instruction(PUMP_PROGRAM, data, accounts)
-
-                msg = Message([set_compute_unit_price(1_000), sell_ix], payer.pubkey())
                 tx = await client.send_transaction(
                     Transaction(
                         [payer],
                         msg,
-                        (await client.get_latest_blockhash()).value.blockhash,
+                        recent_blockhash.value.blockhash,
                     ),
-                    opts=TxOpts(skip_preflight=True, preflight_commitment=Confirmed),
+                    opts=opts,
                 )
-
-                print(f"Transaction sent: https://explorer.solana.com/tx/{tx.value}")
-
-                await client.confirm_transaction(tx.value, commitment="confirmed")
+                tx_hash = tx.value
+                print(f"Transaction sent: https://explorer.solana.com/tx/{tx_hash}")
+                await client.confirm_transaction(tx_hash, commitment="confirmed", sleep_seconds=1)
                 print("Transaction confirmed")
                 return  # Success, exit the function
-
             except Exception as e:
                 print(f"Attempt {attempt + 1} failed: {e!s}")
                 if attempt < max_retries - 1:

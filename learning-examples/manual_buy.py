@@ -62,7 +62,7 @@ class BondingCurveState:
 
         parsed = self._STRUCT.parse(data[8:])
         self.__dict__.update(parsed)
-        
+
         # Convert raw bytes to Pubkey for creator field
         if hasattr(self, 'creator') and isinstance(self.creator, bytes):
             self.creator = Pubkey.from_bytes(self.creator)
@@ -125,74 +125,67 @@ async def buy_token(
 
         # Calculate maximum SOL to spend with slippage
         max_amount_lamports = int(amount_lamports * (1 + slippage))
+
+        accounts = [
+            AccountMeta(pubkey=PUMP_GLOBAL, is_signer=False, is_writable=False),
+            AccountMeta(pubkey=PUMP_FEE, is_signer=False, is_writable=True),
+            AccountMeta(pubkey=mint, is_signer=False, is_writable=False),
+            AccountMeta(pubkey=bonding_curve, is_signer=False, is_writable=True),
+            AccountMeta(
+                pubkey=associated_bonding_curve,
+                is_signer=False,
+                is_writable=True,
+            ),
+            AccountMeta(
+                pubkey=associated_token_account,
+                is_signer=False,
+                is_writable=True,
+            ),
+            AccountMeta(pubkey=payer.pubkey(), is_signer=True, is_writable=True),
+            AccountMeta(pubkey=SYSTEM_PROGRAM, is_signer=False, is_writable=False),
+            AccountMeta(
+                pubkey=SYSTEM_TOKEN_PROGRAM, is_signer=False, is_writable=False
+            ),
+            AccountMeta(pubkey=creator_vault, is_signer=False, is_writable=True),
+            AccountMeta(
+                pubkey=PUMP_EVENT_AUTHORITY, is_signer=False, is_writable=False
+            ),
+            AccountMeta(pubkey=PUMP_PROGRAM, is_signer=False, is_writable=False),
+        ]
+
+        discriminator = struct.pack("<Q", 16927863322537952870)
+        data = (
+            discriminator
+            + struct.pack("<Q", int(token_amount * 10**6))
+            + struct.pack("<Q", max_amount_lamports)
+        )
+        buy_ix = Instruction(PUMP_PROGRAM, data, accounts)
+        idempotent_ata_ix = create_idempotent_associated_token_account(
+            payer.pubkey(), payer.pubkey(), mint
+        )
+        msg = Message(
+            [set_compute_unit_price(1_000), idempotent_ata_ix, buy_ix], payer.pubkey()
+        )
+        recent_blockhash = await client.get_latest_blockhash()
+        opts = TxOpts(skip_preflight=True, preflight_commitment=Confirmed)
+
         for attempt in range(max_retries):
             try:
-                accounts = [
-                    AccountMeta(pubkey=PUMP_GLOBAL, is_signer=False, is_writable=False),
-                    AccountMeta(pubkey=PUMP_FEE, is_signer=False, is_writable=True),
-                    AccountMeta(pubkey=mint, is_signer=False, is_writable=False),
-                    AccountMeta(
-                        pubkey=bonding_curve, is_signer=False, is_writable=True
-                    ),
-                    AccountMeta(
-                        pubkey=associated_bonding_curve,
-                        is_signer=False,
-                        is_writable=True,
-                    ),
-                    AccountMeta(
-                        pubkey=associated_token_account,
-                        is_signer=False,
-                        is_writable=True,
-                    ),
-                    AccountMeta(
-                        pubkey=payer.pubkey(), is_signer=True, is_writable=True
-                    ),
-                    AccountMeta(
-                        pubkey=SYSTEM_PROGRAM, is_signer=False, is_writable=False
-                    ),
-                    AccountMeta(
-                        pubkey=SYSTEM_TOKEN_PROGRAM, is_signer=False, is_writable=False
-                    ),
-                    AccountMeta(pubkey=creator_vault, is_signer=False, is_writable=True),
-                    AccountMeta(
-                        pubkey=PUMP_EVENT_AUTHORITY, is_signer=False, is_writable=False
-                    ),
-                    AccountMeta(
-                        pubkey=PUMP_PROGRAM, is_signer=False, is_writable=False
-                    ),
-                ]
-
-                discriminator = struct.pack("<Q", 16927863322537952870)
-                data = (
-                    discriminator
-                    + struct.pack("<Q", int(token_amount * 10**6))
-                    + struct.pack("<Q", max_amount_lamports)
-                )
-                buy_ix = Instruction(PUMP_PROGRAM, data, accounts)
-                idempotent_ata_ix = create_idempotent_associated_token_account(
-                    payer.pubkey(), payer.pubkey(), mint
-                )
-                msg = Message(
-                    [set_compute_unit_price(1_000), idempotent_ata_ix, buy_ix],
-                    payer.pubkey(),
-                )
                 tx_buy = await client.send_transaction(
                     Transaction(
                         [payer],
                         msg,
-                        (await client.get_latest_blockhash()).value.blockhash,
+                        recent_blockhash.value.blockhash,
                     ),
-                    opts=TxOpts(skip_preflight=True, preflight_commitment=Confirmed),
+                    opts=opts,
                 )
-
+                tx_hash = tx_buy.value
                 print(
-                    f"Transaction sent: https://explorer.solana.com/tx/{tx_buy.value}"
+                    f"Transaction sent: https://explorer.solana.com/tx/{tx_hash}"
                 )
-
-                await client.confirm_transaction(tx_buy.value, commitment="confirmed")
+                await client.confirm_transaction(tx_hash, commitment="confirmed", sleep_seconds=1)
                 print("Transaction confirmed")
                 return  # Success, exit the function
-
             except Exception as e:
                 print(f"Attempt {attempt + 1} failed: {str(e)[:50]}")
                 if attempt < max_retries - 1:
@@ -201,6 +194,7 @@ async def buy_token(
                     await asyncio.sleep(wait_time)
                 else:
                     print("Max retries reached. Unable to complete the transaction.")
+
 
 
 def load_idl(file_path):

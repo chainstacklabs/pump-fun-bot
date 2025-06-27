@@ -18,7 +18,7 @@ from solders.keypair import Keypair
 from solders.message import Message
 from solders.pubkey import Pubkey
 from solders.transaction import Transaction, VersionedTransaction
-from spl.token.instructions import get_associated_token_address
+from spl.token.instructions import create_idempotent_associated_token_account, get_associated_token_address
 
 # Here and later all the discriminators are precalculated. See learning-examples/calculate_discriminator.py
 EXPECTED_DISCRIMINATOR = struct.pack("<Q", 6966180631402821399)
@@ -62,7 +62,7 @@ class BondingCurveState:
 
         parsed = self._STRUCT.parse(data[8:])
         self.__dict__.update(parsed)
-        
+
         # Convert raw bytes to Pubkey for creator field
         if hasattr(self, 'creator') and isinstance(self.creator, bytes):
             self.creator = Pubkey.from_bytes(self.creator)
@@ -126,123 +126,66 @@ async def buy_token(
         # Calculate maximum SOL to spend with slippage
         max_amount_lamports = int(amount_lamports * (1 + slippage))
 
-        # Create associated token account with retries
-        for ata_attempt in range(max_retries):
-            try:
-                account_info = await client.get_account_info(associated_token_account, encoding="base64")
-                if account_info.value is None:
-                    print(
-                        f"Creating associated token account (Attempt {ata_attempt + 1})..."
-                    )
-                    create_ata_ix = spl_token.create_associated_token_account(
-                        payer=payer.pubkey(), owner=payer.pubkey(), mint=mint
-                    )
+        accounts = [
+            AccountMeta(pubkey=PUMP_GLOBAL, is_signer=False, is_writable=False),
+            AccountMeta(pubkey=PUMP_FEE, is_signer=False, is_writable=True),
+            AccountMeta(pubkey=mint, is_signer=False, is_writable=False),
+            AccountMeta(pubkey=bonding_curve, is_signer=False, is_writable=True),
+            AccountMeta(
+                pubkey=associated_bonding_curve,
+                is_signer=False,
+                is_writable=True,
+            ),
+            AccountMeta(
+                pubkey=associated_token_account,
+                is_signer=False,
+                is_writable=True,
+            ),
+            AccountMeta(pubkey=payer.pubkey(), is_signer=True, is_writable=True),
+            AccountMeta(pubkey=SYSTEM_PROGRAM, is_signer=False, is_writable=False),
+            AccountMeta(
+                pubkey=SYSTEM_TOKEN_PROGRAM, is_signer=False, is_writable=False
+            ),
+            AccountMeta(pubkey=creator_vault, is_signer=False, is_writable=True),
+            AccountMeta(
+                pubkey=PUMP_EVENT_AUTHORITY, is_signer=False, is_writable=False
+            ),
+            AccountMeta(pubkey=PUMP_PROGRAM, is_signer=False, is_writable=False),
+        ]
 
-                    msg = Message([create_ata_ix], payer.pubkey())
-                    tx_ata = await client.send_transaction(
-                        Transaction(
-                            [payer],
-                            msg,
-                            (await client.get_latest_blockhash()).value.blockhash,
-                        ),
-                        opts=TxOpts(
-                            skip_preflight=True, preflight_commitment=Confirmed
-                        ),
-                    )
+        discriminator = struct.pack("<Q", 16927863322537952870)
+        data = (
+            discriminator
+            + struct.pack("<Q", int(token_amount * 10**6))
+            + struct.pack("<Q", max_amount_lamports)
+        )
+        buy_ix = Instruction(PUMP_PROGRAM, data, accounts)
+        idempotent_ata_ix = create_idempotent_associated_token_account(
+            payer.pubkey(), payer.pubkey(), mint
+        )
+        msg = Message(
+            [set_compute_unit_price(1_000), idempotent_ata_ix, buy_ix], payer.pubkey()
+        )
+        recent_blockhash = await client.get_latest_blockhash()
+        opts = TxOpts(skip_preflight=True, preflight_commitment=Confirmed)
 
-                    await client.confirm_transaction(
-                        tx_ata.value, commitment="confirmed"
-                    )
-
-                    print("Associated token account created.")
-                    print(
-                        f"Associated token account address: {associated_token_account}"
-                    )
-                    break
-                else:
-                    print("Associated token account already exists.")
-                    print(
-                        f"Associated token account address: {associated_token_account}"
-                    )
-                    break
-            except Exception as e:
-                print(
-                    f"Attempt {ata_attempt + 1} to create associated token account failed: {e!s}"
-                )
-                if ata_attempt < max_retries - 1:
-                    wait_time = 2**ata_attempt
-                    print(f"Retrying in {wait_time} seconds...")
-                    await asyncio.sleep(wait_time)
-                else:
-                    print(
-                        "Max retries reached. Unable to create associated token account."
-                    )
-                    return
-
-        # Continue with the buy transaction
         for attempt in range(max_retries):
             try:
-                accounts = [
-                    AccountMeta(pubkey=PUMP_GLOBAL, is_signer=False, is_writable=False),
-                    AccountMeta(pubkey=PUMP_FEE, is_signer=False, is_writable=True),
-                    AccountMeta(pubkey=mint, is_signer=False, is_writable=False),
-                    AccountMeta(
-                        pubkey=bonding_curve, is_signer=False, is_writable=True
-                    ),
-                    AccountMeta(
-                        pubkey=associated_bonding_curve,
-                        is_signer=False,
-                        is_writable=True,
-                    ),
-                    AccountMeta(
-                        pubkey=associated_token_account,
-                        is_signer=False,
-                        is_writable=True,
-                    ),
-                    AccountMeta(
-                        pubkey=payer.pubkey(), is_signer=True, is_writable=True
-                    ),
-                    AccountMeta(
-                        pubkey=SYSTEM_PROGRAM, is_signer=False, is_writable=False
-                    ),
-                    AccountMeta(
-                        pubkey=SYSTEM_TOKEN_PROGRAM, is_signer=False, is_writable=False
-                    ),
-                    AccountMeta(pubkey=creator_vault, is_signer=False, is_writable=True),
-                    AccountMeta(
-                        pubkey=PUMP_EVENT_AUTHORITY, is_signer=False, is_writable=False
-                    ),
-                    AccountMeta(
-                        pubkey=PUMP_PROGRAM, is_signer=False, is_writable=False
-                    ),
-                ]
-
-                discriminator = struct.pack("<Q", 16927863322537952870)
-                data = (
-                    discriminator
-                    + struct.pack("<Q", int(token_amount * 10**6))
-                    + struct.pack("<Q", max_amount_lamports)
-                )
-                buy_ix = Instruction(PUMP_PROGRAM, data, accounts)
-
-                msg = Message([set_compute_unit_price(1_000), buy_ix], payer.pubkey())
                 tx_buy = await client.send_transaction(
                     Transaction(
                         [payer],
                         msg,
-                        (await client.get_latest_blockhash()).value.blockhash,
+                        recent_blockhash.value.blockhash,
                     ),
-                    opts=TxOpts(skip_preflight=True, preflight_commitment=Confirmed),
+                    opts=opts,
                 )
-
+                tx_hash = tx_buy.value
                 print(
-                    f"Transaction sent: https://explorer.solana.com/tx/{tx_buy.value}"
+                    f"Transaction sent: https://explorer.solana.com/tx/{tx_hash}"
                 )
-
-                await client.confirm_transaction(tx_buy.value, commitment="confirmed")
+                await client.confirm_transaction(tx_hash, commitment="confirmed", sleep_seconds=1)
                 print("Transaction confirmed")
                 return  # Success, exit the function
-
             except Exception as e:
                 print(f"Attempt {attempt + 1} failed: {str(e)[:50]}")
                 if attempt < max_retries - 1:
@@ -251,6 +194,7 @@ async def buy_token(
                     await asyncio.sleep(wait_time)
                 else:
                     print("Max retries reached. Unable to complete the transaction.")
+
 
 
 def load_idl(file_path):

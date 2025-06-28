@@ -6,7 +6,6 @@ import os
 import struct
 
 import base58
-import spl.token.instructions as spl_token
 import websockets
 from construct import Bytes, Flag, Int64ul, Struct
 from solana.rpc.async_api import AsyncClient
@@ -18,7 +17,10 @@ from solders.keypair import Keypair
 from solders.message import Message
 from solders.pubkey import Pubkey
 from solders.transaction import Transaction, VersionedTransaction
-from spl.token.instructions import create_idempotent_associated_token_account, get_associated_token_address
+from spl.token.instructions import (
+    create_idempotent_associated_token_account,
+    get_associated_token_address,
+)
 
 # Here and later all the discriminators are precalculated. See learning-examples/calculate_discriminator.py
 EXPECTED_DISCRIMINATOR = struct.pack("<Q", 6966180631402821399)

@@ -235,7 +235,7 @@ async def sell_token(
 
 async def main():
     # Replace these with the actual values for the token you want to sell
-    mint = Pubkey.from_string("5GkGpfvRLusWGqxSkwk7uEs6mHzNxH8QaZD6uPvYpump")
+    mint = Pubkey.from_string("...")
     bonding_curve, _ = get_bonding_curve_address(mint)
     associated_bonding_curve = find_associated_bonding_curve(mint, bonding_curve)
 

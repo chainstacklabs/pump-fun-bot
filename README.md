@@ -200,7 +200,7 @@ As of April 30, 2025, all changes from **refactored/main-v2** are merged into th
 | | Token analysis script | Script for basic token analysis (market cap, creator investment, liquidity, token age) | Not started |
 | | Archive node integration | Use Solana archive nodes for historical analysis (accounts that consistently print tokens, average mint to raydium time) | Not started |
 | | Geyser implementation | Leverage Solana Geyser for real-time data stream processing | ✅ |
-| **Stage 4: Minting experience** | Token minting | Ability to mint tokens (based on user request - someone minted 18k tokens) | FAFO |
+| **Stage 4: Minting experience** | Token minting | Ability to mint tokens (based on user request - someone minted 18k tokens) | ✅ |
 
 
 ## Development timeline

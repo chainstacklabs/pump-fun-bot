@@ -154,20 +154,25 @@ class DetectionTracker:
             
         providers_list = sorted(all_providers)
         
+        # Calculate column width based on longest provider name
+        max_provider_len = max(len(provider) for provider in providers_list)
+        col_width = max(max_provider_len, 8)  # Minimum 8 for latency values
+        
         print("\nAverage Latency Matrix (ms):")
+        
         # Print header
-        header = "           |"
+        header = f"{'':>{col_width}} |"
         for provider in providers_list:
-            header += f" {provider[:8]:>8} |"
+            header += f" {provider:>{col_width}} |"
         print(header)
         print("-" * len(header))
         
         # Calculate and print latency matrix
         for provider1 in providers_list:
-            row = f"{provider1[:8]:>8} |"
+            row = f"{provider1:>{col_width}} |"
             for provider2 in providers_list:
                 if provider1 == provider2:
-                    row += "      — |"
+                    row += f" {'—':>{col_width}} |"
                     continue
                     
                 # Calculate average latency
@@ -180,9 +185,9 @@ class DetectionTracker:
                 
                 if latencies:
                     avg_latency = sum(latencies) / len(latencies)
-                    row += f" {avg_latency:>+7.1f} |"
+                    row += f" {avg_latency:>+{col_width}.1f} |"
                 else:
-                    row += "      ? |"
+                    row += f" {'?':>{col_width}} |"
             print(row)
 
 

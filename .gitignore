@@ -167,3 +167,5 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 trades/trades.log
+# Mac OS X
+.DS_Store

@@ -101,6 +101,9 @@ async def start_bot(config_path: str):
     
     await trader.start()
 
+def run_bot_process(config_path):
+    asyncio.run(start_bot(config_path))
+
 def run_all_bots():
     """
     Run all bots defined in YAML files in the 'bots' directory.
@@ -136,7 +139,8 @@ def run_all_bots():
             if cfg.get("separate_process", False):
                 logging.info(f"Starting bot '{bot_name}' in separate process")
                 p = multiprocessing.Process(
-                    target=lambda path=str(file): asyncio.run(start_bot(path)), 
+                    target=run_bot_process,
+                    args=(str(file),),
                     name=f"bot-{bot_name}"
                 )
                 p.start()

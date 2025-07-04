@@ -20,6 +20,7 @@ from solana.rpc.commitment import Confirmed
 from solana.rpc.types import MemcmpOpts, TxOpts
 from solders.compute_budget import set_compute_unit_limit, set_compute_unit_price
 from solders.instruction import AccountMeta, Instruction
+from solders.system_program import TransferParams, transfer
 from solders.keypair import Keypair
 from solders.message import Message
 from solders.pubkey import Pubkey
@@ -27,6 +28,8 @@ from solders.transaction import VersionedTransaction
 from spl.token.instructions import (
     create_idempotent_associated_token_account,
     get_associated_token_address,
+    sync_native,
+    SyncNativeParams
 )
 
 load_dotenv()
@@ -53,7 +56,7 @@ SYSTEM_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM = Pubkey.from_string("ATokenGPvbdGVxr1b2
 PUMP_SWAP_EVENT_AUTHORITY = Pubkey.from_string("GS4CU59F31iL7aR2Q8zVS8DRrcRnXX1yjQ66TqNVQnaR")
 LAMPORTS_PER_SOL = 1_000_000_000
 COMPUTE_UNIT_PRICE = 10_000  # Price in micro-lamports per compute unit
-COMPUTE_UNIT_BUDGET = 100_000  # Maximum compute units to use
+COMPUTE_UNIT_BUDGET = 200_000  # Maximum compute units to use
 
 
 async def get_market_address_by_base_mint(client: AsyncClient, base_mint_address: Pubkey, amm_program_id: Pubkey) -> Pubkey:
@@ -253,7 +256,33 @@ async def buy_pump_swap(client: AsyncClient, pump_fun_amm_market: Pubkey, payer:
 
     compute_limit_ix = set_compute_unit_limit(COMPUTE_UNIT_BUDGET)
     compute_price_ix = set_compute_unit_price(COMPUTE_UNIT_PRICE)
-
+    
+    # Wrapping SOL
+    create_wsol_ata_ix = create_idempotent_associated_token_account(
+        payer.pubkey(),
+        payer.pubkey(),
+        SOL,
+        SYSTEM_TOKEN_PROGRAM
+    )
+    
+    # Calculate the amount of SOL to wrap(can also use `max_sol_input`), can get the SOL back by closing the WSOL account while selling
+    pump_protocol_fees = sol_amount_to_spend * 0.1 # adding some buffer fees
+    wrap_amount = int((sol_amount_to_spend + pump_protocol_fees) * LAMPORTS_PER_SOL)
+    
+    transfer_sol_ix = transfer(
+        TransferParams(
+            from_pubkey=payer.pubkey(),
+            to_pubkey=user_quote_token_account,
+            lamports=wrap_amount
+        )
+    )
+    
+    sync_native_ix = sync_native(
+        SyncNativeParams(
+            SYSTEM_TOKEN_PROGRAM, user_quote_token_account
+        )
+    )
+    
     idempotent_ata_ix = create_idempotent_associated_token_account(
         payer.pubkey(),
         payer.pubkey(),
@@ -267,7 +296,7 @@ async def buy_pump_swap(client: AsyncClient, pump_fun_amm_market: Pubkey, payer:
     recent_blockhash = blockhash_resp.value.blockhash
 
     msg = Message.new_with_blockhash(
-        [compute_limit_ix, compute_price_ix, idempotent_ata_ix, buy_ix],
+        [compute_limit_ix, compute_price_ix, create_wsol_ata_ix, transfer_sol_ix, sync_native_ix, idempotent_ata_ix, buy_ix],
         payer.pubkey(),
         recent_blockhash
     )
@@ -276,6 +305,15 @@ async def buy_pump_swap(client: AsyncClient, pump_fun_amm_market: Pubkey, payer:
         message=msg,
         keypairs=[payer]
     )
+    
+    # Optionally, you can simulate the transaction first and check for errors and get the compute units used
+    simulation = await client.simulate_transaction(tx_buy)
+    if simulation.value.err:
+        print(f"Simulation error: {simulation.value.err}")
+        return None
+    
+    compute_units_used = simulation.value.units_consumed
+    print(f"Simulation successful, compute units used: {compute_units_used}")
     
     try:
         tx_sig = await client.send_transaction(

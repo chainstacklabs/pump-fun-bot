@@ -6,8 +6,12 @@ Refactored PumpTrader to only process fresh tokens from WebSocket.
 import asyncio
 import json
 import os
+import signal
+import sys
+from contextlib import asynccontextmanager
 from datetime import datetime
 from time import monotonic
+from typing import Dict, List, Optional, Set
 
 import uvloop
 from solders.pubkey import Pubkey
@@ -28,7 +32,7 @@ from monitoring.logs_listener import LogsListener
 from monitoring.pumpportal_listener import PumpPortalListener
 from trading.base import TokenInfo, TradeResult
 from trading.buyer import TokenBuyer
-from trading.position import Position
+from trading.position import Position, ExitReason
 from trading.seller import TokenSeller
 from utils.logger import get_logger
 
@@ -38,7 +42,7 @@ logger = get_logger(__name__)
 
 
 class PumpTrader:
-    """Coordinates trading operations for pump.fun tokens with focus on freshness."""
+    """Coordinates trading operations for pump.fun tokens with focus on freshness and concurrency."""
     def __init__(
         self,
         rpc_endpoint: str,
@@ -88,6 +92,10 @@ class PumpTrader:
         bro_address: str | None = None,
         marry_mode: bool = False,
         yolo_mode: bool = False,
+        
+        # Concurrency settings
+        max_concurrent_positions: int = 5,
+        max_concurrent_trades: int = 3,
     ):
         """Initialize the pump trader.
         Args:
@@ -134,6 +142,9 @@ class PumpTrader:
             bro_address: Optional creator address to filter by
             marry_mode: If True, only buy tokens and skip selling
             yolo_mode: If True, trade continuously
+            
+            max_concurrent_positions: Maximum number of concurrent positions to monitor
+            max_concurrent_trades: Maximum number of concurrent trades to execute
         """
         self.solana_client = SolanaClient(rpc_endpoint)
         self.wallet = Wallet(private_key)
@@ -222,16 +233,146 @@ class PumpTrader:
         self.marry_mode = marry_mode
         self.yolo_mode = yolo_mode
         
+        # Concurrency parameters
+        self.max_concurrent_positions = max_concurrent_positions
+        self.max_concurrent_trades = max_concurrent_trades
+        
         # State tracking
-        self.traded_mints: set[Pubkey] = set()
+        self.traded_mints: Set[Pubkey] = set()
+        self.active_positions: Dict[str, Position] = {}
         self.token_queue: asyncio.Queue = asyncio.Queue()
         self.processing: bool = False
-        self.processed_tokens: set[str] = set()
-        self.token_timestamps: dict[str, float] = {}
+        self.processed_tokens: Set[str] = set()
+        self.token_timestamps: Dict[str, float] = {}
         
+        # Concurrency control
+        self.trade_semaphore = asyncio.Semaphore(max_concurrent_trades)
+        self.position_semaphore = asyncio.Semaphore(max_concurrent_positions)
+        self.shutdown_event = asyncio.Event()
+        
+        # Task tracking for cleanup
+        self.active_tasks: Set[asyncio.Task] = set()
+        self.monitoring_tasks: Dict[str, asyncio.Task] = {}
+        
+        # Setup signal handlers
+        self._setup_signal_handlers()
+        
+    def _setup_signal_handlers(self) -> None:
+        """Setup signal handlers for graceful shutdown."""
+        def signal_handler(signum, frame):
+            logger.info(f"Received signal {signum}. Initiating graceful shutdown...")
+            self.shutdown_event.set()
+            
+        # Handle SIGINT (Ctrl+C) and SIGTERM
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
+        
+    @asynccontextmanager
+    async def _task_tracker(self, task_name: str):
+        """Context manager to track async tasks for proper cleanup."""
+        task = None
+        try:
+            yield
+        except asyncio.CancelledError:
+            logger.debug(f"Task {task_name} was cancelled")
+            raise
+        except Exception as e:
+            logger.error(f"Error in task {task_name}: {e}")
+            raise
+        finally:
+            if task and not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+                    
+    async def _emergency_shutdown(self) -> None:
+        """Emergency shutdown that immediately sells all positions and cleans up."""
+        logger.critical("EMERGENCY SHUTDOWN: Selling all positions immediately...")
+        
+        # Sell all active positions concurrently
+        sell_tasks = []
+        for mint_str, position in self.active_positions.items():
+            if position.is_active:
+                logger.info(f"Emergency selling position: {position.symbol}")
+                task = asyncio.create_task(self._emergency_sell_position(mint_str, position))
+                sell_tasks.append(task)
+        
+        if sell_tasks:
+            await asyncio.gather(*sell_tasks, return_exceptions=True)
+            
+        # Force cleanup of all traded mints
+        if self.traded_mints:
+            logger.info("Performing emergency cleanup of all traded tokens...")
+            try:
+                await asyncio.wait_for(
+                    handle_cleanup_post_session(
+                        self.solana_client, 
+                        self.wallet, 
+                        list(self.traded_mints), 
+                        self.priority_fee_manager,
+                        self.cleanup_mode,
+                        self.cleanup_with_priority_fee,
+                        self.cleanup_force_close_with_burn
+                    ),
+                    timeout=30.0  # Emergency cleanup timeout
+                )
+            except asyncio.TimeoutError:
+                logger.warning("Emergency cleanup timed out")
+            except Exception as e:
+                logger.error(f"Emergency cleanup failed: {e}")
+        
+        logger.info("Emergency shutdown completed")
+        
+    async def _emergency_sell_position(self, mint_str: str, position: Position) -> None:
+        """Emergency sell a specific position."""
+        try:
+            # Create TokenInfo for selling
+            token_info = TokenInfo(
+                mint=position.mint,
+                symbol=position.symbol,
+                name=position.symbol,
+                bonding_curve=None,  # Will be resolved in seller
+                associated_bonding_curve=None,
+                virtual_token_reserves=0,
+                virtual_sol_reserves=0,
+                real_token_reserves=0,
+                real_sol_reserves=0,
+                token_total_supply=0,
+                complete=False,
+                timestamp=datetime.utcnow()
+            )
+            
+            # Sell with timeout
+            sell_result = await asyncio.wait_for(
+                self.seller.execute(token_info), 
+                timeout=15.0  # Emergency sell timeout
+            )
+            
+            if sell_result.success:
+                logger.info(f"Emergency sell successful for {position.symbol}")
+                position.close_position(sell_result.price, ExitReason.EMERGENCY_STOP)
+                self._log_trade(
+                    "emergency_sell",
+                    token_info,
+                    sell_result.price,
+                    sell_result.amount,
+                    sell_result.tx_signature,
+                )
+            else:
+                logger.error(f"Emergency sell failed for {position.symbol}: {sell_result.error_message}")
+                
+        except asyncio.TimeoutError:
+            logger.warning(f"Emergency sell timed out for {position.symbol}")
+        except Exception as e:
+            logger.error(f"Emergency sell error for {position.symbol}: {e}")
+            
     async def start(self) -> None:
         """Start the trading bot and listen for new tokens."""
-        logger.info("Starting pump.fun trader")
+        logger.info("Starting pump.fun trader with enhanced concurrency")
+        logger.info(f"Max concurrent positions: {self.max_concurrent_positions}")
+        logger.info(f"Max concurrent trades: {self.max_concurrent_trades}")
         logger.info(f"Match filter: {self.match_string if self.match_string else 'None'}")
         logger.info(f"Creator filter: {self.bro_address if self.bro_address else 'None'}")
         logger.info(f"Marry mode: {self.marry_mode}")
@@ -249,45 +390,76 @@ class PumpTrader:
         except Exception as e:
             logger.warning(f"RPC warm-up failed: {e!s}")
 
+        main_task = None
         try:
             # Choose operating mode based on yolo_mode
             if not self.yolo_mode:
                 # Single token mode: process one token and exit
                 logger.info("Running in single token mode - will process one token and exit")
-                token_info = await self._wait_for_token()
-                if token_info:
-                    await self._handle_token(token_info)
-                    logger.info("Finished processing single token. Exiting...")
-                else:
-                    logger.info(f"No suitable token found within timeout period ({self.token_wait_timeout}s). Exiting...")
+                main_task = asyncio.create_task(self._run_single_token_mode())
             else:
                 # Continuous mode: process tokens until interrupted
                 logger.info("Running in continuous mode - will process tokens until interrupted")
-                processor_task = asyncio.create_task(
-                    self._process_token_queue()
-                )
-
+                main_task = asyncio.create_task(self._run_continuous_mode())
+                
+            # Wait for main task or shutdown signal
+            done, pending = await asyncio.wait(
+                [main_task, asyncio.create_task(self.shutdown_event.wait())],
+                return_when=asyncio.FIRST_COMPLETED
+            )
+            
+            # Cancel pending tasks
+            for task in pending:
+                task.cancel()
                 try:
-                    await self.token_listener.listen_for_tokens(
-                        lambda token: self._queue_token(token),
-                        self.match_string,
-                        self.bro_address,
-                    )
-                except Exception as e:
-                    logger.error(f"Token listening stopped due to error: {e!s}")
-                finally:
-                    processor_task.cancel()
-                    try:
-                        await processor_task
-                    except asyncio.CancelledError:
-                        pass
+                    await task
+                except asyncio.CancelledError:
+                    pass
+            
+            # Check if shutdown was requested
+            if self.shutdown_event.is_set():
+                logger.info("Shutdown requested - performing emergency shutdown...")
+                await self._emergency_shutdown()
         
+        except KeyboardInterrupt:
+            logger.info("KeyboardInterrupt received - performing emergency shutdown...")
+            await self._emergency_shutdown()
         except Exception as e:
             logger.error(f"Trading stopped due to error: {e!s}")
+            await self._emergency_shutdown()
         
         finally:
             await self._cleanup_resources()
             logger.info("Pump trader has shut down")
+
+    async def _run_single_token_mode(self) -> None:
+        """Run in single token mode."""
+        token_info = await self._wait_for_token()
+        if token_info:
+            await self._handle_token(token_info)
+            logger.info("Finished processing single token. Exiting...")
+        else:
+            logger.info(f"No suitable token found within timeout period ({self.token_wait_timeout}s). Exiting...")
+
+    async def _run_continuous_mode(self) -> None:
+        """Run in continuous mode."""
+        processor_task = asyncio.create_task(self._process_token_queue())
+        self.active_tasks.add(processor_task)
+
+        try:
+            await self.token_listener.listen_for_tokens(
+                lambda token: self._queue_token(token),
+                self.match_string,
+                self.bro_address,
+            )
+        finally:
+            processor_task.cancel()
+            if processor_task in self.active_tasks:
+                self.active_tasks.remove(processor_task)
+            try:
+                await processor_task
+            except asyncio.CancelledError:
+                pass
 
     async def _wait_for_token(self) -> TokenInfo | None:
         """Wait for a single token to be detected.
@@ -318,6 +490,7 @@ class PumpTrader:
                 self.bro_address,
             )
         )
+        self.active_tasks.add(listener_task)
         
         # Wait for a token with a timeout
         try:
@@ -330,6 +503,8 @@ class PumpTrader:
             return None
         finally:
             listener_task.cancel()
+            if listener_task in self.active_tasks:
+                self.active_tasks.remove(listener_task)
             try:
                 await listener_task
             except asyncio.CancelledError:
@@ -337,9 +512,33 @@ class PumpTrader:
 
     async def _cleanup_resources(self) -> None:
         """Perform cleanup operations before shutting down."""
+        logger.info("Starting resource cleanup...")
+        
+        # Cancel all active tasks
+        if self.active_tasks:
+            logger.info(f"Cancelling {len(self.active_tasks)} active tasks...")
+            for task in self.active_tasks:
+                if not task.done():
+                    task.cancel()
+            
+            # Wait for tasks to complete cancellation
+            await asyncio.gather(*self.active_tasks, return_exceptions=True)
+            self.active_tasks.clear()
+            
+        # Cancel all monitoring tasks
+        if self.monitoring_tasks:
+            logger.info(f"Cancelling {len(self.monitoring_tasks)} monitoring tasks...")
+            for task in self.monitoring_tasks.values():
+                if not task.done():
+                    task.cancel()
+            
+            await asyncio.gather(*self.monitoring_tasks.values(), return_exceptions=True)
+            self.monitoring_tasks.clear()
+        
+        # Final cleanup of traded mints
         if self.traded_mints:
             try:
-                logger.info(f"Cleaning up {len(self.traded_mints)} traded token(s)...")
+                logger.info(f"Final cleanup of {len(self.traded_mints)} traded token(s)...")
                 await handle_cleanup_post_session(
                     self.solana_client, 
                     self.wallet, 
@@ -350,13 +549,18 @@ class PumpTrader:
                     self.cleanup_force_close_with_burn
                 )
             except Exception as e:
-                logger.error(f"Error during cleanup: {e!s}")
+                logger.error(f"Error during final cleanup: {e!s}")
                 
+        # Clear state tracking
         old_keys = {k for k in self.token_timestamps if k not in self.processed_tokens}
         for key in old_keys:
             self.token_timestamps.pop(key, None)
-            
+        
+        self.active_positions.clear()
+        
+        # Close client connection
         await self.solana_client.close()
+        logger.info("Resource cleanup completed")
 
     async def _queue_token(
         self, token_info: TokenInfo
@@ -366,6 +570,9 @@ class PumpTrader:
         Args:
             token_info: Token information to queue
         """
+        if self.shutdown_event.is_set():
+            return
+            
         token_key = str(token_info.mint)
 
         if token_key in self.processed_tokens:
@@ -375,14 +582,22 @@ class PumpTrader:
         # Record timestamp when token was discovered
         self.token_timestamps[token_key] = monotonic()
 
-        await self.token_queue.put(token_info)
-        logger.info(f"Queued new token: {token_info.symbol} ({token_info.mint})")
+        try:
+            await asyncio.wait_for(self.token_queue.put(token_info), timeout=1.0)
+            logger.info(f"Queued new token: {token_info.symbol} ({token_info.mint})")
+        except asyncio.TimeoutError:
+            logger.warning(f"Token queue full, dropping token: {token_info.symbol}")
 
     async def _process_token_queue(self) -> None:
         """Continuously process tokens from the queue, only if they're fresh."""
-        while True:
+        while not self.shutdown_event.is_set():
             try:
-                token_info = await self.token_queue.get()
+                # Check for tokens with timeout to allow shutdown checking
+                token_info = await asyncio.wait_for(
+                    self.token_queue.get(), 
+                    timeout=1.0
+                )
+                
                 token_key = str(token_info.mint)
 
                 # Check if token is still "fresh"
@@ -402,55 +617,78 @@ class PumpTrader:
                 logger.info(
                     f"Processing fresh token: {token_info.symbol} (age: {token_age:.1f}s)"
                 )
-                await self._handle_token(token_info)
+                
+                # Process token with concurrency control
+                task = asyncio.create_task(self._handle_token(token_info))
+                self.active_tasks.add(task)
+                
+                # Clean up completed tasks
+                task.add_done_callback(lambda t: self.active_tasks.discard(t))
 
+            except asyncio.TimeoutError:
+                # Timeout is expected, continue loop to check shutdown
+                continue
             except asyncio.CancelledError:
                 # Handle cancellation gracefully
                 logger.info("Token queue processor was cancelled")
                 break
             except Exception as e:
                 logger.error(f"Error in token queue processor: {e!s}")
+                await asyncio.sleep(1.0)  # Brief pause before retrying
             finally:
-                self.token_queue.task_done()
+                try:
+                    self.token_queue.task_done()
+                except ValueError:
+                    # task_done() called more times than there were items
+                    pass
 
     async def _handle_token(
         self, token_info: TokenInfo
     ) -> None:
-        """Handle a new token creation event.
+        """Handle a new token creation event with concurrency control.
 
         Args:
             token_info: Token information
         """
-        try:
-            # Wait for bonding curve to stabilize (unless in extreme fast mode)
-            if not self.extreme_fast_mode:
-                # Save token info to file
-                # await self._save_token_info(token_info)
+        async with self.trade_semaphore:
+            if self.shutdown_event.is_set():
+                return
+                
+            try:
+                # Wait for bonding curve to stabilize (unless in extreme fast mode)
+                if not self.extreme_fast_mode:
+                    logger.info(
+                        f"Waiting for {self.wait_time_after_creation} seconds for the bonding curve to stabilize..."
+                    )
+                    await asyncio.sleep(self.wait_time_after_creation)
+
+                # Check shutdown again after wait
+                if self.shutdown_event.is_set():
+                    return
+
+                # Buy token
                 logger.info(
-                    f"Waiting for {self.wait_time_after_creation} seconds for the bonding curve to stabilize..."
+                    f"Buying {self.buy_amount:.6f} SOL worth of {token_info.symbol}..."
                 )
-                await asyncio.sleep(self.wait_time_after_creation)
+                buy_result: TradeResult = await self.buyer.execute(token_info)
 
-            # Buy token
-            logger.info(
-                f"Buying {self.buy_amount:.6f} SOL worth of {token_info.symbol}..."
-            )
-            buy_result: TradeResult = await self.buyer.execute(token_info)
+                if buy_result.success:
+                    await self._handle_successful_buy(token_info, buy_result)
+                else:
+                    await self._handle_failed_buy(token_info, buy_result)
 
-            if buy_result.success:
-                await self._handle_successful_buy(token_info, buy_result)
-            else:
-                await self._handle_failed_buy(token_info, buy_result)
+                # Only wait for next token in yolo mode
+                if self.yolo_mode and not self.shutdown_event.is_set():
+                    logger.info(
+                        f"YOLO mode enabled. Waiting {self.wait_time_before_new_token} seconds before looking for next token..."
+                    )
+                    await asyncio.sleep(self.wait_time_before_new_token)
 
-            # Only wait for next token in yolo mode
-            if self.yolo_mode:
-                logger.info(
-                    f"YOLO mode enabled. Waiting {self.wait_time_before_new_token} seconds before looking for next token..."
-                )
-                await asyncio.sleep(self.wait_time_before_new_token)
-
-        except Exception as e:
-            logger.error(f"Error handling token {token_info.symbol}: {e!s}")
+            except asyncio.CancelledError:
+                logger.info(f"Token handling cancelled for {token_info.symbol}")
+                raise
+            except Exception as e:
+                logger.error(f"Error handling token {token_info.symbol}: {e!s}")
 
     async def _handle_successful_buy(
         self, token_info: TokenInfo, buy_result: TradeResult
@@ -506,31 +744,45 @@ class PumpTrader:
         )
 
     async def _handle_tp_sl_exit(self, token_info: TokenInfo, buy_result: TradeResult) -> None:
-        """Handle take profit/stop loss exit strategy.
+        """Handle take profit/stop loss exit strategy with concurrent monitoring.
         
         Args:
             token_info: Token information
             buy_result: Result from the buy operation
         """
-        # Create position
-        position = Position.create_from_buy_result(
-            mint=token_info.mint,
-            symbol=token_info.symbol,
-            entry_price=buy_result.price,  # type: ignore
-            quantity=buy_result.amount,    # type: ignore
-            take_profit_percentage=self.take_profit_percentage,
-            stop_loss_percentage=self.stop_loss_percentage,
-            max_hold_time=self.max_hold_time,
-        )
-        
-        logger.info(f"Created position: {position}")
-        if position.take_profit_price:
-            logger.info(f"Take profit target: {position.take_profit_price:.8f} SOL")
-        if position.stop_loss_price:
-            logger.info(f"Stop loss target: {position.stop_loss_price:.8f} SOL")
-        
-        # Monitor position until exit condition is met
-        await self._monitor_position_until_exit(token_info, position)
+        # Use semaphore to limit concurrent position monitoring
+        async with self.position_semaphore:
+            # Create position
+            position = Position.create_from_buy_result(
+                mint=token_info.mint,
+                symbol=token_info.symbol,
+                entry_price=buy_result.price,  # type: ignore
+                quantity=buy_result.amount,    # type: ignore
+                take_profit_percentage=self.take_profit_percentage,
+                stop_loss_percentage=self.stop_loss_percentage,
+                max_hold_time=self.max_hold_time,
+            )
+            
+            # Store position
+            position_key = str(token_info.mint)
+            self.active_positions[position_key] = position
+            
+            logger.info(f"Created position: {position}")
+            if position.take_profit_price:
+                logger.info(f"Take profit target: {position.take_profit_price:.8f} SOL")
+            if position.stop_loss_price:
+                logger.info(f"Stop loss target: {position.stop_loss_price:.8f} SOL")
+            
+            # Start monitoring task
+            monitor_task = asyncio.create_task(
+                self._monitor_position_until_exit(token_info, position)
+            )
+            self.monitoring_tasks[position_key] = monitor_task
+            
+            # Clean up completed monitoring tasks
+            monitor_task.add_done_callback(
+                lambda t: self.monitoring_tasks.pop(position_key, None)
+            )
 
     async def _handle_time_based_exit(self, token_info: TokenInfo) -> None:
         """Handle legacy time-based exit strategy.
@@ -541,7 +793,22 @@ class PumpTrader:
         logger.info(
             f"Waiting for {self.wait_time_after_buy} seconds before selling..."
         )
-        await asyncio.sleep(self.wait_time_after_buy)
+        
+        # Wait with shutdown check
+        try:
+            await asyncio.wait_for(
+                self.shutdown_event.wait(), 
+                timeout=self.wait_time_after_buy
+            )
+            # If shutdown event was set, don't proceed with selling
+            logger.info("Shutdown requested during wait, skipping sell")
+            return
+        except asyncio.TimeoutError:
+            # Normal timeout, proceed with selling
+            pass
+
+        if self.shutdown_event.is_set():
+            return
 
         logger.info(f"Selling {token_info.symbol}...")
         sell_result: TradeResult = await self.seller.execute(token_info)
@@ -578,69 +845,88 @@ class PumpTrader:
             position: Position to monitor
         """
         logger.info(f"Starting position monitoring (check interval: {self.price_check_interval}s)")
+        position_key = str(token_info.mint)
         
-        while position.is_active:
-            try:
-                # Get current price from bonding curve
-                current_price = await self.curve_manager.calculate_price(token_info.bonding_curve)
-                
-                # Check if position should be exited
-                should_exit, exit_reason = position.should_exit(current_price)
-                
-                if should_exit and exit_reason:
-                    logger.info(f"Exit condition met: {exit_reason.value}")
-                    logger.info(f"Current price: {current_price:.8f} SOL")
+        try:
+            while position.is_active and not self.shutdown_event.is_set():
+                try:
+                    # Get current price from bonding curve
+                    current_price = await self.curve_manager.calculate_price(token_info.bonding_curve)
                     
-                    # Log PnL before exit
-                    pnl = position.get_pnl(current_price)
-                    logger.info(f"Position PnL: {pnl['price_change_pct']:.2f}% ({pnl['unrealized_pnl_sol']:.6f} SOL)")
+                    # Check if position should be exited
+                    should_exit, exit_reason = position.should_exit(current_price)
                     
-                    # Execute sell
-                    sell_result = await self.seller.execute(token_info)
-                    
-                    if sell_result.success:
-                        # Close position with actual exit price
-                        position.close_position(sell_result.price, exit_reason)  # type: ignore
+                    if should_exit and exit_reason:
+                        logger.info(f"Exit condition met: {exit_reason.value}")
+                        logger.info(f"Current price: {current_price:.8f} SOL")
                         
-                        logger.info(f"Successfully exited position: {exit_reason.value}")
-                        self._log_trade(
-                            "sell",
-                            token_info,
-                            sell_result.price,  # type: ignore
-                            sell_result.amount,  # type: ignore
-                            sell_result.tx_signature,
-                        )
+                        # Log PnL before exit
+                        pnl = position.get_pnl(current_price)
+                        logger.info(f"Position PnL: {pnl['price_change_pct']:.2f}% ({pnl['unrealized_pnl_sol']:.6f} SOL)")
                         
-                        # Log final PnL
-                        final_pnl = position.get_pnl()
-                        logger.info(f"Final PnL: {final_pnl['price_change_pct']:.2f}% ({final_pnl['unrealized_pnl_sol']:.6f} SOL)")
+                        # Execute sell
+                        sell_result = await self.seller.execute(token_info)
                         
-                        # Close ATA if enabled
-                        await handle_cleanup_after_sell(
-                            self.solana_client, 
-                            self.wallet, 
-                            token_info.mint, 
-                            self.priority_fee_manager,
-                            self.cleanup_mode,
-                            self.cleanup_with_priority_fee,
-                            self.cleanup_force_close_with_burn
-                        )
+                        if sell_result.success:
+                            # Close position with actual exit price
+                            position.close_position(sell_result.price, exit_reason)  # type: ignore
+                            
+                            logger.info(f"Successfully exited position: {exit_reason.value}")
+                            self._log_trade(
+                                "sell",
+                                token_info,
+                                sell_result.price,  # type: ignore
+                                sell_result.amount,  # type: ignore
+                                sell_result.tx_signature,
+                            )
+                            
+                            # Log final PnL
+                            final_pnl = position.get_pnl()
+                            logger.info(f"Final PnL: {final_pnl['price_change_pct']:.2f}% ({final_pnl['unrealized_pnl_sol']:.6f} SOL)")
+                            
+                            # Close ATA if enabled
+                            await handle_cleanup_after_sell(
+                                self.solana_client, 
+                                self.wallet, 
+                                token_info.mint, 
+                                self.priority_fee_manager,
+                                self.cleanup_mode,
+                                self.cleanup_with_priority_fee,
+                                self.cleanup_force_close_with_burn
+                            )
+                        else:
+                            logger.error(f"Failed to exit position: {sell_result.error_message}")
+                            # Keep monitoring in case sell can be retried
+                            
+                        break
                     else:
-                        logger.error(f"Failed to exit position: {sell_result.error_message}")
-                        # Keep monitoring in case sell can be retried
-                        
-                    break
-                else:
-                    # Log current status
-                    pnl = position.get_pnl(current_price)
-                    logger.debug(f"Position status: {current_price:.8f} SOL ({pnl['price_change_pct']:+.2f}%)")
-                
-                # Wait before next price check
-                await asyncio.sleep(self.price_check_interval)
-                
-            except Exception as e:
-                logger.error(f"Error monitoring position: {e}")
-                await asyncio.sleep(self.price_check_interval)  # Continue monitoring despite errors
+                        # Log current status
+                        pnl = position.get_pnl(current_price)
+                        logger.debug(f"Position status: {current_price:.8f} SOL ({pnl['price_change_pct']:+.2f}%)")
+                    
+                    # Wait before next price check with shutdown awareness
+                    try:
+                        await asyncio.wait_for(
+                            self.shutdown_event.wait(), 
+                            timeout=self.price_check_interval
+                        )
+                        # If shutdown event was set, exit monitoring
+                        break
+                    except asyncio.TimeoutError:
+                        # Normal timeout, continue monitoring
+                        continue
+                    
+                except Exception as e:
+                    logger.error(f"Error monitoring position: {e}")
+                    await asyncio.sleep(self.price_check_interval)  # Continue monitoring despite errors
+                    
+        except asyncio.CancelledError:
+            logger.info(f"Position monitoring cancelled for {position.symbol}")
+            raise
+        finally:
+            # Clean up position tracking
+            self.active_positions.pop(position_key, None)
+            logger.info(f"Position monitoring ended for {position.symbol}")
 
     async def _save_token_info(
         self, token_info: TokenInfo
@@ -672,7 +958,7 @@ class PumpTrader:
         """Log trade information.
 
         Args:
-            action: Trade action (buy/sell)
+            action: Trade action (buy/sell/emergency_sell)
             token_info: Token information
             price: Token price in SOL
             amount: Trade amount in SOL

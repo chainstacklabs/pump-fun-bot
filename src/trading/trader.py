@@ -293,15 +293,39 @@ class PumpTrader:
         
         # Sell all active positions concurrently
         sell_tasks = []
+        position_map = {}  # Map task to position for tracking failures
+        
         for mint_str, position in self.active_positions.items():
             if position.is_active:
                 logger.info(f"Emergency selling position: {position.symbol}")
                 task = asyncio.create_task(self._emergency_sell_position(mint_str, position))
                 sell_tasks.append(task)
+                position_map[task] = (mint_str, position)
+        
+        failed_positions = []
         
         if sell_tasks:
-            await asyncio.gather(*sell_tasks, return_exceptions=True)
+            results = await asyncio.gather(*sell_tasks, return_exceptions=True)
             
+            # Track failed sell attempts
+            for task, result in zip(sell_tasks, results):
+                if isinstance(result, Exception):
+                    mint_str, position = position_map[task]
+                    failed_positions.append({
+                        'mint': str(position.mint),
+                        'symbol': position.symbol,
+                        'entry_price': position.entry_price,
+                        'quantity': position.quantity,
+                        'entry_time': position.entry_time.isoformat(),
+                        'failed_at': datetime.utcnow().isoformat(),
+                        'error': str(result)
+                    })
+                    logger.error(f"Failed to emergency sell {position.symbol}: {result}")
+            
+            # Write failed positions to file for retry on next startup
+            if failed_positions:
+                await self._save_failed_sells(failed_positions)
+                
         # Force cleanup of all traded mints
         if self.traded_mints:
             logger.info("Performing emergency cleanup of all traded tokens...")
@@ -368,6 +392,121 @@ class PumpTrader:
         except Exception as e:
             logger.error(f"Emergency sell error for {position.symbol}: {e}")
             
+    async def _save_failed_sells(self, failed_positions: List[Dict]) -> None:
+        """Save failed sell positions to file for retry on next startup."""
+        try:
+            os.makedirs("emergency", exist_ok=True)
+            failed_sells_file = "emergency/failed_sells.json"
+            
+            with open(failed_sells_file, 'w') as f:
+                json.dump(failed_positions, f, indent=2)
+            
+            logger.critical(f"Saved {len(failed_positions)} failed sell(s) to {failed_sells_file}")
+        except Exception as e:
+            logger.error(f"Failed to save failed sells to file: {e}")
+    
+    async def _load_and_process_failed_sells(self) -> None:
+        """Load and process failed sells from previous emergency shutdown."""
+        failed_sells_file = "emergency/failed_sells.json"
+        
+        if not os.path.exists(failed_sells_file):
+            return
+            
+        try:
+            with open(failed_sells_file, 'r') as f:
+                failed_positions = json.load(f)
+            
+            if not failed_positions:
+                return
+                
+            logger.warning(f"Found {len(failed_positions)} failed sell(s) from previous shutdown. Processing...")
+            
+            # Process failed sells concurrently
+            retry_tasks = []
+            for pos_data in failed_positions:
+                logger.info(f"Retrying emergency sell for {pos_data['symbol']} ({pos_data['mint']})")
+                task = asyncio.create_task(self._retry_failed_sell(pos_data))
+                retry_tasks.append(task)
+            
+            if retry_tasks:
+                results = await asyncio.gather(*retry_tasks, return_exceptions=True)
+                
+                # Check for any remaining failures
+                still_failed = []
+                for pos_data, result in zip(failed_positions, results):
+                    if isinstance(result, Exception):
+                        # Update failure information
+                        pos_data['retry_failed_at'] = datetime.utcnow().isoformat()
+                        pos_data['retry_error'] = str(result)
+                        still_failed.append(pos_data)
+                        logger.error(f"Retry failed for {pos_data['symbol']}: {result}")
+                    else:
+                        logger.info(f"Successfully retried emergency sell for {pos_data['symbol']}")
+                
+                # Update file with remaining failures or remove if all succeeded
+                if still_failed:
+                    with open(failed_sells_file, 'w') as f:
+                        json.dump(still_failed, f, indent=2)
+                    logger.warning(f"{len(still_failed)} sell(s) still failed after retry")
+                else:
+                    os.remove(failed_sells_file)
+                    logger.info("All failed sells successfully retried and processed")
+                    
+        except Exception as e:
+            logger.error(f"Error processing failed sells: {e}")
+    
+    async def _retry_failed_sell(self, pos_data: Dict) -> None:
+        """Retry selling a position that failed during emergency shutdown."""
+        try:
+            # Recreate TokenInfo from stored data
+            token_info = TokenInfo(
+                mint=Pubkey.from_string(pos_data['mint']),
+                symbol=pos_data['symbol'],
+                name=pos_data['symbol'],
+                bonding_curve=None,  # Will be resolved in seller
+                associated_bonding_curve=None,
+                virtual_token_reserves=0,
+                virtual_sol_reserves=0,
+                real_token_reserves=0,
+                real_sol_reserves=0,
+                token_total_supply=0,
+                complete=False,
+                timestamp=datetime.utcnow()
+            )
+            
+            # Attempt to sell with timeout
+            sell_result = await asyncio.wait_for(
+                self.seller.execute(token_info),
+                timeout=30.0  # Longer timeout for retry
+            )
+            
+            if sell_result.success:
+                logger.info(f"Retry sell successful for {pos_data['symbol']}")
+                self._log_trade(
+                    "emergency_sell_retry",
+                    token_info,
+                    sell_result.price,
+                    sell_result.amount,
+                    sell_result.tx_signature,
+                )
+                
+                # Perform cleanup after successful sell
+                await handle_cleanup_after_sell(
+                    self.solana_client,
+                    self.wallet,
+                    token_info.mint,
+                    self.priority_fee_manager,
+                    self.cleanup_mode,
+                    self.cleanup_with_priority_fee,
+                    self.cleanup_force_close_with_burn
+                )
+            else:
+                raise Exception(f"Sell failed: {sell_result.error_message}")
+                
+        except Exception as e:
+            logger.error(f"Retry sell failed for {pos_data['symbol']}: {e}")
+            raise
+            
     async def start(self) -> None:
         """Start the trading bot and listen for new tokens."""
         logger.info("Starting pump.fun trader with enhanced concurrency")
@@ -389,6 +528,9 @@ class PumpTrader:
             logger.info(f"RPC warm-up successful (getHealth passed: {health_resp})")
         except Exception as e:
             logger.warning(f"RPC warm-up failed: {e!s}")
+
+        # Process any failed sells from previous emergency shutdown
+        await self._load_and_process_failed_sells()
 
         main_task = None
         try:
@@ -958,7 +1100,7 @@ class PumpTrader:
         """Log trade information.
 
         Args:
-            action: Trade action (buy/sell/emergency_sell)
+            action: Trade action (buy/sell/emergency_sell/emergency_sell_retry)
             token_info: Token information
             price: Token price in SOL
             amount: Trade amount in SOL

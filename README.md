@@ -38,22 +38,16 @@ The official maintainers are in the [MAINTAINERS.md](MAINTAINERS.md) file. Leave
 
 ### Installation
 
-#### 1️⃣ Install Python (if needed)
-```bash
-uv python install
-```
-> **Why?** `uv` will fetch and install the required Python version for your system.
-
-#### 2️⃣ Clone the repository
+#### 1️⃣ Clone the repository
 ```bash
 git clone https://github.com/chainstacklabs/pump-fun-bot.git
 cd pump-fun-bot
 ```
 
-#### 3️⃣ Set up a virtual environment
+#### 2️⃣ Set up a virtual environment
 ```bash
 # Create virtual environment
-uv venv
+uv sync
 
 # Activate (Unix/macOS)
 source .venv/bin/activate  
@@ -63,13 +57,7 @@ source .venv/bin/activate
 ```
 > Virtual environments help keep dependencies isolated and prevent conflicts.
 
-#### 4️⃣ Install dependencies
-```bash
-uv pip install -e .
-```
-> **Why `-e` (editable mode)?** Lets you modify the code without reinstalling the package—useful for development!
-
-#### 5️⃣ Configure the bot
+#### 3️⃣ Configure the bot
 ```bash
 # Copy example config
 cp .env.example .env  # Unix/macOS
@@ -81,6 +69,11 @@ Edit the `.env` file and add your **Solana RPC endpoints** and **private key**.
 
 Edit `.yaml` templates in `bots` folder. Each file is a separate instance of a trading bot. Examine its parameters and apply your preferred strategy.
 
+#### 4️⃣ Install the bot as a package
+```bash
+uv pip install -e .
+```
+> **Why `-e` (editable mode)?** Lets you modify the code without reinstalling the package—useful for development!
 
 ### Running the bot
 

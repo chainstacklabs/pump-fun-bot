@@ -1,0 +1,9 @@
+# Cleanup Logic Guide
+
+- [manager.py](mdc:src/cleanup/manager.py) manages cleanup operations and resource management.
+- [modes.py](mdc:src/cleanup/modes.py) defines cleanup modes and strategies.
+- This directory is responsible for resource cleanup and related logic.
+description:
+globs:
+alwaysApply: false
+---

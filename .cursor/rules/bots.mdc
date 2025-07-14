@@ -1,0 +1,8 @@
+# Bot Configuration Guide
+
+- YAML files in this directory define configuration for different bot strategies and behaviors.
+- Each file specifies parameters for a specific bot instance or strategy.
+description:
+globs:
+alwaysApply: false
+---

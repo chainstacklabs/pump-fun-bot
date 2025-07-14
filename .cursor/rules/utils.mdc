@@ -1,0 +1,8 @@
+# Utility Functions Guide
+
+- [logger.py](mdc:src/utils/logger.py) provides logging utilities for the project.
+- Utility modules in this directory are intended for shared, reusable helper functions and classes.
+description:
+globs:
+alwaysApply: false
+---

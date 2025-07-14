@@ -1,0 +1,11 @@
+# Core Logic Guide
+
+- [client.py](mdc:src/core/client.py) handles blockchain client interactions.
+- [wallet.py](mdc:src/core/wallet.py) manages wallet logic.
+- [pubkeys.py](mdc:src/core/pubkeys.py) stores and manages public keys.
+- [curve.py](mdc:src/core/curve.py) provides curve math and related utilities.
+- This directory contains core abstractions and logic for blockchain and protocol interactions.
+description:
+globs:
+alwaysApply: false
+---

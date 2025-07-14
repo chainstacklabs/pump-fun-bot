@@ -1,0 +1,9 @@
+# Monitoring Logic Guide
+
+- Listener files (e.g., [pumpportal_listener.py](mdc:src/monitoring/pumpportal_listener.py), [logs_listener.py](mdc:src/monitoring/logs_listener.py), [geyser_listener.py](mdc:src/monitoring/geyser_listener.py), [block_listener.py](mdc:src/monitoring/block_listener.py)) are responsible for subscribing to and receiving events from various sources.
+- Event processor files (e.g., [pumpportal_event_processor.py](mdc:src/monitoring/pumpportal_event_processor.py), [logs_event_processor.py](mdc:src/monitoring/logs_event_processor.py), [geyser_event_processor.py](mdc:src/monitoring/geyser_event_processor.py), [block_event_processor.py](mdc:src/monitoring/block_event_processor.py)) handle the logic for processing and reacting to those events.
+- [base_listener.py](mdc:src/monitoring/base_listener.py) provides shared abstractions for listeners.
+description:
+globs:
+alwaysApply: false
+---

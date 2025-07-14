@@ -1,0 +1,17 @@
+# Project Structure Guide
+
+- The main source code is in the [src/](mdc:src/) directory.
+- Trading logic is in [src/trading/](mdc:src/trading/), including [trader.py](mdc:src/trading/trader.py), [buyer.py](mdc:src/trading/buyer.py), and [seller.py](mdc:src/trading/seller.py).
+- Monitoring logic is in [src/monitoring/](mdc:src/monitoring/), with various listeners and event processors.
+- Utility functions are in [src/utils/](mdc:src/utils/).
+- Core abstractions and blockchain logic are in [src/core/](mdc:src/core/).
+- Cleanup logic is in [src/cleanup/](mdc:src/cleanup/).
+- Geyser-related code is in [src/geyser/](mdc:src/geyser/).
+- Bot configuration files are in [bots/](mdc:bots/).
+- Trade logs are in [trades/](mdc:trades/).
+- Interface definitions are in [idl/](mdc:idl/).
+- Tests are in [tests/](mdc:tests/).
+description:
+globs:
+alwaysApply: false
+---

@@ -1,0 +1,11 @@
+# Trading Logic Guide
+
+- [trader.py](mdc:src/trading/trader.py) is the main entry point for trading operations, orchestrating buy and sell actions.
+- [buyer.py](mdc:src/trading/buyer.py) implements logic for buying assets.
+- [seller.py](mdc:src/trading/seller.py) implements logic for selling assets.
+- [position.py](mdc:src/trading/position.py) manages trading positions.
+- [base.py](mdc:src/trading/base.py) provides base classes and shared abstractions for trading components.
+description:
+globs:
+alwaysApply: false
+---

@@ -1,0 +1,8 @@
+# Interface Definition Guide
+
+- JSON files in this directory define program interfaces (IDLs) for interacting with on-chain programs.
+- These files are used for serialization, deserialization, and program interaction logic.
+description:
+globs:
+alwaysApply: false
+---

@@ -1,0 +1,9 @@
+# Testing Guide
+
+- Python files in this directory contain tests for listeners and other core components.
+- Tests are organized by component type (e.g., geyser, logs, block listeners).
+- [compare_listeners.py](mdc:tests/compare_listeners.py) is used for comparing listener outputs.
+description:
+globs:
+alwaysApply: false
+---

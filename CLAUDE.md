@@ -122,7 +122,7 @@ GEYSER_API_TOKEN=your_geyser_token
 ## Important Notes
 
 - This is educational/learning code - not for production use
-- The bot trades on pump.fun bonding curves and handles migrations to Raydium/PumpSwap
+- The bot trades on pump.fun bonding curves and handles migrations to PumpSwap
 - Geyser listener provides fastest token detection
 - All configurations support environment variable substitution with `${VAR}` syntax
 - Bot logs are stored in `logs/` directory with timestamps

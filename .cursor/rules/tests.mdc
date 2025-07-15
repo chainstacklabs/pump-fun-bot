@@ -1,9 +1,87 @@
+---
+description: Testing framework and test cases for system validation. Apply when writing tests or performing system validation.
+globs: tests/*.py
+alwaysApply: true
+---
+
 # Testing Guide
 
-- Python files in this directory contain tests for listeners and other core components.
-- Tests are organized by component type (e.g., geyser, logs, block listeners).
-- [compare_listeners.py](mdc:tests/compare_listeners.py) is used for comparing listener outputs.
-description:
-globs:
-alwaysApply: false
----
+## Overview
+
+The testing framework provides validation for key components of the pump-bot system, focusing on listener accuracy, trading execution, and system integration. Tests ensure reliability and proper functioning of critical bot operations.
+
+## Test Organization
+
+### Listener Tests
+
+Multiple implementations are tested for correctness and performance:
+
+- @tests/test_geyser_listener.py: Tests the Geyser-based implementation
+- @tests/test_logs_listener.py: Validates log-based token detection
+- @tests/test_block_listener.py: Verifies block scanning functionality
+
+### Comparison Testing
+
+@tests/compare_listeners.py provides comparative analysis:
+- Side-by-side execution of different listener implementations
+- Latency measurement and comparison
+- Detection reliability metrics
+- False positive/negative analysis
+
+```python
+# Example comparison usage
+python -m tests.compare_listeners --duration 600 --output-file results.json
+```
+
+## Test Configuration
+
+Tests use environment variables for configuration:
+- Connection endpoints
+- API keys
+- Test durations
+- Output verbosity
+
+```bash
+# Example test execution
+SOLANA_NODE_RPC_ENDPOINT=https://api.mainnet-beta.solana.com \
+GEYSER_ENDPOINT=wss://geyser.example.com/subscribe \
+python -m tests.test_geyser_listener
+```
+
+## Test Data
+
+The test suite includes:
+- Mock token creation events
+- Historical transaction data
+- Performance benchmarks
+- Edge case scenarios
+
+## Running Tests
+
+### Individual Component Tests
+
+```bash
+# Run a specific listener test
+python -m tests.test_logs_listener
+
+# Run with custom parameters
+python -m tests.test_block_listener --duration 60
+```
+
+### Full Test Suite
+
+```bash
+# Run all tests
+python -m pytest tests/
+
+# Run with coverage report
+python -m pytest --cov=src tests/
+```
+
+## Related Files
+
+- @tests/test_geyser_listener.py: Geyser listener validation
+- @tests/test_logs_listener.py: Logs listener validation
+- @tests/test_block_listener.py: Block listener validation
+- @tests/compare_listeners.py: Comparative listener analysis
+- @tests/test_trading.py: Trading execution validation

@@ -1,9 +1,96 @@
-# Monitoring Logic Guide
-
-- Listener files (e.g., [pumpportal_listener.py](mdc:src/monitoring/pumpportal_listener.py), [logs_listener.py](mdc:src/monitoring/logs_listener.py), [geyser_listener.py](mdc:src/monitoring/geyser_listener.py), [block_listener.py](mdc:src/monitoring/block_listener.py)) are responsible for subscribing to and receiving events from various sources.
-- Event processor files (e.g., [pumpportal_event_processor.py](mdc:src/monitoring/pumpportal_event_processor.py), [logs_event_processor.py](mdc:src/monitoring/logs_event_processor.py), [geyser_event_processor.py](mdc:src/monitoring/geyser_event_processor.py), [block_event_processor.py](mdc:src/monitoring/block_event_processor.py)) handle the logic for processing and reacting to those events.
-- [base_listener.py](mdc:src/monitoring/base_listener.py) provides shared abstractions for listeners.
-description:
-globs:
-alwaysApply: false
 ---
+description: Event monitoring and data collection systems for tracking blockchain activity. Apply when implementing token detection, event processing, or subscription logic.
+globs: src/monitoring/*.py
+alwaysApply: true
+---
+
+# Monitoring System Guide
+
+## Overview
+
+The monitoring module provides various mechanisms to detect and process events from the Solana blockchain. It offers multiple strategies for token discovery, event filtering, and real-time notifications through different data sources.
+
+## Listener Architecture
+
+### Base Listener
+
+@src/monitoring/base_listener.py defines the abstract base class `BaseTokenListener` which:
+- Provides a common interface for all token listeners
+- Declares required methods for event subscription
+- Standardizes token event processing
+
+```python
+# Common listener interface
+async def listen_for_tokens(
+    self,
+    token_callback: Callable[[TokenInfo], Awaitable[None]],
+    match_string: str | None = None,
+    creator_address: str | None = None,
+) -> None:
+    pass
+```
+
+### Listener Implementations
+
+#### Geyser Listener (Fastest)
+
+@src/monitoring/geyser_listener.py implements the Geyser-based listener:
+- Direct connection to Geyser WebSocket endpoint
+- Lowest latency for token detection
+- Advanced filtering capabilities
+
+#### Logs Listener
+
+@src/monitoring/logs_listener.py provides log-based monitoring:
+- Subscription to program logs
+- Pattern matching for token creation events
+- Program-specific event detection
+
+#### Block Listener
+
+@src/monitoring/block_listener.py implements block-based scanning:
+- Processes entire blocks
+- Extracts transaction data
+- Identifies token creation events
+
+#### PumpPortal Listener
+
+@src/monitoring/pumpportal_listener.py offers integration with external service:
+- Connects to PumpPortal API
+- Receives preprocessed token events
+- Simplifies integration with third-party data providers
+
+## Event Processing
+
+Each listener has a corresponding event processor that:
+- Validates incoming events
+- Extracts relevant token information
+- Applies filtering rules
+- Dispatches events to trading components
+
+## Configuration
+
+In bot configuration files, specify the listener type:
+
+```yaml
+filters:
+  listener_type: "geyser"  # Options: "logs", "blocks", "geyser", "pumpportal"
+  max_token_age: 0.001     # Maximum token age in seconds
+```
+
+## Comparison of Approaches
+
+| Listener Type | Latency | CPU Usage | Reliability | Use Case |
+|---------------|---------|-----------|-------------|----------|
+| Geyser        | Lowest  | Medium    | High        | Production sniper bots |
+| Logs          | Low     | Low       | High        | General purpose |
+| Blocks        | Medium  | High      | Very High   | Deep scanning |
+| PumpPortal    | Varies  | Very Low  | Depends     | Easy integration |
+
+## Related Files
+
+- @src/monitoring/base_listener.py: Abstract listener interface
+- @src/monitoring/geyser_listener.py: Geyser-based implementation
+- @src/monitoring/logs_listener.py: Program log monitoring
+- @src/monitoring/block_listener.py: Block processing implementation
+- @src/monitoring/pumpportal_listener.py: External API integration

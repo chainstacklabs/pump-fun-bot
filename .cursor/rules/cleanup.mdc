@@ -1,9 +1,68 @@
-# Cleanup Logic Guide
-
-- [manager.py](mdc:src/cleanup/manager.py) manages cleanup operations and resource management.
-- [modes.py](mdc:src/cleanup/modes.py) defines cleanup modes and strategies.
-- This directory is responsible for resource cleanup and related logic.
-description:
-globs:
-alwaysApply: false
 ---
+description: Comprehensive guide for account cleanup operations and resource management. Apply when working with token account cleanup operations.
+globs: src/cleanup/*.py
+alwaysApply: true
+---
+
+# Account Cleanup System Guide
+
+## Overview
+
+The cleanup module handles the safe management and disposal of Solana token accounts after trading operations. This system ensures resources are properly released and minimizes unnecessary account maintenance fees.
+
+## Core Components
+
+### AccountCleanupManager
+
+@src/cleanup/manager.py implements the `AccountCleanupManager` class which:
+- Handles safe cleanup of Associated Token Accounts (ATAs)
+- Manages token burning operations when needed
+- Implements proper account closure to recover rent
+- Integrates with priority fee systems for high-congestion scenarios
+
+```python
+# Example usage
+cleanup_manager = AccountCleanupManager(client, wallet, priority_fee_manager, use_priority_fees)
+await cleanup_manager.cleanup_ata(token_mint)
+```
+
+### Cleanup Modes
+
+@src/cleanup/modes.py defines various cleanup strategies and their implementation:
+
+1. **Disabled** - No automatic cleanup performed
+2. **On Failure** - Clean up accounts only after transaction failures
+3. **After Sell** - Clean up accounts after successful sell operations
+4. **Post-Session** - Clean up all empty accounts when a trading session ends
+
+```python
+# Example implementation
+if should_cleanup_after_sell(cleanup_mode):
+    await manager.cleanup_ata(mint)
+```
+
+## Configuration
+
+Account cleanup is configured in bot YAML files:
+
+```yaml
+cleanup:
+  mode: "post_session"          # Options: "disabled", "on_fail", "after_sell", "post_session"
+  force_close_with_burn: false  # Force burn remaining tokens before closing
+  with_priority_fee: false      # Use priority fees for cleanup transactions
+```
+
+## When to Use Each Mode
+
+| Mode | Use Case |
+|------|----------|
+| `disabled` | Development/testing or when manual account management is preferred |
+| `on_fail` | Conservative approach to only clean up failed transaction remnants |
+| `after_sell` | Balance between efficiency and account reuse |
+| `post_session` | Maximum cleanup, recommended for production |
+
+## Related Files
+
+- @src/cleanup/manager.py: Core account cleanup implementation
+- @src/cleanup/modes.py: Cleanup mode strategies and handlers
+- @src/core/client.py: Solana client interface used by cleanup operations

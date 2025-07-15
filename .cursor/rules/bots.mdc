@@ -1,6 +1,6 @@
 ---
 description: Comprehensive configuration guide for trading bots in the pump-bot system. Apply when configuring bots.
-globs: ["bots/*.yaml"]
+globs: bots/*.yaml
 alwaysApply: true
 ---
 

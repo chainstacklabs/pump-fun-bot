@@ -7,14 +7,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Environment Setup
 ```bash
 # Create virtual environment and install dependencies
-uv sync
+uv sync --extra dev
 
 # Activate virtual environment
 source .venv/bin/activate  # Unix/macOS
 .venv\Scripts\activate     # Windows
-
-# Install bot as editable package
-uv pip install -e .
 ```
 
 ### Running the Bot
@@ -23,30 +20,24 @@ uv pip install -e .
 pump_bot
 
 # Run bot directly
-python -m src.bot_runner
-
-# Run specific bot configuration
-python -m src.bot_runner path/to/bot-config.yaml
+uv run src/bot_runner.py
 ```
 
 ### Development Tools
 ```bash
-# Lint code with ruff
-ruff check .
+# Run linting
+uv run ruff check src/
 
-# Format code with ruff
-ruff format .
-
-# Run both linting and formatting
-ruff check . && ruff format .
+# Run formatting
+uv run ruff format src/
 ```
 
 ### Testing
 ```bash
 # Run individual test files
-python tests/test_block_listener.py
-python tests/test_geyser_listener.py
-python tests/test_logs_listener.py
+uv run tests/test_block_listener.py
+uv run tests/test_geyser_listener.py
+uv run tests/test_logs_listener.py
 ```
 
 ## Architecture Overview

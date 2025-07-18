@@ -196,7 +196,7 @@ async def run_comparison(test_duration: int = 300):
 
 
 if __name__ == "__main__":
-    test_duration = 30  # seconds
+    test_duration = 60  # seconds
 
     if len(sys.argv) > 1:
         try:

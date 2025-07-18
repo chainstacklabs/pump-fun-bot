@@ -105,7 +105,7 @@ class BlockListener(BaseTokenListener):
                     {"mentionsAccountOrProgram": str(self.pump_program)},
                     {
                         "commitment": "confirmed",
-                        "encoding": "base64", # base64 is faster than other encoding options
+                        "encoding": "base64",  # base64 is faster than other encoding options
                         "showRewards": False,
                         "transactionDetails": "full",
                         "maxSupportedTransactionVersion": 0,

@@ -1,0 +1,89 @@
+---
+description: Package management and command execution guidelines using uv. Apply when installing dependencies, running scripts, or managing the Python environment.
+globs: "**/*"
+alwaysApply: true
+---
+
+# Package Management with UV
+
+## Overview
+
+This project exclusively uses `uv` as the package manager for all Python operations. UV is a fast Python package installer and resolver, written in Rust, that serves as a drop-in replacement for pip and other Python package managers.
+
+## Core Principles
+
+1. **Use `uv` for all package operations** - Never use pip, pipenv, poetry, or conda
+2. **Use `uv run` for script execution** - Ensures proper virtual environment activation
+3. **Maintain consistency** - All documentation and examples should reference uv commands
+
+## Package Installation
+
+### Installing Dependencies
+
+```bash
+# Install all project dependencies
+uv sync --extra dev
+
+# Install additional packages
+uv add package-name
+
+# Install from requirements file
+uv add -r requirements.txt
+```
+
+### Managing Virtual Environments
+
+```bash
+# Create virtual environment
+uv venv
+
+# Activate virtual environment (if needed manually)
+source .venv/bin/activate
+```
+
+## Script Execution
+
+### Running Bot Scripts
+
+```bash
+# Primary method: Use the installed command
+pump_bot
+
+# Alternative: Run bot_runner.py directly
+uv run src/bot_runner.py
+```
+
+### Running Test Scripts
+
+```bash
+# Run listener performance tests
+uv run tests/test_geyser_listener.py
+uv run tests/test_logs_listener.py
+uv run tests/test_block_listener.py
+
+# Run comparative analysis
+uv run tests/compare_listeners.py
+uv run tests/compare_listeners.py 60
+```
+
+### Development and Testing
+
+```bash
+# Run linting
+uv run ruff check src/
+
+# Run formatting
+uv run ruff format src/
+```
+
+## Project Structure Integration
+
+The project is configured to work seamlessly with uv:
+
+- `pyproject.toml` - Defines project dependencies and the `pump_bot` command
+- `uv.lock` - Locks dependency versions for reproducible builds
+- `.venv/` - Virtual environment managed by uv
+
+## Environment Configuration
+
+UV automatically detects and uses the virtual environment when running commands.

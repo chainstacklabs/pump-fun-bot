@@ -23,7 +23,7 @@ Each listener has a dedicated test script for standalone performance analysis:
 
 ```bash
 # Run Geyser listener test for 30 seconds
-python tests/test_geyser_listener.py
+uv run tests/test_geyser_listener.py
 ```
 
 ### Logs Listener Test
@@ -35,7 +35,7 @@ python tests/test_geyser_listener.py
 
 ```bash
 # Run logs listener test
-python tests/test_logs_listener.py
+uv run tests/test_logs_listener.py
 ```
 
 ### Block Listener Test
@@ -47,7 +47,7 @@ python tests/test_logs_listener.py
 
 ```bash
 # Run block listener test
-python tests/test_block_listener.py
+uv run tests/test_block_listener.py
 ```
 
 ## Comparative Performance Analysis
@@ -62,10 +62,10 @@ python tests/test_block_listener.py
 
 ```bash
 # Compare all listeners for 60 seconds
-python tests/compare_listeners.py 60
+uv run tests/compare_listeners.py 60
 
 # Default 60-second comparison
-python tests/compare_listeners.py
+uv run tests/compare_listeners.py
 ```
 
 ### Performance Metrics
@@ -123,19 +123,19 @@ export GEYSER_API_TOKEN="your-api-token"
 ### Quick Performance Check
 ```bash
 # 30-second comparison of all listeners
-python tests/compare_listeners.py 30
+uv run tests/compare_listeners.py 30
 ```
 
 ### Extended Performance Analysis
 ```bash
 # 10-minute deep analysis
-python tests/compare_listeners.py 600
+uv run tests/compare_listeners.py 600
 ```
 
 ### Individual Listener Validation
 ```bash
 # Test specific listener implementation
-python tests/test_geyser_listener.py
+uv run tests/test_geyser_listener.py
 ```
 
 ## Use Cases

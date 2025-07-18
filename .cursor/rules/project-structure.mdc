@@ -20,6 +20,12 @@ The main codebase is organized as follows:
   - @src/bot_runner.py: Entry point for bot execution
   - @src/config_loader.py: Configuration loading and validation
 
+### Package Command
+
+The project provides a convenient command-line interface:
+- `pump_bot`: Installed command that runs all enabled bots (defined in @pyproject.toml)
+- Alternative: `uv run src/bot_runner.py` for direct script execution
+
 #### Core Components
 
 - @src/core/: Blockchain interaction and protocol abstractions
@@ -90,7 +96,7 @@ The main codebase is organized as follows:
 ## Development Flow
 
 1. Configure bot parameters in @bots/*.yaml
-2. Launch bot using @src/bot_runner.py
+2. Launch bot using `uv run pump_bot` or `uv run src/bot_runner.py`
 3. Monitor execution in @logs/
 4. Review trade outcomes in @trades/trades.log
 
@@ -106,4 +112,4 @@ The main codebase is organized as follows:
 
 - @README.md: Project overview and setup instructions
 - @MAINTAINERS.md: Maintenance guidelines and procedures
-- @CLAUDE.md: Integration with Claude AI for strategy development
+- @CLAUDE.md: Development rules for Claude Code

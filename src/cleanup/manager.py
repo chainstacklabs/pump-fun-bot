@@ -14,6 +14,7 @@ logger = get_logger(__name__)
 
 class AccountCleanupManager:
     """Handles safe cleanup of token accounts (ATA) after trading sessions."""
+
     def __init__(
         self,
         client: SolanaClient,
@@ -60,7 +61,9 @@ class AccountCleanupManager:
             instructions = []
 
             if balance > 0 and self.close_with_force_burn:
-                logger.info(f"Burning {balance} tokens from ATA {ata} (mint: {mint})...")
+                logger.info(
+                    f"Burning {balance} tokens from ATA {ata} (mint: {mint})..."
+                )
                 burn_ix = burn(
                     BurnParams(
                         account=ata,

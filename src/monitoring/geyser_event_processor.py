@@ -28,7 +28,9 @@ class GeyserEventProcessor:
         """
         self.pump_program = pump_program
 
-    def process_transaction_data(self, instruction_data: bytes, accounts: list, keys: list) -> TokenInfo | None:
+    def process_transaction_data(
+        self, instruction_data: bytes, accounts: list, keys: list
+    ) -> TokenInfo | None:
         """Process transaction data and extract token creation info.
 
         Args:
@@ -45,7 +47,7 @@ class GeyserEventProcessor:
         try:
             # Skip past the 8-byte discriminator
             offset = 8
-            
+
             # Helper to read strings (prefixed with length)
             def read_string():
                 nonlocal offset
@@ -53,16 +55,18 @@ class GeyserEventProcessor:
                 length = struct.unpack_from("<I", instruction_data, offset)[0]
                 offset += 4
                 # Extract and decode the string
-                value = instruction_data[offset:offset + length].decode("utf-8")
+                value = instruction_data[offset : offset + length].decode("utf-8")
                 offset += length
                 return value
-            
+
             def read_pubkey():
                 nonlocal offset
-                value = base58.b58encode(instruction_data[offset : offset + 32]).decode("utf-8")
+                value = base58.b58encode(instruction_data[offset : offset + 32]).decode(
+                    "utf-8"
+                )
                 offset += 32
                 return Pubkey.from_string(value)
-            
+
             # Helper to get account key
             def get_account_key(index):
                 if index >= len(accounts):
@@ -71,7 +75,7 @@ class GeyserEventProcessor:
                 if account_index >= len(keys):
                     return None
                 return Pubkey.from_bytes(keys[account_index])
-            
+
             name = read_string()
             symbol = read_string()
             uri = read_string()
@@ -83,11 +87,11 @@ class GeyserEventProcessor:
             user = get_account_key(7)
 
             creator_vault = self._find_creator_vault(creator)
-            
+
             if not all([mint, bonding_curve, associated_bonding_curve, user]):
                 logger.warning("Missing required account keys in token creation")
                 return None
-            
+
             return TokenInfo(
                 name=name,
                 symbol=symbol,
@@ -99,11 +103,11 @@ class GeyserEventProcessor:
                 creator=creator,
                 creator_vault=creator_vault,
             )
-            
+
         except Exception as e:
             logger.error(f"Failed to process transaction data: {e}")
             return None
-    
+
     def _find_creator_vault(self, creator: Pubkey) -> Pubkey:
         """
         Find the creator vault for a creator.
@@ -115,10 +119,7 @@ class GeyserEventProcessor:
             Creator vault address
         """
         derived_address, _ = Pubkey.find_program_address(
-            [
-                b"creator-vault",
-                bytes(creator)
-            ],
+            [b"creator-vault", bytes(creator)],
             PumpAddresses.PROGRAM,
         )
         return derived_address

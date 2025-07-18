@@ -43,7 +43,10 @@ def setup_file_logging(
 
     # Check if file handler with same filename already exists
     for handler in root_logger.handlers:
-        if isinstance(handler, logging.FileHandler) and handler.baseFilename == filename:
+        if (
+            isinstance(handler, logging.FileHandler)
+            and handler.baseFilename == filename
+        ):
             return  # File handler already added
 
     formatter = logging.Formatter(

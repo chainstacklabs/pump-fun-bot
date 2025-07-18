@@ -45,9 +45,9 @@ class BondingCurveState:
 
         parsed = self._STRUCT.parse(data[8:])
         self.__dict__.update(parsed)
-        
+
         # Convert raw bytes to Pubkey for creator field
-        if hasattr(self, 'creator') and isinstance(self.creator, bytes):
+        if hasattr(self, "creator") and isinstance(self.creator, bytes):
             self.creator = Pubkey.from_bytes(self.creator)
 
     def calculate_price(self) -> float:

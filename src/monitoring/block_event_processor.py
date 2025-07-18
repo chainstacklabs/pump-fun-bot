@@ -172,7 +172,7 @@ class PumpEventProcessor:
         args["user"] = str(accounts[7])
 
         return args
-    
+
     def _find_creator_vault(self, creator: Pubkey) -> Pubkey:
         """
         Find the creator vault for a creator.
@@ -184,10 +184,7 @@ class PumpEventProcessor:
             Creator vault address
         """
         derived_address, _ = Pubkey.find_program_address(
-            [
-                b"creator-vault",
-                bytes(creator)
-            ],
+            [b"creator-vault", bytes(creator)],
             PumpAddresses.PROGRAM,
         )
         return derived_address

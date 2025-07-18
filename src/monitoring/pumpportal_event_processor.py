@@ -55,7 +55,7 @@ class PumpPortalEventProcessor:
             mint = Pubkey.from_string(mint_str)
             bonding_curve = Pubkey.from_string(bonding_curve_str)
             user = Pubkey.from_string(creator_str)
-            
+
             # For PumpPortal, we assume the creator is the same as the user
             # since PumpPortal doesn't distinguish between them
             creator = user
@@ -117,10 +117,7 @@ class PumpPortalEventProcessor:
             Creator vault address
         """
         derived_address, _ = Pubkey.find_program_address(
-            [
-                b"creator-vault",
-                bytes(creator)
-            ],
+            [b"creator-vault", bytes(creator)],
             PumpAddresses.PROGRAM,
         )
         return derived_address

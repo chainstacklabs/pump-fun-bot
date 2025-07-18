@@ -20,7 +20,11 @@ logger = get_logger(__name__)
 class PumpPortalListener(BaseTokenListener):
     """PumpPortal listener for pump.fun token creation events."""
 
-    def __init__(self, pump_program: Pubkey, pumpportal_url: str = "wss://pumpportal.fun/api/data"):
+    def __init__(
+        self,
+        pump_program: Pubkey,
+        pumpportal_url: str = "wss://pumpportal.fun/api/data",
+    ):
         """Initialize token listener.
 
         Args:
@@ -82,7 +86,9 @@ class PumpPortalListener(BaseTokenListener):
                             await token_callback(token_info)
 
                     except websockets.exceptions.ConnectionClosed:
-                        logger.warning("PumpPortal WebSocket connection closed. Reconnecting...")
+                        logger.warning(
+                            "PumpPortal WebSocket connection closed. Reconnecting..."
+                        )
                     finally:
                         ping_task.cancel()
                         try:
@@ -94,16 +100,14 @@ class PumpPortalListener(BaseTokenListener):
                 logger.exception("PumpPortal WebSocket connection error")
                 logger.info("Reconnecting in 5 seconds...")
                 await asyncio.sleep(5)
+
     async def _subscribe_to_new_tokens(self, websocket) -> None:
         """Subscribe to new token events from PumpPortal.
 
         Args:
             websocket: Active WebSocket connection
         """
-        subscription_message = json.dumps({
-            "method": "subscribeNewToken",
-            "params": []
-        })
+        subscription_message = json.dumps({"method": "subscribeNewToken", "params": []})
 
         await websocket.send(subscription_message)
         logger.info("Subscribed to PumpPortal new token events")

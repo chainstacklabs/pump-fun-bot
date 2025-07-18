@@ -175,7 +175,9 @@ class TokenSeller(Trader):
                 pubkey=SystemAddresses.PROGRAM, is_signer=False, is_writable=False
             ),
             AccountMeta(
-                pubkey=token_info.creator_vault, is_signer=False, is_writable=True,
+                pubkey=token_info.creator_vault,
+                is_signer=False,
+                is_writable=True,
             ),
             AccountMeta(
                 pubkey=SystemAddresses.TOKEN_PROGRAM, is_signer=False, is_writable=False

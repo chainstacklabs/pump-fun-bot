@@ -43,7 +43,7 @@ class LogsEventProcessor:
         # Check if this is a token creation
         if not any("Program log: Instruction: Create" in log for log in logs):
             return None
-        
+
         # Skip swaps as the first condition may pass them
         if any("Program log: Instruction: CreateTokenAccount" in log for log in logs):
             return None
@@ -55,7 +55,7 @@ class LogsEventProcessor:
                     encoded_data = log.split(": ")[1]
                     decoded_data = base64.b64decode(encoded_data)
                     parsed_data = self._parse_create_instruction(decoded_data)
-                    
+
                     if parsed_data and "name" in parsed_data:
                         mint = Pubkey.from_string(parsed_data["mint"])
                         bonding_curve = Pubkey.from_string(parsed_data["bondingCurve"])
@@ -64,7 +64,7 @@ class LogsEventProcessor:
                         )
                         creator = Pubkey.from_string(parsed_data["creator"])
                         creator_vault = self._find_creator_vault(creator)
-                        
+
                         return TokenInfo(
                             name=parsed_data["name"],
                             symbol=parsed_data["symbol"],
@@ -78,7 +78,7 @@ class LogsEventProcessor:
                         )
                 except Exception as e:
                     logger.error(f"Failed to process log data: {e}")
-        
+
         return None
 
     def _parse_create_instruction(self, data: bytes) -> dict | None:
@@ -92,11 +92,13 @@ class LogsEventProcessor:
         """
         if len(data) < 8:
             return None
-            
+
         # Check for the correct instruction discriminator
         discriminator = struct.unpack("<Q", data[:8])[0]
         if discriminator != self.CREATE_DISCRIMINATOR:
-            logger.info(f"Skipping non-Create instruction with discriminator: {discriminator}")
+            logger.info(
+                f"Skipping non-Create instruction with discriminator: {discriminator}"
+            )
             return None
 
         offset = 8
@@ -154,7 +156,7 @@ class LogsEventProcessor:
             SystemAddresses.ASSOCIATED_TOKEN_PROGRAM,
         )
         return derived_address
-    
+
     def _find_creator_vault(self, creator: Pubkey) -> Pubkey:
         """
         Find the creator vault for a creator.
@@ -166,10 +168,7 @@ class LogsEventProcessor:
             Creator vault address
         """
         derived_address, _ = Pubkey.find_program_address(
-            [
-                b"creator-vault",
-                bytes(creator)
-            ],
+            [b"creator-vault", bytes(creator)],
             PumpAddresses.PROGRAM,
         )
         return derived_address

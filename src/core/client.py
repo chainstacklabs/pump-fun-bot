@@ -36,7 +36,9 @@ class SolanaClient:
         self._client = None
         self._cached_blockhash: Hash | None = None
         self._blockhash_lock = asyncio.Lock()
-        self._blockhash_updater_task = asyncio.create_task(self.start_blockhash_updater())
+        self._blockhash_updater_task = asyncio.create_task(
+            self.start_blockhash_updater()
+        )
 
     async def start_blockhash_updater(self, interval: float = 5.0):
         """Start background task to update recent blockhash."""
@@ -104,7 +106,9 @@ class SolanaClient:
             ValueError: If account doesn't exist or has no data
         """
         client = await self.get_client()
-        response = await client.get_account_info(pubkey, encoding="base64") # base64 encoding for account data by default
+        response = await client.get_account_info(
+            pubkey, encoding="base64"
+        )  # base64 encoding for account data by default
         if not response.value:
             raise ValueError(f"Account {pubkey} not found")
         return response.value
@@ -207,7 +211,9 @@ class SolanaClient:
         """
         client = await self.get_client()
         try:
-            await client.confirm_transaction(signature, commitment=commitment, sleep_seconds=1)
+            await client.confirm_transaction(
+                signature, commitment=commitment, sleep_seconds=1
+            )
             return True
         except Exception as e:
             logger.error(f"Failed to confirm transaction {signature}: {e!s}")

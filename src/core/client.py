@@ -167,7 +167,7 @@ class SolanaClient:
         # Add priority fee instructions if applicable
         if priority_fee is not None:
             fee_instructions = [
-                set_compute_unit_limit(72_000),  # Default compute unit limit
+                set_compute_unit_limit(85_000),  # Default compute unit limit
                 set_compute_unit_price(priority_fee),
             ]
             instructions = fee_instructions + instructions

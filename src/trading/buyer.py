@@ -195,6 +195,12 @@ class TokenBuyer(Trader):
             AccountMeta(
                 pubkey=PumpAddresses.PROGRAM, is_signer=False, is_writable=False
             ),
+            AccountMeta(
+                pubkey=PumpAddresses.find_global_volume_accumulator(), is_signer=False, is_writable=True
+            ),
+            AccountMeta(
+                pubkey=PumpAddresses.find_user_volume_accumulator(self.wallet.pubkey), is_signer=False, is_writable=True
+            ),
         ]
 
         # Prepare idempotent create ATA instruction: it will not fail if ATA already exists

@@ -101,6 +101,27 @@ def find_creator_vault(creator: Pubkey) -> Pubkey:
     return derived_address
 
 
+def _find_global_volume_accumulator() -> Pubkey:
+    derived_address, _ = Pubkey.find_program_address(
+        [
+            b"global_volume_accumulator"
+        ],
+        PUMP_PROGRAM,
+        )
+    return derived_address
+
+
+def _find_user_volume_accumulator(user: Pubkey) -> Pubkey:
+    derived_address, _ = Pubkey.find_program_address(
+        [
+            b"user_volume_accumulator",
+            bytes(user)
+        ],
+        PUMP_PROGRAM,
+        )
+    return derived_address
+
+
 def create_pump_create_instruction(
     mint: Pubkey,
     mint_authority: Pubkey,
@@ -177,6 +198,8 @@ def create_buy_instruction(
         AccountMeta(pubkey=creator_vault, is_signer=False, is_writable=True),
         AccountMeta(pubkey=PUMP_EVENT_AUTHORITY, is_signer=False, is_writable=False),
         AccountMeta(pubkey=PUMP_PROGRAM, is_signer=False, is_writable=False),
+        AccountMeta(pubkey=_find_global_volume_accumulator(), is_signer=False, is_writable=True),
+        AccountMeta(pubkey=_find_user_volume_accumulator(user), is_signer=False, is_writable=True),
     ]
     
     data = (

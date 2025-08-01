@@ -8,6 +8,265 @@
     },
     "instructions": [
         {
+            "name": "admin_set_coin_creator",
+            "docs": [
+                "Overrides the coin creator for a canonical pump pool"
+            ],
+            "discriminator": [
+                242,
+                40,
+                117,
+                145,
+                73,
+                96,
+                105,
+                104
+            ],
+            "accounts": [
+                {
+                    "name": "admin_set_coin_creator_authority",
+                    "signer": true,
+                    "relations": [
+                        "global_config"
+                    ]
+                },
+                {
+                    "name": "global_config"
+                },
+                {
+                    "name": "pool",
+                    "writable": true
+                },
+                {
+                    "name": "event_authority",
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const",
+                                "value": [
+                                    95,
+                                    95,
+                                    101,
+                                    118,
+                                    101,
+                                    110,
+                                    116,
+                                    95,
+                                    97,
+                                    117,
+                                    116,
+                                    104,
+                                    111,
+                                    114,
+                                    105,
+                                    116,
+                                    121
+                                ]
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "program"
+                }
+            ],
+            "args": [
+                {
+                    "name": "coin_creator",
+                    "type": "pubkey"
+                }
+            ]
+        },
+        {
+            "name": "admin_update_token_incentives",
+            "discriminator": [
+                209,
+                11,
+                115,
+                87,
+                213,
+                23,
+                124,
+                204
+            ],
+            "accounts": [
+                {
+                    "name": "admin",
+                    "writable": true,
+                    "signer": true,
+                    "relations": [
+                        "global_config"
+                    ]
+                },
+                {
+                    "name": "global_config"
+                },
+                {
+                    "name": "global_volume_accumulator",
+                    "writable": true,
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const",
+                                "value": [
+                                    103,
+                                    108,
+                                    111,
+                                    98,
+                                    97,
+                                    108,
+                                    95,
+                                    118,
+                                    111,
+                                    108,
+                                    117,
+                                    109,
+                                    101,
+                                    95,
+                                    97,
+                                    99,
+                                    99,
+                                    117,
+                                    109,
+                                    117,
+                                    108,
+                                    97,
+                                    116,
+                                    111,
+                                    114
+                                ]
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "mint"
+                },
+                {
+                    "name": "global_incentive_token_account",
+                    "writable": true,
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "account",
+                                "path": "global_volume_accumulator"
+                            },
+                            {
+                                "kind": "account",
+                                "path": "token_program"
+                            },
+                            {
+                                "kind": "account",
+                                "path": "mint"
+                            }
+                        ],
+                        "program": {
+                            "kind": "const",
+                            "value": [
+                                140,
+                                151,
+                                37,
+                                143,
+                                78,
+                                36,
+                                137,
+                                241,
+                                187,
+                                61,
+                                16,
+                                41,
+                                20,
+                                142,
+                                13,
+                                131,
+                                11,
+                                90,
+                                19,
+                                153,
+                                218,
+                                255,
+                                16,
+                                132,
+                                4,
+                                142,
+                                123,
+                                216,
+                                219,
+                                233,
+                                248,
+                                89
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "associated_token_program",
+                    "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+                },
+                {
+                    "name": "system_program",
+                    "address": "11111111111111111111111111111111"
+                },
+                {
+                    "name": "token_program"
+                },
+                {
+                    "name": "event_authority",
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const",
+                                "value": [
+                                    95,
+                                    95,
+                                    101,
+                                    118,
+                                    101,
+                                    110,
+                                    116,
+                                    95,
+                                    97,
+                                    117,
+                                    116,
+                                    104,
+                                    111,
+                                    114,
+                                    105,
+                                    116,
+                                    121
+                                ]
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "program"
+                }
+            ],
+            "args": [
+                {
+                    "name": "start_time",
+                    "type": "i64"
+                },
+                {
+                    "name": "end_time",
+                    "type": "i64"
+                },
+                {
+                    "name": "seconds_in_a_day",
+                    "type": "i64"
+                },
+                {
+                    "name": "day_number",
+                    "type": "u64"
+                },
+                {
+                    "name": "token_supply_per_day",
+                    "type": "u64"
+                }
+            ]
+        },
+        {
             "name": "buy",
             "discriminator": [
                 102,
@@ -257,6 +516,84 @@
                             }
                         ]
                     }
+                },
+                {
+                    "name": "global_volume_accumulator",
+                    "writable": true,
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const",
+                                "value": [
+                                    103,
+                                    108,
+                                    111,
+                                    98,
+                                    97,
+                                    108,
+                                    95,
+                                    118,
+                                    111,
+                                    108,
+                                    117,
+                                    109,
+                                    101,
+                                    95,
+                                    97,
+                                    99,
+                                    99,
+                                    117,
+                                    109,
+                                    117,
+                                    108,
+                                    97,
+                                    116,
+                                    111,
+                                    114
+                                ]
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "user_volume_accumulator",
+                    "writable": true,
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const",
+                                "value": [
+                                    117,
+                                    115,
+                                    101,
+                                    114,
+                                    95,
+                                    118,
+                                    111,
+                                    108,
+                                    117,
+                                    109,
+                                    101,
+                                    95,
+                                    97,
+                                    99,
+                                    99,
+                                    117,
+                                    109,
+                                    117,
+                                    108,
+                                    97,
+                                    116,
+                                    111,
+                                    114
+                                ]
+                            },
+                            {
+                                "kind": "account",
+                                "path": "user"
+                            }
+                        ]
+                    }
                 }
             ],
             "args": [
@@ -269,6 +606,270 @@
                     "type": "u64"
                 }
             ]
+        },
+        {
+            "name": "claim_token_incentives",
+            "discriminator": [
+                16,
+                4,
+                71,
+                28,
+                204,
+                1,
+                40,
+                27
+            ],
+            "accounts": [
+                {
+                    "name": "user"
+                },
+                {
+                    "name": "user_ata",
+                    "writable": true,
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "account",
+                                "path": "user"
+                            },
+                            {
+                                "kind": "account",
+                                "path": "token_program"
+                            },
+                            {
+                                "kind": "account",
+                                "path": "mint"
+                            }
+                        ],
+                        "program": {
+                            "kind": "const",
+                            "value": [
+                                140,
+                                151,
+                                37,
+                                143,
+                                78,
+                                36,
+                                137,
+                                241,
+                                187,
+                                61,
+                                16,
+                                41,
+                                20,
+                                142,
+                                13,
+                                131,
+                                11,
+                                90,
+                                19,
+                                153,
+                                218,
+                                255,
+                                16,
+                                132,
+                                4,
+                                142,
+                                123,
+                                216,
+                                219,
+                                233,
+                                248,
+                                89
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "global_volume_accumulator",
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const",
+                                "value": [
+                                    103,
+                                    108,
+                                    111,
+                                    98,
+                                    97,
+                                    108,
+                                    95,
+                                    118,
+                                    111,
+                                    108,
+                                    117,
+                                    109,
+                                    101,
+                                    95,
+                                    97,
+                                    99,
+                                    99,
+                                    117,
+                                    109,
+                                    117,
+                                    108,
+                                    97,
+                                    116,
+                                    111,
+                                    114
+                                ]
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "global_incentive_token_account",
+                    "writable": true,
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "account",
+                                "path": "global_volume_accumulator"
+                            },
+                            {
+                                "kind": "account",
+                                "path": "token_program"
+                            },
+                            {
+                                "kind": "account",
+                                "path": "mint"
+                            }
+                        ],
+                        "program": {
+                            "kind": "const",
+                            "value": [
+                                140,
+                                151,
+                                37,
+                                143,
+                                78,
+                                36,
+                                137,
+                                241,
+                                187,
+                                61,
+                                16,
+                                41,
+                                20,
+                                142,
+                                13,
+                                131,
+                                11,
+                                90,
+                                19,
+                                153,
+                                218,
+                                255,
+                                16,
+                                132,
+                                4,
+                                142,
+                                123,
+                                216,
+                                219,
+                                233,
+                                248,
+                                89
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "user_volume_accumulator",
+                    "writable": true,
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const",
+                                "value": [
+                                    117,
+                                    115,
+                                    101,
+                                    114,
+                                    95,
+                                    118,
+                                    111,
+                                    108,
+                                    117,
+                                    109,
+                                    101,
+                                    95,
+                                    97,
+                                    99,
+                                    99,
+                                    117,
+                                    109,
+                                    117,
+                                    108,
+                                    97,
+                                    116,
+                                    111,
+                                    114
+                                ]
+                            },
+                            {
+                                "kind": "account",
+                                "path": "user"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "mint",
+                    "relations": [
+                        "global_volume_accumulator"
+                    ]
+                },
+                {
+                    "name": "token_program"
+                },
+                {
+                    "name": "system_program",
+                    "address": "11111111111111111111111111111111"
+                },
+                {
+                    "name": "associated_token_program",
+                    "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+                },
+                {
+                    "name": "event_authority",
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const",
+                                "value": [
+                                    95,
+                                    95,
+                                    101,
+                                    118,
+                                    101,
+                                    110,
+                                    116,
+                                    95,
+                                    97,
+                                    117,
+                                    116,
+                                    104,
+                                    111,
+                                    114,
+                                    105,
+                                    116,
+                                    121
+                                ]
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "program"
+                },
+                {
+                    "name": "payer",
+                    "writable": true,
+                    "signer": true
+                }
+            ],
+            "args": []
         },
         {
             "name": "collect_coin_creator_fee",
@@ -290,8 +891,7 @@
                     "name": "quote_token_program"
                 },
                 {
-                    "name": "coin_creator",
-                    "signer": true
+                    "name": "coin_creator"
                 },
                 {
                     "name": "coin_creator_vault_authority",
@@ -521,6 +1121,10 @@
                 {
                     "name": "coin_creator_fee_basis_points",
                     "type": "u64"
+                },
+                {
+                    "name": "admin_set_coin_creator_authority",
+                    "type": "pubkey"
                 }
             ]
         },
@@ -1612,6 +2216,134 @@
             "args": []
         },
         {
+            "name": "sync_user_volume_accumulator",
+            "discriminator": [
+                86,
+                31,
+                192,
+                87,
+                163,
+                87,
+                79,
+                238
+            ],
+            "accounts": [
+                {
+                    "name": "user"
+                },
+                {
+                    "name": "global_volume_accumulator",
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const",
+                                "value": [
+                                    103,
+                                    108,
+                                    111,
+                                    98,
+                                    97,
+                                    108,
+                                    95,
+                                    118,
+                                    111,
+                                    108,
+                                    117,
+                                    109,
+                                    101,
+                                    95,
+                                    97,
+                                    99,
+                                    99,
+                                    117,
+                                    109,
+                                    117,
+                                    108,
+                                    97,
+                                    116,
+                                    111,
+                                    114
+                                ]
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "user_volume_accumulator",
+                    "writable": true,
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const",
+                                "value": [
+                                    117,
+                                    115,
+                                    101,
+                                    114,
+                                    95,
+                                    118,
+                                    111,
+                                    108,
+                                    117,
+                                    109,
+                                    101,
+                                    95,
+                                    97,
+                                    99,
+                                    99,
+                                    117,
+                                    109,
+                                    117,
+                                    108,
+                                    97,
+                                    116,
+                                    111,
+                                    114
+                                ]
+                            },
+                            {
+                                "kind": "account",
+                                "path": "user"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "event_authority",
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const",
+                                "value": [
+                                    95,
+                                    95,
+                                    101,
+                                    118,
+                                    101,
+                                    110,
+                                    116,
+                                    95,
+                                    97,
+                                    117,
+                                    116,
+                                    104,
+                                    111,
+                                    114,
+                                    105,
+                                    116,
+                                    121
+                                ]
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "program"
+                }
+            ],
+            "args": []
+        },
+        {
             "name": "update_admin",
             "discriminator": [
                 161,
@@ -1751,6 +2483,10 @@
                 {
                     "name": "coin_creator_fee_basis_points",
                     "type": "u64"
+                },
+                {
+                    "name": "admin_set_coin_creator_authority",
+                    "type": "pubkey"
                 }
             ]
         },
@@ -1908,6 +2644,19 @@
             ]
         },
         {
+            "name": "GlobalVolumeAccumulator",
+            "discriminator": [
+                202,
+                42,
+                246,
+                43,
+                142,
+                190,
+                30,
+                255
+            ]
+        },
+        {
             "name": "Pool",
             "discriminator": [
                 241,
@@ -1919,9 +2668,48 @@
                 109,
                 188
             ]
+        },
+        {
+            "name": "UserVolumeAccumulator",
+            "discriminator": [
+                86,
+                255,
+                112,
+                14,
+                102,
+                53,
+                154,
+                250
+            ]
         }
     ],
     "events": [
+        {
+            "name": "AdminSetCoinCreatorEvent",
+            "discriminator": [
+                45,
+                220,
+                93,
+                24,
+                25,
+                97,
+                172,
+                104
+            ]
+        },
+        {
+            "name": "AdminUpdateTokenIncentivesEvent",
+            "discriminator": [
+                147,
+                250,
+                108,
+                120,
+                247,
+                29,
+                67,
+                222
+            ]
+        },
         {
             "name": "BuyEvent",
             "discriminator": [
@@ -1933,6 +2721,19 @@
                 245,
                 119,
                 119
+            ]
+        },
+        {
+            "name": "ClaimTokenIncentivesEvent",
+            "discriminator": [
+                79,
+                172,
+                246,
+                49,
+                205,
+                91,
+                206,
+                232
             ]
         },
         {
@@ -2050,6 +2851,19 @@
                 207,
                 102,
                 228
+            ]
+        },
+        {
+            "name": "SyncUserVolumeAccumulatorEvent",
+            "discriminator": [
+                197,
+                122,
+                167,
+                124,
+                116,
+                81,
+                91,
+                255
             ]
         },
         {
@@ -2208,9 +3022,105 @@
         {
             "code": 6028,
             "name": "OnlyCanonicalPumpPoolsCanHaveCoinCreator"
+        },
+        {
+            "code": 6029,
+            "name": "InvalidAdminSetCoinCreatorAuthority"
+        },
+        {
+            "code": 6030,
+            "name": "StartTimeInThePast"
+        },
+        {
+            "code": 6031,
+            "name": "EndTimeInThePast"
+        },
+        {
+            "code": 6032,
+            "name": "EndTimeBeforeStartTime"
+        },
+        {
+            "code": 6033,
+            "name": "TimeRangeTooLarge"
+        },
+        {
+            "code": 6034,
+            "name": "EndTimeBeforeCurrentDay"
+        },
+        {
+            "code": 6035,
+            "name": "SupplyUpdateForFinishedRange"
+        },
+        {
+            "code": 6036,
+            "name": "DayIndexAfterEndIndex"
+        },
+        {
+            "code": 6037,
+            "name": "DayInActiveRange"
+        },
+        {
+            "code": 6038,
+            "name": "InvalidIncentiveMint"
         }
     ],
     "types": [
+        {
+            "name": "AdminSetCoinCreatorEvent",
+            "type": {
+                "kind": "struct",
+                "fields": [
+                    {
+                        "name": "timestamp",
+                        "type": "i64"
+                    },
+                    {
+                        "name": "admin_set_coin_creator_authority",
+                        "type": "pubkey"
+                    },
+                    {
+                        "name": "base_mint",
+                        "type": "pubkey"
+                    },
+                    {
+                        "name": "pool",
+                        "type": "pubkey"
+                    },
+                    {
+                        "name": "old_coin_creator",
+                        "type": "pubkey"
+                    },
+                    {
+                        "name": "new_coin_creator",
+                        "type": "pubkey"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "AdminUpdateTokenIncentivesEvent",
+            "type": {
+                "kind": "struct",
+                "fields": [
+                    {
+                        "name": "start_time",
+                        "type": "i64"
+                    },
+                    {
+                        "name": "end_time",
+                        "type": "i64"
+                    },
+                    {
+                        "name": "day_number",
+                        "type": "u64"
+                    },
+                    {
+                        "name": "token_supply_per_day",
+                        "type": "u64"
+                    }
+                ]
+            }
+        },
         {
             "name": "BondingCurve",
             "type": {
@@ -2348,6 +3258,26 @@
             }
         },
         {
+            "name": "ClaimTokenIncentivesEvent",
+            "type": {
+                "kind": "struct",
+                "fields": [
+                    {
+                        "name": "user",
+                        "type": "pubkey"
+                    },
+                    {
+                        "name": "mint",
+                        "type": "pubkey"
+                    },
+                    {
+                        "name": "amount",
+                        "type": "u64"
+                    }
+                ]
+            }
+        },
+        {
             "name": "CollectCoinCreatorFeeEvent",
             "type": {
                 "kind": "struct",
@@ -2408,6 +3338,10 @@
                     {
                         "name": "coin_creator_fee_basis_points",
                         "type": "u64"
+                    },
+                    {
+                        "name": "admin_set_coin_creator_authority",
+                        "type": "pubkey"
                     }
                 ]
             }
@@ -2692,6 +3626,55 @@
                             "The coin creator fee in basis points (0.01%)"
                         ],
                         "type": "u64"
+                    },
+                    {
+                        "name": "admin_set_coin_creator_authority",
+                        "docs": [
+                            "The admin authority for setting coin creators"
+                        ],
+                        "type": "pubkey"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "GlobalVolumeAccumulator",
+            "type": {
+                "kind": "struct",
+                "fields": [
+                    {
+                        "name": "start_time",
+                        "type": "i64"
+                    },
+                    {
+                        "name": "end_time",
+                        "type": "i64"
+                    },
+                    {
+                        "name": "seconds_in_a_day",
+                        "type": "i64"
+                    },
+                    {
+                        "name": "mint",
+                        "type": "pubkey"
+                    },
+                    {
+                        "name": "total_token_supply",
+                        "type": {
+                            "array": [
+                                "u64",
+                                30
+                            ]
+                        }
+                    },
+                    {
+                        "name": "sol_volumes",
+                        "type": {
+                            "array": [
+                                "u64",
+                                30
+                            ]
+                        }
                     }
                 ]
             }
@@ -2904,6 +3887,26 @@
             }
         },
         {
+            "name": "SyncUserVolumeAccumulatorEvent",
+            "type": {
+                "kind": "struct",
+                "fields": [
+                    {
+                        "name": "user",
+                        "type": "pubkey"
+                    },
+                    {
+                        "name": "total_claimed_tokens_before",
+                        "type": "u64"
+                    },
+                    {
+                        "name": "total_claimed_tokens_after",
+                        "type": "u64"
+                    }
+                ]
+            }
+        },
+        {
             "name": "UpdateAdminEvent",
             "type": {
                 "kind": "struct",
@@ -2956,6 +3959,46 @@
                     {
                         "name": "coin_creator_fee_basis_points",
                         "type": "u64"
+                    },
+                    {
+                        "name": "admin_set_coin_creator_authority",
+                        "type": "pubkey"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "UserVolumeAccumulator",
+            "type": {
+                "kind": "struct",
+                "fields": [
+                    {
+                        "name": "user",
+                        "type": "pubkey"
+                    },
+                    {
+                        "name": "needs_claim",
+                        "type": "bool"
+                    },
+                    {
+                        "name": "total_unclaimed_tokens",
+                        "type": "u64"
+                    },
+                    {
+                        "name": "total_claimed_tokens",
+                        "type": "u64"
+                    },
+                    {
+                        "name": "current_sol_volume",
+                        "type": "u64"
+                    },
+                    {
+                        "name": "last_update_timestamp",
+                        "type": "i64"
+                    },
+                    {
+                        "name": "has_total_claimed_tokens",
+                        "type": "bool"
                     }
                 ]
             }

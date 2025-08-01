@@ -104,6 +104,27 @@ def _find_creator_vault(creator: Pubkey) -> Pubkey:
     return derived_address
 
 
+def _find_global_volume_accumulator() -> Pubkey:
+    derived_address, _ = Pubkey.find_program_address(
+        [
+            b"global_volume_accumulator"
+        ],
+        PUMP_PROGRAM,
+        )
+    return derived_address
+
+
+def _find_user_volume_accumulator(user: Pubkey) -> Pubkey:
+    derived_address, _ = Pubkey.find_program_address(
+        [
+            b"user_volume_accumulator",
+            bytes(user)
+        ],
+        PUMP_PROGRAM,
+        )
+    return derived_address
+
+
 async def buy_token(
     mint: Pubkey,
     bonding_curve: Pubkey,
@@ -153,6 +174,8 @@ async def buy_token(
                 pubkey=PUMP_EVENT_AUTHORITY, is_signer=False, is_writable=False
             ),
             AccountMeta(pubkey=PUMP_PROGRAM, is_signer=False, is_writable=False),
+            AccountMeta(pubkey=_find_global_volume_accumulator(), is_signer=False, is_writable=True),
+            AccountMeta(pubkey=_find_user_volume_accumulator(payer.pubkey()), is_signer=False, is_writable=True),
         ]
 
         discriminator = struct.pack("<Q", 16927863322537952870)

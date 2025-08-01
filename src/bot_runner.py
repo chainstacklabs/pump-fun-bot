@@ -86,7 +86,7 @@ async def start_bot(config_path: str):
             "wait_before_new_token", 15
         ),
         max_token_age=cfg.get("timing", {}).get("max_token_age", 0.001),
-        token_wait_timeout=cfg.get("timing", {}).get("token_wait_timeout", 30),
+        token_wait_timeout=cfg.get("timing", {}).get("token_wait_timeout", 120),
         # Cleanup settings
         cleanup_mode=cfg.get("cleanup", {}).get("mode", "disabled"),
         cleanup_force_close_with_burn=cfg.get("cleanup", {}).get(

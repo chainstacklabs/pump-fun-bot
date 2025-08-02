@@ -5,7 +5,7 @@ This module handles LetsBonk (Raydium LaunchLab) specific pool operations
 by implementing the CurveManager interface using IDL-based decoding.
 """
 
-import struct
+import os
 from typing import Any
 
 from solders.pubkey import Pubkey
@@ -14,12 +14,10 @@ from core.client import SolanaClient
 from core.pubkeys import LAMPORTS_PER_SOL, TOKEN_DECIMALS
 from interfaces.core import CurveManager, Platform
 from platforms.letsbonk.address_provider import LetsBonkAddressProvider
+from utils.idl_parser import IDLParser
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
-
-# Pool state discriminator for Raydium LaunchLab
-POOL_STATE_DISCRIMINATOR = bytes([247, 237, 227, 245, 215, 195, 222, 70])
 
 
 class LetsBonkCurveManager(CurveManager):
@@ -33,6 +31,22 @@ class LetsBonkCurveManager(CurveManager):
         """
         self.client = client
         self.address_provider = LetsBonkAddressProvider()
+        self._idl_parser = self._load_idl_parser()
+        
+        logger.info("LetsBonk curve manager initialized with IDL-based account parsing")
+    
+    def _load_idl_parser(self) -> IDLParser:
+        """Load the IDL parser for LetsBonk (Raydium LaunchLab)."""
+        # Get the IDL file path relative to the project root
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.join(current_dir, "..", "..", "..")
+        idl_path = os.path.join(project_root, "idl", "raydium_launchlab_idl.json")
+        idl_path = os.path.normpath(idl_path)
+        
+        if not os.path.exists(idl_path):
+            raise FileNotFoundError(f"IDL file not found at {idl_path}")
+        
+        return IDLParser(idl_path, verbose=False)
     
     @property
     def platform(self) -> Platform:
@@ -53,8 +67,8 @@ class LetsBonkCurveManager(CurveManager):
             if not account.data:
                 raise ValueError(f"No data in pool state account {pool_address}")
             
-            # Decode pool state (simplified - in production you'd use IDL parser)
-            pool_state_data = self._decode_pool_state(account.data)
+            # Decode pool state using IDL parser
+            pool_state_data = self._decode_pool_state_with_idl(account.data)
             
             return pool_state_data
             
@@ -160,95 +174,84 @@ class LetsBonkCurveManager(CurveManager):
         pool_state = await self.get_pool_state(pool_address)
         return (pool_state["virtual_base"], pool_state["virtual_quote"])
     
-    def _decode_pool_state(self, data: bytes) -> dict[str, Any]:
-        """Decode pool state data from raw bytes.
-        
-        This is a simplified decoder. In production, you should use the IDL parser.
+    def _decode_pool_state_with_idl(self, data: bytes) -> dict[str, Any]:
+        """Decode pool state data using IDL parser.
         
         Args:
             data: Raw account data
             
         Returns:
             Dictionary with decoded pool state
+            
+        Raises:
+            ValueError: If IDL parsing fails
         """
-        if len(data) < 8:
-            raise ValueError("Pool state data too short")
+        # Use IDL parser to decode PoolState account data
+        decoded_pool_state = self._idl_parser.decode_account_data(
+            data, 
+            "PoolState", 
+            skip_discriminator=True
+        )
         
-        # Skip discriminator
-        offset = 8
+        if not decoded_pool_state:
+            raise ValueError("Failed to decode pool state with IDL parser")
         
-        # Based on the PoolState structure from the IDL:
-        # - authority: Pubkey (32 bytes)
-        # - base_mint: Pubkey (32 bytes) 
-        # - quote_mint: Pubkey (32 bytes)
-        # - base_vault: Pubkey (32 bytes)
-        # - quote_vault: Pubkey (32 bytes)
-        # - status: u8 (1 byte)
-        # - virtual_base: u64 (8 bytes)
-        # - virtual_quote: u64 (8 bytes)
-        # - real_base: u64 (8 bytes)
-        # - real_quote: u64 (8 bytes)
-        # ... and more fields
+        # Extract the fields we need for trading calculations
+        # Based on the PoolState structure from the IDL
+        pool_data = {
+            "virtual_base": decoded_pool_state.get("virtual_base", 0),
+            "virtual_quote": decoded_pool_state.get("virtual_quote", 0),
+            "real_base": decoded_pool_state.get("real_base", 0),
+            "real_quote": decoded_pool_state.get("real_quote", 0),
+            "status": decoded_pool_state.get("status", 0),
+            "supply": decoded_pool_state.get("supply", 0),
+        }
         
-        try:
-            # Skip to the fields we need
-            offset += 32 * 5  # Skip 5 pubkeys (authority, mints, vaults)
-            offset += 1  # Skip status
-            
-            # Read virtual reserves
-            virtual_base = struct.unpack_from("<Q", data, offset)[0]
-            offset += 8
-            
-            virtual_quote = struct.unpack_from("<Q", data, offset)[0]
-            offset += 8
-            
-            # Read real reserves
-            real_base = struct.unpack_from("<Q", data, offset)[0]
-            offset += 8
-            
-            real_quote = struct.unpack_from("<Q", data, offset)[0]
-            offset += 8
-            
-            return {
-                "virtual_base": virtual_base,
-                "virtual_quote": virtual_quote,
-                "real_base": real_base,
-                "real_quote": real_quote,
-                "price_per_token": (virtual_quote / virtual_base) * (10**TOKEN_DECIMALS) / LAMPORTS_PER_SOL if virtual_base > 0 else 0,
-            }
-            
-        except Exception as e:
-            logger.error(f"Failed to decode pool state: {e}")
-            # Return some default values for testing
-            return {
-                "virtual_base": 1_000_000_000,  # 1000 tokens with 6 decimals
-                "virtual_quote": 1_000_000_000,  # 1 SOL
-                "real_base": 1_000_000_000,
-                "real_quote": 1_000_000_000,
-                "price_per_token": 0.001,  # 0.001 SOL per token
-            }
+        # Calculate additional metrics
+        if pool_data["virtual_base"] > 0:
+            pool_data["price_per_token"] = (
+                (pool_data["virtual_quote"] / pool_data["virtual_base"]) 
+                * (10**TOKEN_DECIMALS) / LAMPORTS_PER_SOL
+            )
+        else:
+            pool_data["price_per_token"] = 0
+        
+        logger.debug(f"Decoded pool state: virtual_base={pool_data['virtual_base']}, "
+                    f"virtual_quote={pool_data['virtual_quote']}, "
+                    f"price={pool_data['price_per_token']:.8f} SOL")
+        
+        return pool_data
     
-    async def get_pool_info(self, pool_address: Pubkey) -> dict[str, Any]:
-        """Get detailed pool information including status and progress.
+    def validate_pool_state_structure(self, pool_address: Pubkey) -> bool:
+        """Validate that the pool state structure matches IDL expectations.
         
         Args:
             pool_address: Address of the pool state
             
         Returns:
-            Dictionary with pool information
+            True if structure is valid, False otherwise
         """
-        pool_state = await self.get_pool_state(pool_address)
-        
-        # Calculate additional metrics
-        sol_raised = pool_state["real_quote"] / LAMPORTS_PER_SOL
-        tokens_sold = (pool_state["virtual_base"] - pool_state["real_base"]) / 10**TOKEN_DECIMALS
-        
-        return {
-            "virtual_base_reserves": pool_state["virtual_base"],
-            "virtual_quote_reserves": pool_state["virtual_quote"],
-            "real_base_reserves": pool_state["real_base"],
-            "real_quote_reserves": pool_state["real_quote"],
-            "sol_raised": sol_raised,
-            "tokens_sold": tokens_sold,
-            "current_price": pool_state["price_per_token"],
-        }
+        try:
+            # This would be used during development/testing to ensure
+            # the IDL parsing is working correctly
+            pool_state = self.get_pool_state(pool_address)
+            
+            required_fields = [
+                "virtual_base", "virtual_quote", 
+                "real_base", "real_quote"
+            ]
+            
+            for field in required_fields:
+                if field not in pool_state:
+                    logger.error(f"Missing required field: {field}")
+                    return False
+                
+                if not isinstance(pool_state[field], int):
+                    logger.error(f"Field {field} is not an integer: {type(pool_state[field])}")
+                    return False
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Pool state validation failed: {e}")
+            return False

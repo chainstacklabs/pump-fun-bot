@@ -104,14 +104,29 @@ class LetsBonkEventParser(EventParser):
             if not base_mint_param:
                 return None
 
-            # Extract account information based on IDL account order
-            creator = get_account_key(1)  # creator account
+            # Extract account information based on IDL account order for initialize instruction
+            # From the manual example, the account order is:
+            # 0: creator (signer)
+            # 1: creator_ata (not needed for TokenInfo)
+            # 2: global_config
+            # 3: platform_config  
+            # 4: creator
+            # 5: pool_state
+            # 6: base_mint
+            # 7: quote_mint (WSOL)
+            # 8: base_vault
+            # 9: quote_vault
+            # ... other accounts
+            
+            creator = get_account_key(0)  # First signer account (creator)
             pool_state = get_account_key(5)  # pool_state account
             base_mint = get_account_key(6)  # base_mint account
             base_vault = get_account_key(8)  # base_vault account
             quote_vault = get_account_key(9)  # quote_vault account
 
             if not all([creator, pool_state, base_mint, base_vault, quote_vault]):
+                logger.debug(f"Missing required accounts: creator={creator}, pool_state={pool_state}, "
+                           f"base_mint={base_mint}, base_vault={base_vault}, quote_vault={quote_vault}")
                 return None
 
             return TokenInfo(

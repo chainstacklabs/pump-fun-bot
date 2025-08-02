@@ -104,28 +104,28 @@ class LetsBonkInstructionBuilder(InstructionBuilder):
         initialize_wsol_ix = self._create_initialize_account_instruction(
             wsol_account, 
             SystemAddresses.SOL_MINT, 
-            user,
-            address_provider
+            user
         )
         instructions.append(initialize_wsol_ix)
         
-        # 4. Build buy_exact_in instruction
+        # 4. Build buy_exact_in instruction with correct account ordering
+        # Based on the IDL and manual examples, the account order should be:
         buy_accounts = [
-            AccountMeta(pubkey=accounts_info["payer"], is_signer=True, is_writable=True),
-            AccountMeta(pubkey=accounts_info["authority"], is_signer=False, is_writable=False),
-            AccountMeta(pubkey=accounts_info["global_config"], is_signer=False, is_writable=False),
-            AccountMeta(pubkey=accounts_info["platform_config"], is_signer=False, is_writable=False),
-            AccountMeta(pubkey=accounts_info["pool_state"], is_signer=False, is_writable=True),
-            AccountMeta(pubkey=accounts_info["user_base_token"], is_signer=False, is_writable=True),
-            AccountMeta(pubkey=wsol_account, is_signer=False, is_writable=True),  # user_quote_token
-            AccountMeta(pubkey=accounts_info["base_vault"], is_signer=False, is_writable=True),
-            AccountMeta(pubkey=accounts_info["quote_vault"], is_signer=False, is_writable=True),
-            AccountMeta(pubkey=accounts_info["base_token_mint"], is_signer=False, is_writable=False),
-            AccountMeta(pubkey=accounts_info["quote_token_mint"], is_signer=False, is_writable=False),
-            AccountMeta(pubkey=accounts_info["base_token_program"], is_signer=False, is_writable=False),
-            AccountMeta(pubkey=accounts_info["quote_token_program"], is_signer=False, is_writable=False),
-            AccountMeta(pubkey=accounts_info["event_authority"], is_signer=False, is_writable=False),
-            AccountMeta(pubkey=accounts_info["program"], is_signer=False, is_writable=False),
+            AccountMeta(pubkey=user, is_signer=True, is_writable=True),                    # payer
+            AccountMeta(pubkey=accounts_info["authority"], is_signer=False, is_writable=False),             # authority  
+            AccountMeta(pubkey=accounts_info["global_config"], is_signer=False, is_writable=False),         # global_config
+            AccountMeta(pubkey=accounts_info["platform_config"], is_signer=False, is_writable=False),       # platform_config
+            AccountMeta(pubkey=accounts_info["pool_state"], is_signer=False, is_writable=True),             # pool_state
+            AccountMeta(pubkey=accounts_info["user_base_token"], is_signer=False, is_writable=True),        # user_base_token
+            AccountMeta(pubkey=wsol_account, is_signer=False, is_writable=True),           # user_quote_token (WSOL account)
+            AccountMeta(pubkey=accounts_info["base_vault"], is_signer=False, is_writable=True),             # base_vault
+            AccountMeta(pubkey=accounts_info["quote_vault"], is_signer=False, is_writable=True),            # quote_vault
+            AccountMeta(pubkey=token_info.mint, is_signer=False, is_writable=False),       # base_token_mint
+            AccountMeta(pubkey=SystemAddresses.SOL_MINT, is_signer=False, is_writable=False),              # quote_token_mint
+            AccountMeta(pubkey=SystemAddresses.TOKEN_PROGRAM, is_signer=False, is_writable=False),         # base_token_program
+            AccountMeta(pubkey=SystemAddresses.TOKEN_PROGRAM, is_signer=False, is_writable=False),         # quote_token_program
+            AccountMeta(pubkey=accounts_info["event_authority"], is_signer=False, is_writable=False),       # event_authority
+            AccountMeta(pubkey=accounts_info["program"], is_signer=False, is_writable=False),              # program
         ]
         
         # Build instruction data: discriminator + amount_in + minimum_amount_out + share_fee_rate
@@ -148,8 +148,7 @@ class LetsBonkInstructionBuilder(InstructionBuilder):
         close_wsol_ix = self._create_close_account_instruction(
             wsol_account, 
             user, 
-            user,
-            address_provider
+            user
         )
         instructions.append(close_wsol_ix)
         
@@ -204,28 +203,27 @@ class LetsBonkInstructionBuilder(InstructionBuilder):
         initialize_wsol_ix = self._create_initialize_account_instruction(
             wsol_account, 
             SystemAddresses.SOL_MINT, 
-            user,
-            address_provider
+            user
         )
         instructions.append(initialize_wsol_ix)
         
-        # 3. Build sell_exact_in instruction
+        # 3. Build sell_exact_in instruction with correct account ordering
         sell_accounts = [
-            AccountMeta(pubkey=accounts_info["payer"], is_signer=True, is_writable=True),
-            AccountMeta(pubkey=accounts_info["authority"], is_signer=False, is_writable=False),
-            AccountMeta(pubkey=accounts_info["global_config"], is_signer=False, is_writable=False),
-            AccountMeta(pubkey=accounts_info["platform_config"], is_signer=False, is_writable=False),
-            AccountMeta(pubkey=accounts_info["pool_state"], is_signer=False, is_writable=True),
-            AccountMeta(pubkey=accounts_info["user_base_token"], is_signer=False, is_writable=True),
-            AccountMeta(pubkey=wsol_account, is_signer=False, is_writable=True),  # user_quote_token
-            AccountMeta(pubkey=accounts_info["base_vault"], is_signer=False, is_writable=True),
-            AccountMeta(pubkey=accounts_info["quote_vault"], is_signer=False, is_writable=True),
-            AccountMeta(pubkey=accounts_info["base_token_mint"], is_signer=False, is_writable=False),
-            AccountMeta(pubkey=accounts_info["quote_token_mint"], is_signer=False, is_writable=False),
-            AccountMeta(pubkey=accounts_info["base_token_program"], is_signer=False, is_writable=False),
-            AccountMeta(pubkey=accounts_info["quote_token_program"], is_signer=False, is_writable=False),
-            AccountMeta(pubkey=accounts_info["event_authority"], is_signer=False, is_writable=False),
-            AccountMeta(pubkey=accounts_info["program"], is_signer=False, is_writable=False),
+            AccountMeta(pubkey=user, is_signer=True, is_writable=True),                    # payer
+            AccountMeta(pubkey=accounts_info["authority"], is_signer=False, is_writable=False),             # authority
+            AccountMeta(pubkey=accounts_info["global_config"], is_signer=False, is_writable=False),         # global_config
+            AccountMeta(pubkey=accounts_info["platform_config"], is_signer=False, is_writable=False),       # platform_config
+            AccountMeta(pubkey=accounts_info["pool_state"], is_signer=False, is_writable=True),             # pool_state
+            AccountMeta(pubkey=accounts_info["user_base_token"], is_signer=False, is_writable=True),        # user_base_token (tokens being sold)
+            AccountMeta(pubkey=wsol_account, is_signer=False, is_writable=True),           # user_quote_token (WSOL received)
+            AccountMeta(pubkey=accounts_info["base_vault"], is_signer=False, is_writable=True),             # base_vault (receives tokens)
+            AccountMeta(pubkey=accounts_info["quote_vault"], is_signer=False, is_writable=True),            # quote_vault (sends WSOL)
+            AccountMeta(pubkey=token_info.mint, is_signer=False, is_writable=False),       # base_token_mint
+            AccountMeta(pubkey=SystemAddresses.SOL_MINT, is_signer=False, is_writable=False),              # quote_token_mint
+            AccountMeta(pubkey=SystemAddresses.TOKEN_PROGRAM, is_signer=False, is_writable=False),         # base_token_program
+            AccountMeta(pubkey=SystemAddresses.TOKEN_PROGRAM, is_signer=False, is_writable=False),         # quote_token_program
+            AccountMeta(pubkey=accounts_info["event_authority"], is_signer=False, is_writable=False),       # event_authority
+            AccountMeta(pubkey=accounts_info["program"], is_signer=False, is_writable=False),              # program
         ]
         
         # Build instruction data: discriminator + amount_in + minimum_amount_out + share_fee_rate
@@ -248,8 +246,7 @@ class LetsBonkInstructionBuilder(InstructionBuilder):
         close_wsol_ix = self._create_close_account_instruction(
             wsol_account, 
             user, 
-            user,
-            address_provider
+            user
         )
         instructions.append(close_wsol_ix)
         
@@ -278,8 +275,8 @@ class LetsBonkInstructionBuilder(InstructionBuilder):
             accounts_info["user_base_token"],
             accounts_info["base_vault"],
             accounts_info["quote_vault"],
-            accounts_info["base_token_mint"],
-            accounts_info["quote_token_mint"],
+            token_info.mint,
+            SystemAddresses.SOL_MINT,
             accounts_info["program"],
         ]
     
@@ -306,8 +303,8 @@ class LetsBonkInstructionBuilder(InstructionBuilder):
             accounts_info["user_base_token"],
             accounts_info["base_vault"],
             accounts_info["quote_vault"],
-            accounts_info["base_token_mint"],
-            accounts_info["quote_token_mint"],
+            token_info.mint,
+            SystemAddresses.SOL_MINT,
             accounts_info["program"],
         ]
     
@@ -328,8 +325,7 @@ class LetsBonkInstructionBuilder(InstructionBuilder):
         self, 
         account: Pubkey, 
         mint: Pubkey, 
-        owner: Pubkey,
-        address_provider: AddressProvider
+        owner: Pubkey
     ) -> Instruction:
         """Create an InitializeAccount instruction for the Token Program.
         
@@ -337,7 +333,6 @@ class LetsBonkInstructionBuilder(InstructionBuilder):
             account: The account to initialize
             mint: The token mint
             owner: The account owner
-            address_provider: Platform address provider
             
         Returns:
             Instruction for initializing the account
@@ -362,8 +357,7 @@ class LetsBonkInstructionBuilder(InstructionBuilder):
         self, 
         account: Pubkey, 
         destination: Pubkey, 
-        owner: Pubkey,
-        address_provider: AddressProvider
+        owner: Pubkey
     ) -> Instruction:
         """Create a CloseAccount instruction for the Token Program.
         
@@ -371,7 +365,6 @@ class LetsBonkInstructionBuilder(InstructionBuilder):
             account: The account to close
             destination: Where to send the remaining lamports
             owner: The account owner (must sign)
-            address_provider: Platform address provider
             
         Returns:
             Instruction for closing the account

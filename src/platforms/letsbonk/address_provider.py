@@ -102,20 +102,16 @@ class LetsBonkAddressProvider(AddressProvider):
         """
         accounts = {}
         
-        # Add pool state if available
+        # Add pool state - must be present in token_info
         if token_info.pool_state:
             accounts["pool_state"] = token_info.pool_state
         
-        # Add vault addresses if available
+        # Add vault addresses - must be present in token_info
         if token_info.base_vault:
             accounts["base_vault"] = token_info.base_vault
         if token_info.quote_vault:
             accounts["quote_vault"] = token_info.quote_vault
             
-        # Derive pool state if not provided
-        if not token_info.pool_state:
-            accounts["pool_state"] = self.derive_pool_address(token_info.mint)
-        
         # Derive authority PDA
         accounts["authority"] = self.derive_authority_pda()
         
@@ -178,15 +174,20 @@ class LetsBonkAddressProvider(AddressProvider):
         """
         additional_accounts = self.get_additional_accounts(token_info)
         
+        # Vault addresses must be present in token_info
+        if not token_info.base_vault or not token_info.quote_vault:
+            raise ValueError(f"Missing required vault addresses for token {token_info.mint}. "
+                           f"base_vault: {token_info.base_vault}, quote_vault: {token_info.quote_vault}")
+        
         return {
             "payer": user,
             "authority": additional_accounts["authority"],
             "global_config": LetsBonkAddresses.GLOBAL_CONFIG,
             "platform_config": LetsBonkAddresses.PLATFORM_CONFIG,
-            "pool_state": additional_accounts["pool_state"],
+            "pool_state": token_info.pool_state,
             "user_base_token": self.derive_user_token_account(user, token_info.mint),
-            "base_vault": additional_accounts.get("base_vault", token_info.base_vault),
-            "quote_vault": additional_accounts.get("quote_vault", token_info.quote_vault),
+            "base_vault": token_info.base_vault,
+            "quote_vault": token_info.quote_vault,
             "base_token_mint": token_info.mint,
             "quote_token_mint": SystemAddresses.SOL_MINT,
             "base_token_program": SystemAddresses.TOKEN_PROGRAM,
@@ -207,15 +208,20 @@ class LetsBonkAddressProvider(AddressProvider):
         """
         additional_accounts = self.get_additional_accounts(token_info)
         
+        # Vault addresses must be present in token_info
+        if not token_info.base_vault or not token_info.quote_vault:
+            raise ValueError(f"Missing required vault addresses for token {token_info.mint}. "
+                           f"base_vault: {token_info.base_vault}, quote_vault: {token_info.quote_vault}")
+        
         return {
             "payer": user,
             "authority": additional_accounts["authority"],
             "global_config": LetsBonkAddresses.GLOBAL_CONFIG,
             "platform_config": LetsBonkAddresses.PLATFORM_CONFIG,
-            "pool_state": additional_accounts["pool_state"],
+            "pool_state": token_info.pool_state,
             "user_base_token": self.derive_user_token_account(user, token_info.mint),
-            "base_vault": additional_accounts.get("base_vault", token_info.base_vault),
-            "quote_vault": additional_accounts.get("quote_vault", token_info.quote_vault),
+            "base_vault": token_info.base_vault,
+            "quote_vault": token_info.quote_vault,
             "base_token_mint": token_info.mint,
             "quote_token_mint": SystemAddresses.SOL_MINT,
             "base_token_program": SystemAddresses.TOKEN_PROGRAM,

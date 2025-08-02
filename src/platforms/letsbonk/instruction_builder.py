@@ -6,7 +6,6 @@ by implementing the InstructionBuilder interface with IDL-based discriminators.
 """
 
 import hashlib
-import os
 import struct
 import time
 
@@ -26,29 +25,20 @@ logger = get_logger(__name__)
 class LetsBonkInstructionBuilder(InstructionBuilder):
     """LetsBonk (Raydium LaunchLab) implementation of InstructionBuilder interface with IDL-based discriminators."""
     
-    def __init__(self):
-        """Initialize LetsBonk instruction builder with IDL support."""
-        self._idl_parser = self._load_idl_parser()
+    def __init__(self, idl_parser: IDLParser):
+        """Initialize LetsBonk instruction builder with injected IDL parser.
         
-        # Get discriminators from IDL
+        Args:
+            idl_parser: Pre-loaded IDL parser for LetsBonk platform
+        """
+        self._idl_parser = idl_parser
+        
+        # Get discriminators from injected IDL parser
         discriminators = self._idl_parser.get_instruction_discriminators()
         self._buy_exact_in_discriminator = discriminators["buy_exact_in"]
         self._sell_exact_in_discriminator = discriminators["sell_exact_in"]
         
-        logger.info("LetsBonk instruction builder initialized with IDL-based discriminators")
-    
-    def _load_idl_parser(self) -> IDLParser:
-        """Load the IDL parser for LetsBonk (Raydium LaunchLab)."""
-        # Get the IDL file path relative to the project root
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        project_root = os.path.join(current_dir, "..", "..", "..")
-        idl_path = os.path.join(project_root, "idl", "raydium_launchlab_idl.json")
-        idl_path = os.path.normpath(idl_path)
-        
-        if not os.path.exists(idl_path):
-            raise FileNotFoundError(f"IDL file not found at {idl_path}")
-        
-        return IDLParser(idl_path, verbose=False)
+        logger.info("LetsBonk instruction builder initialized with injected IDL parser")
     
     @property
     def platform(self) -> Platform:

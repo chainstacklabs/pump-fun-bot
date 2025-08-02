@@ -2,7 +2,7 @@
 Platform factory and registry for managing multiple trading platforms.
 
 This module provides a centralized way to instantiate and access
-platform-specific implementations of the trading interfaces.
+platform-specific implementations of the trading interfaces with IDL support.
 """
 
 from dataclasses import dataclass
@@ -16,6 +16,10 @@ from interfaces.core import (
     InstructionBuilder,
     Platform,
 )
+from utils.idl_manager import get_idl_manager, has_idl_support
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -64,7 +68,7 @@ class PlatformRegistry:
         client: SolanaClient,
         **kwargs: Any
     ) -> PlatformImplementations:
-        """Create platform implementation instances.
+        """Create platform implementation instances with IDL support.
         
         Args:
             platform: Platform to create implementations for
@@ -89,11 +93,29 @@ class PlatformRegistry:
         
         impl_classes = self._implementations[platform]
         
-        # Create instances - only curve_manager needs client
+        # Check if platform has IDL support and prepare IDL parser
+        idl_parser = None
+        if has_idl_support(platform):
+            try:
+                idl_manager = get_idl_manager()
+                idl_parser = idl_manager.get_parser(platform, verbose=kwargs.get('verbose_idl', False))
+                logger.info(f"IDL parser loaded for {platform.value} platform implementations")
+            except Exception as e:
+                logger.warning(f"Failed to load IDL parser for {platform.value}: {e}")
+        
+        # Create instances - pass IDL parser to classes that need it
         address_provider = impl_classes['address_provider']()
-        instruction_builder = impl_classes['instruction_builder']()
-        curve_manager = impl_classes['curve_manager'](client)
-        event_parser = impl_classes['event_parser']()
+        
+        # For platforms with IDL support, pass the parser to relevant classes
+        if idl_parser and platform in [Platform.LETS_BONK]:  # Add other IDL-supported platforms here
+            instruction_builder = impl_classes['instruction_builder'](idl_parser=idl_parser)
+            curve_manager = impl_classes['curve_manager'](client, idl_parser=idl_parser)
+            event_parser = impl_classes['event_parser'](idl_parser=idl_parser)
+        else:
+            # Fallback for platforms without IDL support (like pump.fun)
+            instruction_builder = impl_classes['instruction_builder']()
+            curve_manager = impl_classes['curve_manager'](client)
+            event_parser = impl_classes['event_parser']()
         
         implementations = PlatformImplementations(
             address_provider=address_provider,
@@ -138,10 +160,25 @@ class PlatformRegistry:
             True if platform is registered, False otherwise
         """
         return platform in self._implementations
+    
+    def clear_implementation_cache(self, platform: Platform | None = None) -> None:
+        """Clear cached platform implementations.
+        
+        Args:
+            platform: Specific platform to clear, or None to clear all
+        """
+        if platform is None:
+            logger.info("Clearing all cached platform implementations")
+            self._instances.clear()
+        else:
+            keys_to_remove = [key for key in self._instances.keys() if key[0] == platform]
+            for key in keys_to_remove:
+                del self._instances[key]
+            logger.info(f"Cleared cached implementations for {platform.value}")
 
 
 class PlatformFactory:
-    """Factory for creating platform-specific implementations."""
+    """Factory for creating platform-specific implementations with IDL support."""
     
     def __init__(self):
         self.registry = PlatformRegistry()
@@ -200,7 +237,7 @@ class PlatformFactory:
         Args:
             platform: Platform to create implementations for
             client: Solana RPC client
-            **config: Platform-specific configuration
+            **config: Platform-specific configuration (including verbose_idl)
             
         Returns:
             PlatformImplementations containing all interface implementations
@@ -266,6 +303,19 @@ class PlatformFactory:
             List of supported platforms
         """
         return self.registry.get_supported_platforms()
+    
+    def clear_caches(self, platform: Platform | None = None) -> None:
+        """Clear all caches for better memory management.
+        
+        Args:
+            platform: Specific platform to clear, or None to clear all
+        """
+        # Clear implementation cache
+        self.registry.clear_implementation_cache(platform)
+        
+        # Clear IDL parser cache
+        idl_manager = get_idl_manager()
+        idl_manager.clear_cache(platform)
 
 
 # Global factory instance

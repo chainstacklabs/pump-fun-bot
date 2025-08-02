@@ -6,7 +6,6 @@ by implementing the EventParser interface with IDL-based parsing.
 """
 
 import base64
-import os
 import struct
 from time import monotonic
 from typing import Any
@@ -25,30 +24,21 @@ logger = get_logger(__name__)
 class LetsBonkEventParser(EventParser):
     """LetsBonk implementation of EventParser interface with IDL-based parsing."""
     
-    def __init__(self):
-        """Initialize LetsBonk event parser with IDL support."""
-        self.address_provider = LetsBonkAddressProvider()
-        self._idl_parser = self._load_idl_parser()
+    def __init__(self, idl_parser: IDLParser):
+        """Initialize LetsBonk event parser with injected IDL parser.
         
-        # Get discriminators from IDL
+        Args:
+            idl_parser: Pre-loaded IDL parser for LetsBonk platform
+        """
+        self.address_provider = LetsBonkAddressProvider()
+        self._idl_parser = idl_parser
+        
+        # Get discriminators from injected IDL parser
         discriminators = self._idl_parser.get_instruction_discriminators()
         self._initialize_discriminator_bytes = discriminators["initialize"]
         self._initialize_discriminator = struct.unpack("<Q", self._initialize_discriminator_bytes)[0]
         
-        logger.info("LetsBonk event parser initialized with IDL-based discriminators")
-    
-    def _load_idl_parser(self) -> IDLParser:
-        """Load the IDL parser for LetsBonk (Raydium LaunchLab)."""
-        # Get the IDL file path relative to the project root
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        project_root = os.path.join(current_dir, "..", "..", "..")
-        idl_path = os.path.join(project_root, "idl", "raydium_launchlab_idl.json")
-        idl_path = os.path.normpath(idl_path)
-        
-        if not os.path.exists(idl_path):
-            raise FileNotFoundError(f"IDL file not found at {idl_path}")
-        
-        return IDLParser(idl_path, verbose=False)
+        logger.info("LetsBonk event parser initialized with injected IDL parser")
     
     @property
     def platform(self) -> Platform:
@@ -79,7 +69,7 @@ class LetsBonkEventParser(EventParser):
         accounts: list[int],
         account_keys: list[bytes]
     ) -> TokenInfo | None:
-        """Parse token creation from LetsBonk instruction data using IDL.
+        """Parse token creation from LetsBonk instruction data using injected IDL parser.
         
         Args:
             instruction_data: Raw instruction data
@@ -102,7 +92,7 @@ class LetsBonkEventParser(EventParser):
                     return None
                 return Pubkey.from_bytes(account_keys[account_index])
 
-            # Parse instruction data using IDL parser
+            # Parse instruction data using injected IDL parser
             decoded = self._idl_parser.decode_instruction(instruction_data, account_keys, accounts)
             if not decoded or decoded['instruction_name'] != 'initialize':
                 return None

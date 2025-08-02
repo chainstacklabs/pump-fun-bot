@@ -5,7 +5,6 @@ This module handles LetsBonk (Raydium LaunchLab) specific pool operations
 by implementing the CurveManager interface using IDL-based decoding.
 """
 
-import os
 from typing import Any
 
 from solders.pubkey import Pubkey
@@ -23,30 +22,18 @@ logger = get_logger(__name__)
 class LetsBonkCurveManager(CurveManager):
     """LetsBonk (Raydium LaunchLab) implementation of CurveManager interface."""
     
-    def __init__(self, client: SolanaClient):
-        """Initialize LetsBonk curve manager.
+    def __init__(self, client: SolanaClient, idl_parser: IDLParser):
+        """Initialize LetsBonk curve manager with injected IDL parser.
         
         Args:
             client: Solana RPC client
+            idl_parser: Pre-loaded IDL parser for LetsBonk platform
         """
         self.client = client
         self.address_provider = LetsBonkAddressProvider()
-        self._idl_parser = self._load_idl_parser()
+        self._idl_parser = idl_parser
         
-        logger.info("LetsBonk curve manager initialized with IDL-based account parsing")
-    
-    def _load_idl_parser(self) -> IDLParser:
-        """Load the IDL parser for LetsBonk (Raydium LaunchLab)."""
-        # Get the IDL file path relative to the project root
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        project_root = os.path.join(current_dir, "..", "..", "..")
-        idl_path = os.path.join(project_root, "idl", "raydium_launchlab_idl.json")
-        idl_path = os.path.normpath(idl_path)
-        
-        if not os.path.exists(idl_path):
-            raise FileNotFoundError(f"IDL file not found at {idl_path}")
-        
-        return IDLParser(idl_path, verbose=False)
+        logger.info("LetsBonk curve manager initialized with injected IDL parser")
     
     @property
     def platform(self) -> Platform:
@@ -67,7 +54,7 @@ class LetsBonkCurveManager(CurveManager):
             if not account.data:
                 raise ValueError(f"No data in pool state account {pool_address}")
             
-            # Decode pool state using IDL parser
+            # Decode pool state using injected IDL parser
             pool_state_data = self._decode_pool_state_with_idl(account.data)
             
             return pool_state_data
@@ -175,7 +162,7 @@ class LetsBonkCurveManager(CurveManager):
         return (pool_state["virtual_base"], pool_state["virtual_quote"])
     
     def _decode_pool_state_with_idl(self, data: bytes) -> dict[str, Any]:
-        """Decode pool state data using IDL parser.
+        """Decode pool state data using injected IDL parser.
         
         Args:
             data: Raw account data
@@ -186,7 +173,7 @@ class LetsBonkCurveManager(CurveManager):
         Raises:
             ValueError: If IDL parsing fails
         """
-        # Use IDL parser to decode PoolState account data
+        # Use injected IDL parser to decode PoolState account data
         decoded_pool_state = self._idl_parser.decode_account_data(
             data, 
             "PoolState", 

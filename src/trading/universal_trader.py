@@ -1,6 +1,6 @@
 """
 Universal trading coordinator that works with any platform.
-Replaces PumpTrader with platform-agnostic implementation.
+Cleaned up to remove all platform-specific hardcoding.
 """
 
 import asyncio
@@ -84,18 +84,7 @@ class UniversalTrader:
         marry_mode: bool = False,
         yolo_mode: bool = False,
     ):
-        """Initialize the universal trader.
-        
-        Args:
-            rpc_endpoint: RPC endpoint URL
-            wss_endpoint: WebSocket endpoint URL
-            private_key: Wallet private key
-            buy_amount: Amount of SOL to spend on buys
-            buy_slippage: Slippage tolerance for buys
-            sell_slippage: Slippage tolerance for sells
-            platform: Platform to trade on (Platform enum or string)
-            ... (other args same as PumpTrader)
-        """
+        """Initialize the universal trader."""
         # Core components
         self.solana_client = SolanaClient(rpc_endpoint)
         self.wallet = Wallet(private_key)
@@ -115,6 +104,15 @@ class UniversalTrader:
             self.platform = platform
 
         logger.info(f"Initialized Universal Trader for platform: {self.platform.value}")
+
+        # Validate platform support
+        try:
+            from platforms import platform_factory
+            if not platform_factory.registry.is_platform_supported(self.platform):
+                raise ValueError(f"Platform {self.platform.value} is not supported")
+        except Exception as e:
+            logger.error(f"Platform validation failed: {e}")
+            raise
 
         # Get platform-specific implementations
         self.platform_implementations = get_platform_implementations(
@@ -141,7 +139,7 @@ class UniversalTrader:
             max_retries,
         )
 
-        # Initialize the appropriate listener
+        # Initialize the appropriate listener with platform filtering
         self.token_listener = ListenerFactory.create_listener(
             listener_type=listener_type,
             wss_endpoint=wss_endpoint,
@@ -253,11 +251,7 @@ class UniversalTrader:
             logger.info("Universal Trader has shut down")
 
     async def _wait_for_token(self) -> TokenInfo | None:
-        """Wait for a single token to be detected.
-
-        Returns:
-            TokenInfo or None if timeout occurs
-        """
+        """Wait for a single token to be detected."""
         # Create a one-time event to signal when a token is found
         token_found = asyncio.Event()
         found_token = None
@@ -322,11 +316,7 @@ class UniversalTrader:
         await self.solana_client.close()
 
     async def _queue_token(self, token_info: TokenInfo) -> None:
-        """Queue a token for processing if not already processed.
-
-        Args:
-            token_info: Token information to queue
-        """
+        """Queue a token for processing if not already processed."""
         token_key = str(token_info.mint)
 
         if token_key in self.processed_tokens:
@@ -360,7 +350,6 @@ class UniversalTrader:
                 await self._handle_token(token_info)
 
             except asyncio.CancelledError:
-                # Handle cancellation gracefully
                 logger.info("Token queue processor was cancelled")
                 break
             except Exception as e:
@@ -369,11 +358,7 @@ class UniversalTrader:
                 self.token_queue.task_done()
 
     async def _handle_token(self, token_info: TokenInfo) -> None:
-        """Handle a new token creation event.
-
-        Args:
-            token_info: Token information
-        """
+        """Handle a new token creation event."""
         try:
             # Validate that token is for our platform
             if token_info.platform != self.platform:
@@ -404,12 +389,7 @@ class UniversalTrader:
             logger.error(f"Error handling token {token_info.symbol}: {e!s}")
 
     async def _handle_successful_buy(self, token_info: TokenInfo, buy_result: TradeResult) -> None:
-        """Handle successful token purchase.
-
-        Args:
-            token_info: Token information
-            buy_result: The result of the buy operation
-        """
+        """Handle successful token purchase."""
         logger.info(f"Successfully bought {token_info.symbol} on {token_info.platform.value}")
         self._log_trade("buy", token_info, buy_result.price, buy_result.amount, buy_result.tx_signature)
         self.traded_mints.add(token_info.mint)
@@ -426,12 +406,7 @@ class UniversalTrader:
             logger.info("Marry mode enabled. Skipping sell operation.")
 
     async def _handle_failed_buy(self, token_info: TokenInfo, buy_result: TradeResult) -> None:
-        """Handle failed token purchase.
-
-        Args:
-            token_info: Token information
-            buy_result: The result of the buy operation
-        """
+        """Handle failed token purchase."""
         logger.error(f"Failed to buy {token_info.symbol}: {buy_result.error_message}")
         # Close ATA if enabled
         await handle_cleanup_after_failure(
@@ -445,12 +420,7 @@ class UniversalTrader:
         )
 
     async def _handle_tp_sl_exit(self, token_info: TokenInfo, buy_result: TradeResult) -> None:
-        """Handle take profit/stop loss exit strategy.
-
-        Args:
-            token_info: Token information
-            buy_result: Result from the buy operation
-        """
+        """Handle take profit/stop loss exit strategy."""
         # Create position
         position = Position.create_from_buy_result(
             mint=token_info.mint,
@@ -472,11 +442,7 @@ class UniversalTrader:
         await self._monitor_position_until_exit(token_info, position)
 
     async def _handle_time_based_exit(self, token_info: TokenInfo) -> None:
-        """Handle legacy time-based exit strategy.
-
-        Args:
-            token_info: Token information
-        """
+        """Handle legacy time-based exit strategy."""
         logger.info(f"Waiting for {self.wait_time_after_buy} seconds before selling...")
         await asyncio.sleep(self.wait_time_after_buy)
 
@@ -500,15 +466,10 @@ class UniversalTrader:
             logger.error(f"Failed to sell {token_info.symbol}: {sell_result.error_message}")
 
     async def _monitor_position_until_exit(self, token_info: TokenInfo, position: Position) -> None:
-        """Monitor a position until exit conditions are met.
-
-        Args:
-            token_info: Token information
-            position: Position to monitor
-        """
+        """Monitor a position until exit conditions are met."""
         logger.info(f"Starting position monitoring (check interval: {self.price_check_interval}s)")
 
-        # Get pool address for price monitoring
+        # Get pool address for price monitoring using platform-agnostic method
         pool_address = self._get_pool_address(token_info)
         curve_manager = self.platform_implementations.curve_manager
 
@@ -570,35 +531,25 @@ class UniversalTrader:
                 await asyncio.sleep(self.price_check_interval)  # Continue monitoring despite errors
 
     def _get_pool_address(self, token_info: TokenInfo) -> Pubkey:
-        """Get the pool/curve address for price monitoring.
-        
-        Args:
-            token_info: Token information
-            
-        Returns:
-            Pool/curve address
-        """
+        """Get the pool/curve address for price monitoring using platform-agnostic method."""
         address_provider = self.platform_implementations.address_provider
         
-        if token_info.platform == Platform.PUMP_FUN:
-            return token_info.bonding_curve or address_provider.derive_pool_address(token_info.mint)
-        elif token_info.platform == Platform.LETS_BONK:
-            return token_info.pool_state or address_provider.derive_pool_address(token_info.mint)
+        # Use platform-specific logic to get the appropriate address
+        if hasattr(token_info, 'bonding_curve') and token_info.bonding_curve:
+            return token_info.bonding_curve
+        elif hasattr(token_info, 'pool_state') and token_info.pool_state:
+            return token_info.pool_state
         else:
-            # Fallback to deriving the address
+            # Fallback to deriving the address using platform provider
             return address_provider.derive_pool_address(token_info.mint)
 
     async def _save_token_info(self, token_info: TokenInfo) -> None:
-        """Save token information to a file.
-
-        Args:
-            token_info: Token information
-        """
+        """Save token information to a file."""
         try:
             os.makedirs("trades", exist_ok=True)
             file_name = os.path.join("trades", f"{token_info.mint}.txt")
 
-            # Convert to dictionary for saving
+            # Convert to dictionary for saving - platform-agnostic
             token_dict = {
                 "name": token_info.name,
                 "symbol": token_info.symbol,
@@ -607,14 +558,22 @@ class UniversalTrader:
                 "platform": token_info.platform.value,
                 "user": str(token_info.user) if token_info.user else None,
                 "creator": str(token_info.creator) if token_info.creator else None,
-                # Platform-specific fields
-                "bonding_curve": str(token_info.bonding_curve) if token_info.bonding_curve else None,
-                "associated_bonding_curve": str(token_info.associated_bonding_curve) if token_info.associated_bonding_curve else None,
-                "creator_vault": str(token_info.creator_vault) if token_info.creator_vault else None,
-                "pool_state": str(token_info.pool_state) if token_info.pool_state else None,
-                "base_vault": str(token_info.base_vault) if token_info.base_vault else None,
-                "quote_vault": str(token_info.quote_vault) if token_info.quote_vault else None,
+                "creation_timestamp": token_info.creation_timestamp,
             }
+            
+            # Add platform-specific fields only if they exist
+            platform_fields = {
+                "bonding_curve": token_info.bonding_curve,
+                "associated_bonding_curve": token_info.associated_bonding_curve,
+                "creator_vault": token_info.creator_vault,
+                "pool_state": token_info.pool_state,
+                "base_vault": token_info.base_vault,
+                "quote_vault": token_info.quote_vault,
+            }
+            
+            for field_name, field_value in platform_fields.items():
+                if field_value is not None:
+                    token_dict[field_name] = str(field_value)
 
             with open(file_name, "w") as file:
                 file.write(json.dumps(token_dict, indent=2))
@@ -624,15 +583,7 @@ class UniversalTrader:
             logger.error(f"Failed to save token information: {e!s}")
 
     def _log_trade(self, action: str, token_info: TokenInfo, price: float, amount: float, tx_hash: str | None) -> None:
-        """Log trade information.
-
-        Args:
-            action: Trade action (buy/sell)
-            token_info: Token information
-            price: Token price in SOL
-            amount: Trade amount in SOL
-            tx_hash: Transaction hash
-        """
+        """Log trade information."""
         try:
             os.makedirs("trades", exist_ok=True)
 

@@ -32,7 +32,7 @@ class PlatformRegistry:
     
     def __init__(self):
         self._implementations: dict[Platform, dict[str, type]] = {}
-        self._instances: dict[Platform, PlatformImplementations] = {}
+        self._instances: dict[tuple[Platform, str], PlatformImplementations] = {}
     
     def register_platform(
         self,
@@ -80,13 +80,16 @@ class PlatformRegistry:
         if platform not in self._implementations:
             raise ValueError(f"Platform {platform} is not registered")
         
-        # Check if we already have instances for this platform
-        if platform in self._instances:
-            return self._instances[platform]
+        # Use client address as cache key to allow multiple clients
+        cache_key = (platform, str(client.rpc_endpoint))
+        
+        # Check if we already have instances for this platform + client combo
+        if cache_key in self._instances:
+            return self._instances[cache_key]
         
         impl_classes = self._implementations[platform]
         
-        # Create instances
+        # Create instances - only curve_manager needs client
         address_provider = impl_classes['address_provider']()
         instruction_builder = impl_classes['instruction_builder']()
         curve_manager = impl_classes['curve_manager'](client)
@@ -100,20 +103,22 @@ class PlatformRegistry:
         )
         
         # Cache the instances
-        self._instances[platform] = implementations
+        self._instances[cache_key] = implementations
         
         return implementations
     
-    def get_platform_implementations(self, platform: Platform) -> PlatformImplementations | None:
+    def get_platform_implementations(self, platform: Platform, client_endpoint: str) -> PlatformImplementations | None:
         """Get cached platform implementations.
         
         Args:
             platform: Platform to get implementations for
+            client_endpoint: Client endpoint for cache lookup
             
         Returns:
             PlatformImplementations if available, None otherwise
         """
-        return self._instances.get(platform)
+        cache_key = (platform, client_endpoint)
+        return self._instances.get(cache_key)
     
     def get_supported_platforms(self) -> list[Platform]:
         """Get list of supported platforms.
@@ -144,7 +149,7 @@ class PlatformFactory:
     
     def _setup_default_platforms(self) -> None:
         """Setup default platform registrations."""
-        # Import platform implementations dynamically to avoid circular imports
+        # Import and register pump.fun platform
         try:
             from platforms.pumpfun import (
                 PumpFunAddressProvider,
@@ -164,6 +169,7 @@ class PlatformFactory:
         except ImportError as e:
             print(f"Warning: Could not register pump.fun platform: {e}")
         
+        # Import and register LetsBonk platform
         try:
             from platforms.letsbonk import (
                 LetsBonkAddressProvider,

@@ -6,12 +6,10 @@ import asyncio
 from collections.abc import Awaitable, Callable
 
 import grpc
-from solders.pubkey import Pubkey
 
 from geyser.generated import geyser_pb2, geyser_pb2_grpc
 from interfaces.core import Platform, TokenInfo
 from monitoring.base_listener import BaseTokenListener
-from platforms import get_platform_implementations
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -27,14 +25,7 @@ class UniversalGeyserListener(BaseTokenListener):
         geyser_auth_type: str,
         platforms: list[Platform] | None = None,
     ):
-        """Initialize universal Geyser listener.
-
-        Args:
-            geyser_endpoint: Geyser gRPC endpoint URL
-            geyser_api_token: API token for authentication
-            geyser_auth_type: authentication type ('x-token' or 'basic')
-            platforms: List of platforms to monitor (if None, monitor all supported platforms)
-        """
+        """Initialize universal Geyser listener."""
         super().__init__()
         self.geyser_endpoint = geyser_endpoint
         self.geyser_api_token = geyser_api_token
@@ -51,7 +42,6 @@ class UniversalGeyserListener(BaseTokenListener):
         from platforms import platform_factory
         
         if platforms is None:
-            # Monitor all supported platforms
             self.platforms = platform_factory.get_supported_platforms()
         else:
             self.platforms = platforms
@@ -60,13 +50,13 @@ class UniversalGeyserListener(BaseTokenListener):
         self.platform_parsers = {}
         self.platform_program_ids = set()
         
+        # Create a temporary client for getting parsers
+        from core.client import SolanaClient
+        temp_client = SolanaClient("http://temp")
+        
         for platform in self.platforms:
             try:
-                # We'll need a dummy client for getting the parser - this is a design issue we should fix
-                from core.client import SolanaClient
-                dummy_client = SolanaClient("http://localhost")  # Won't be used for parsing
-                
-                implementations = get_platform_implementations(platform, dummy_client)
+                implementations = platform_factory.create_for_platform(platform, temp_client)
                 parser = implementations.event_parser
                 self.platform_parsers[platform] = parser
                 self.platform_program_ids.add(parser.get_program_id())
@@ -78,6 +68,7 @@ class UniversalGeyserListener(BaseTokenListener):
 
     async def _create_geyser_connection(self):
         """Establish a secure connection to the Geyser endpoint."""
+        
         if self.auth_type == "x-token":
             auth = grpc.metadata_call_credentials(
                 lambda _, callback: callback(
@@ -92,10 +83,12 @@ class UniversalGeyserListener(BaseTokenListener):
             )
         creds = grpc.composite_channel_credentials(grpc.ssl_channel_credentials(), auth)
         channel = grpc.aio.secure_channel(self.geyser_endpoint, creds)
+        
         return geyser_pb2_grpc.GeyserStub(channel), channel
 
     def _create_subscription_request(self):
         """Create a subscription request for all monitored platforms."""
+        
         request = geyser_pb2.SubscribeRequest()
         
         # Add all platform program IDs to the filter
@@ -113,13 +106,7 @@ class UniversalGeyserListener(BaseTokenListener):
         match_string: str | None = None,
         creator_address: str | None = None,
     ) -> None:
-        """Listen for new token creations using Geyser subscription.
-
-        Args:
-            token_callback: Callback function for new tokens
-            match_string: Optional string to match in token name/symbol
-            creator_address: Optional creator address to filter by
-        """
+        """Listen for new token creations using Geyser subscription."""
         if not self.platform_parsers:
             logger.error("No platform parsers available. Cannot listen for tokens.")
             return
@@ -161,8 +148,12 @@ class UniversalGeyserListener(BaseTokenListener):
 
                         await token_callback(token_info)
 
-                except grpc.aio.AioRpcError as e:
-                    logger.error(f"gRPC error: {e.details()}")
+                except Exception as e:
+                    import grpc
+                    if isinstance(e, grpc.aio.AioRpcError):
+                        logger.error(f"gRPC error: {e.details()}")
+                    else:
+                        logger.error(f"Geyser error: {e}")
                     await asyncio.sleep(5)
 
                 finally:
@@ -174,14 +165,7 @@ class UniversalGeyserListener(BaseTokenListener):
                 await asyncio.sleep(10)
 
     async def _process_update(self, update) -> TokenInfo | None:
-        """Process a Geyser update and extract token creation info.
-
-        Args:
-            update: Geyser update from the subscription
-
-        Returns:
-            TokenInfo if a token creation is found, None otherwise
-        """
+        """Process a Geyser update and extract token creation info."""
         try:
             if not update.HasField("transaction"):
                 return None
@@ -190,6 +174,8 @@ class UniversalGeyserListener(BaseTokenListener):
             msg = getattr(tx, "message", None)
             if msg is None:
                 return None
+
+            from solders.pubkey import Pubkey
 
             for ix in msg.instructions:
                 # Check which platform this instruction belongs to

@@ -1,8 +1,6 @@
 """
 Platform-aware trader implementations that use the interface system.
-
-This module provides new trader classes that work with any platform
-through the interface system, while maintaining compatibility with existing code.
+Final cleanup removing all platform-specific hardcoding.
 """
 
 from solders.pubkey import Pubkey
@@ -33,18 +31,7 @@ class PlatformAwareBuyer(Trader):
         extreme_fast_token_amount: int = 0,
         extreme_fast_mode: bool = False,
     ):
-        """Initialize platform-aware token buyer.
-
-        Args:
-            client: Solana client for RPC calls
-            wallet: Wallet for signing transactions
-            priority_fee_manager: Priority fee manager
-            amount: Amount of SOL to spend
-            slippage: Slippage tolerance (0.01 = 1%)
-            max_retries: Maximum number of retry attempts
-            extreme_fast_token_amount: Amount of token to buy if extreme fast mode is enabled
-            extreme_fast_mode: If enabled, avoid fetching pool state for price estimation
-        """
+        """Initialize platform-aware token buyer."""
         self.client = client
         self.wallet = wallet
         self.priority_fee_manager = priority_fee_manager
@@ -55,14 +42,7 @@ class PlatformAwareBuyer(Trader):
         self.extreme_fast_token_amount = extreme_fast_token_amount
 
     async def execute(self, token_info: TokenInfo, *args, **kwargs) -> TradeResult:
-        """Execute buy operation using platform-specific implementations.
-
-        Args:
-            token_info: Enhanced token information with platform
-
-        Returns:
-            TradeResult with buy outcome
-        """
+        """Execute buy operation using platform-specific implementations."""
         try:
             # Get platform-specific implementations
             implementations = get_platform_implementations(token_info.platform, self.client)
@@ -78,7 +58,7 @@ class PlatformAwareBuyer(Trader):
                 token_amount = self.extreme_fast_token_amount
                 token_price_sol = self.amount / token_amount if token_amount > 0 else 0
             else:
-                # Get pool address based on platform
+                # Get pool address based on platform using platform-agnostic method
                 pool_address = self._get_pool_address(token_info, address_provider)
                 
                 # Regular behavior with RPC call
@@ -92,7 +72,7 @@ class PlatformAwareBuyer(Trader):
             # Calculate maximum SOL to spend with slippage
             max_amount_lamports = int(amount_lamports * (1 + self.slippage))
 
-            # Build buy instructions
+            # Build buy instructions using platform-specific builder
             instructions = await instruction_builder.build_buy_instruction(
                 token_info,
                 self.wallet.pubkey,
@@ -107,7 +87,7 @@ class PlatformAwareBuyer(Trader):
             )
 
             logger.info(
-                f"Buying {token_amount:.6f} tokens at {token_price_sol:.8f} SOL per token"
+                f"Buying {token_amount:.6f} tokens at {token_price_sol:.8f} SOL per token on {token_info.platform.value}"
             )
             logger.info(
                 f"Total cost: {self.amount:.6f} SOL (max: {max_amount_lamports / LAMPORTS_PER_SOL:.6f} SOL)"
@@ -151,22 +131,17 @@ class PlatformAwareBuyer(Trader):
             )
 
     def _get_pool_address(self, token_info: TokenInfo, address_provider: AddressProvider) -> Pubkey:
-        """Get the pool/curve address for price calculations.
-        
-        Args:
-            token_info: Token information
-            address_provider: Platform address provider
-            
-        Returns:
-            Pool/curve address
-        """
+        """Get the pool/curve address for price calculations using platform-agnostic method."""
+        # Try to get the address from token_info first, then derive if needed
         if token_info.platform == Platform.PUMP_FUN:
-            return token_info.bonding_curve or address_provider.derive_pool_address(token_info.mint)
+            if hasattr(token_info, 'bonding_curve') and token_info.bonding_curve:
+                return token_info.bonding_curve
         elif token_info.platform == Platform.LETS_BONK:
-            return token_info.pool_state or address_provider.derive_pool_address(token_info.mint)
-        else:
-            # Fallback to deriving the address
-            return address_provider.derive_pool_address(token_info.mint)
+            if hasattr(token_info, 'pool_state') and token_info.pool_state:
+                return token_info.pool_state
+        
+        # Fallback to deriving the address using platform provider
+        return address_provider.derive_pool_address(token_info.mint)
 
 
 class PlatformAwareSeller(Trader):
@@ -180,15 +155,7 @@ class PlatformAwareSeller(Trader):
         slippage: float = 0.25,
         max_retries: int = 5,
     ):
-        """Initialize platform-aware token seller.
-
-        Args:
-            client: Solana client for RPC calls
-            wallet: Wallet for signing transactions
-            priority_fee_manager: Priority fee manager
-            slippage: Slippage tolerance (0.25 = 25%)
-            max_retries: Maximum number of retry attempts
-        """
+        """Initialize platform-aware token seller."""
         self.client = client
         self.wallet = wallet
         self.priority_fee_manager = priority_fee_manager
@@ -196,14 +163,7 @@ class PlatformAwareSeller(Trader):
         self.max_retries = max_retries
 
     async def execute(self, token_info: TokenInfo, *args, **kwargs) -> TradeResult:
-        """Execute sell operation using platform-specific implementations.
-
-        Args:
-            token_info: Enhanced token information with platform
-
-        Returns:
-            TradeResult with sell outcome
-        """
+        """Execute sell operation using platform-specific implementations."""
         try:
             # Get platform-specific implementations
             implementations = get_platform_implementations(token_info.platform, self.client)
@@ -229,7 +189,7 @@ class PlatformAwareSeller(Trader):
                     error_message="No tokens to sell"
                 )
 
-            # Get pool address and current price
+            # Get pool address and current price using platform-agnostic method
             pool_address = self._get_pool_address(token_info, address_provider)
             token_price_sol = await curve_manager.calculate_price(pool_address)
 
@@ -239,13 +199,13 @@ class PlatformAwareSeller(Trader):
             expected_sol_output = float(token_balance_decimal) * float(token_price_sol)
             min_sol_output = int((expected_sol_output * (1 - self.slippage)) * LAMPORTS_PER_SOL)
 
-            logger.info(f"Selling {token_balance_decimal} tokens")
+            logger.info(f"Selling {token_balance_decimal} tokens on {token_info.platform.value}")
             logger.info(f"Expected SOL output: {expected_sol_output:.8f} SOL")
             logger.info(
                 f"Minimum SOL output (with {self.slippage * 100}% slippage): {min_sol_output / LAMPORTS_PER_SOL:.8f} SOL"
             )
 
-            # Build sell instructions
+            # Build sell instructions using platform-specific builder
             instructions = await instruction_builder.build_sell_instruction(
                 token_info,
                 self.wallet.pubkey,
@@ -297,19 +257,14 @@ class PlatformAwareSeller(Trader):
             )
 
     def _get_pool_address(self, token_info: TokenInfo, address_provider: AddressProvider) -> Pubkey:
-        """Get the pool/curve address for price calculations.
-        
-        Args:
-            token_info: Token information
-            address_provider: Platform address provider
-            
-        Returns:
-            Pool/curve address
-        """
+        """Get the pool/curve address for price calculations using platform-agnostic method."""
+        # Try to get the address from token_info first, then derive if needed
         if token_info.platform == Platform.PUMP_FUN:
-            return token_info.bonding_curve or address_provider.derive_pool_address(token_info.mint)
+            if hasattr(token_info, 'bonding_curve') and token_info.bonding_curve:
+                return token_info.bonding_curve
         elif token_info.platform == Platform.LETS_BONK:
-            return token_info.pool_state or address_provider.derive_pool_address(token_info.mint)
-        else:
-            # Fallback to deriving the address
-            return address_provider.derive_pool_address(token_info.mint)
+            if hasattr(token_info, 'pool_state') and token_info.pool_state:
+                return token_info.pool_state
+        
+        # Fallback to deriving the address using platform provider
+        return address_provider.derive_pool_address(token_info.mint)

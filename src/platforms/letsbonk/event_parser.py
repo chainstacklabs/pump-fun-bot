@@ -5,11 +5,13 @@ This module parses LetsBonk-specific token creation events from various sources
 by implementing the EventParser interface.
 """
 
+import base64
 import struct
 from time import monotonic
 from typing import Any, Final
 
 from solders.pubkey import Pubkey
+from solders.transaction import VersionedTransaction
 
 from interfaces.core import EventParser, Platform, TokenInfo
 from platforms.letsbonk.address_provider import LetsBonkAddressProvider
@@ -184,6 +186,108 @@ class LetsBonkEventParser(EventParser):
         """
         return [self.INITIALIZE_DISCRIMINATOR]
     
+    def parse_token_creation_from_block(self, block_data: dict) -> TokenInfo | None:
+        """Parse token creation from block data (for block listener).
+        
+        Args:
+            block_data: Block data from WebSocket
+            
+        Returns:
+            TokenInfo if token creation found, None otherwise
+        """
+        try:
+            if "transactions" not in block_data:
+                return None
+
+            for tx in block_data["transactions"]:
+                if not isinstance(tx, dict) or "transaction" not in tx:
+                    continue
+
+                # Decode base64 transaction data if needed
+                tx_data = tx["transaction"]
+                if isinstance(tx_data, list) and len(tx_data) > 0:
+                    try:
+                        tx_data_encoded = tx_data[0]
+                        tx_data_decoded = base64.b64decode(tx_data_encoded)
+                        transaction = VersionedTransaction.from_bytes(tx_data_decoded)
+                        
+                        for ix in transaction.message.instructions:
+                            program_id = transaction.message.account_keys[ix.program_id_index]
+                            
+                            # Check if instruction is from LetsBonk program
+                            if str(program_id) != str(self.get_program_id()):
+                                continue
+
+                            ix_data = bytes(ix.data)
+                            
+                            # Check for initialize discriminator
+                            if len(ix_data) >= 8:
+                                discriminator = struct.unpack("<Q", ix_data[:8])[0]
+                                
+                                if discriminator == self.INITIALIZE_DISCRIMINATOR_INT:
+                                    # Token creation should have substantial data and many accounts
+                                    if len(ix_data) <= 8 or len(ix.accounts) < 10:
+                                        continue
+                                    
+                                    # Parse the instruction
+                                    token_info = self.parse_token_creation_from_instruction(
+                                        ix_data, ix.accounts, transaction.message.account_keys
+                                    )
+                                    if token_info:
+                                        return token_info
+                                        
+                    except Exception:
+                        continue
+                
+                # Handle already decoded transaction data
+                elif isinstance(tx_data, dict) and "message" in tx_data:
+                    try:
+                        message = tx_data["message"]
+                        if "instructions" not in message or "accountKeys" not in message:
+                            continue
+                            
+                        for ix in message["instructions"]:
+                            if "programIdIndex" not in ix or "accounts" not in ix or "data" not in ix:
+                                continue
+                                
+                            program_idx = ix["programIdIndex"]
+                            if program_idx >= len(message["accountKeys"]):
+                                continue
+                                
+                            program_id_str = message["accountKeys"][program_idx]
+                            if program_id_str != str(self.get_program_id()):
+                                continue
+                            
+                            # Decode instruction data
+                            ix_data = base64.b64decode(ix["data"])
+                            
+                            if len(ix_data) >= 8:
+                                discriminator = struct.unpack("<Q", ix_data[:8])[0]
+                                
+                                if discriminator == self.INITIALIZE_DISCRIMINATOR_INT:
+                                    if len(ix_data) <= 8 or len(ix["accounts"]) < 10:
+                                        continue
+                                    
+                                    # Convert account keys to bytes for parsing
+                                    account_keys_bytes = [
+                                        Pubkey.from_string(key).to_bytes() 
+                                        for key in message["accountKeys"]
+                                    ]
+                                    
+                                    token_info = self.parse_token_creation_from_instruction(
+                                        ix_data, ix["accounts"], account_keys_bytes
+                                    )
+                                    if token_info:
+                                        return token_info
+                                        
+                    except Exception:
+                        continue
+
+            return None
+
+        except Exception:
+            return None
+    
     def _parse_initialize_instruction_data(self, data: bytes) -> dict | None:
         """Parse the initialize instruction data from LetsBonk.
         
@@ -241,32 +345,3 @@ class LetsBonkEventParser(EventParser):
             
         except Exception:
             return None
-    
-    def parse_token_creation_from_block(self, block_data: dict) -> list[TokenInfo]:
-        """Parse token creations from block data (for block listener).
-        
-        Args:
-            block_data: Block data from WebSocket
-            
-        Returns:
-            List of TokenInfo for any token creations found
-        """
-        tokens = []
-        
-        try:
-            if "transactions" not in block_data:
-                return tokens
-
-            for tx in block_data["transactions"]:
-                if not isinstance(tx, dict) or "transaction" not in tx:
-                    continue
-
-                # Process transaction (implementation would be similar to pump.fun)
-                # This is a simplified version - full implementation would decode
-                # the transaction and check for LetsBonk initialize instructions
-                pass
-
-            return tokens
-
-        except Exception:
-            return tokens

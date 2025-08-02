@@ -1,7 +1,6 @@
 """
 Universal logs listener that works with any platform through the interface system.
 """
-
 import asyncio
 import json
 from collections.abc import Awaitable, Callable
@@ -10,7 +9,6 @@ import websockets
 
 from interfaces.core import Platform, TokenInfo
 from monitoring.base_listener import BaseTokenListener
-from platforms import get_platform_implementations
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -47,13 +45,13 @@ class UniversalLogsListener(BaseTokenListener):
         self.platform_parsers = {}
         self.platform_program_ids = []
         
+        # Create a temporary client for getting parsers (stateless parsers don't use it)
+        from core.client import SolanaClient
+        temp_client = SolanaClient("http://temp")
+        
         for platform in self.platforms:
             try:
-                # We'll need a dummy client for getting the parser
-                from core.client import SolanaClient
-                dummy_client = SolanaClient("http://localhost")  # Won't be used for parsing
-                
-                implementations = get_platform_implementations(platform, dummy_client)
+                implementations = platform_factory.create_for_platform(platform, temp_client)
                 parser = implementations.event_parser
                 self.platform_parsers[platform] = parser
                 self.platform_program_ids.append(str(parser.get_program_id()))
@@ -130,11 +128,11 @@ class UniversalLogsListener(BaseTokenListener):
             websocket: Active WebSocket connection
         """
         # Subscribe to logs for all monitored platforms
-        for program_id in self.platform_program_ids:
+        for i, program_id in enumerate(self.platform_program_ids):
             subscription_message = json.dumps(
                 {
                     "jsonrpc": "2.0",
-                    "id": len(self.platform_program_ids),  # Use different IDs
+                    "id": i + 1,
                     "method": "logsSubscribe",
                     "params": [
                         {"mentions": [program_id]},
@@ -155,11 +153,7 @@ class UniversalLogsListener(BaseTokenListener):
                 logger.warning(f"Unexpected subscription response: {response}")
 
     async def _ping_loop(self, websocket) -> None:
-        """Keep connection alive with pings.
-
-        Args:
-            websocket: Active WebSocket connection
-        """
+        """Keep connection alive with pings."""
         try:
             while True:
                 await asyncio.sleep(self.ping_interval)
@@ -168,7 +162,6 @@ class UniversalLogsListener(BaseTokenListener):
                     await asyncio.wait_for(pong_waiter, timeout=10)
                 except TimeoutError:
                     logger.warning("Ping timeout - server not responding")
-                    # Force reconnection
                     await websocket.close()
                     return
         except asyncio.CancelledError:
@@ -177,14 +170,7 @@ class UniversalLogsListener(BaseTokenListener):
             logger.error(f"Ping error: {e!s}")
 
     async def _wait_for_token_creation(self, websocket) -> TokenInfo | None:
-        """Wait for token creation events from any platform.
-
-        Args:
-            websocket: Active WebSocket connection
-
-        Returns:
-            TokenInfo if a token creation is found, None otherwise
-        """
+        """Wait for token creation events from any platform."""
         try:
             response = await asyncio.wait_for(websocket.recv(), timeout=30)
             data = json.loads(response)

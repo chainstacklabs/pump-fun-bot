@@ -15,7 +15,7 @@ from solders.pubkey import Pubkey
 from solders.system_program import CreateAccountWithSeedParams, create_account_with_seed
 from spl.token.instructions import create_idempotent_associated_token_account
 
-from core.pubkeys import TOKEN_DECIMALS
+from core.pubkeys import TOKEN_DECIMALS, SystemAddresses
 from interfaces.core import AddressProvider, InstructionBuilder, Platform, TokenInfo
 
 # Instruction discriminators for LetsBonk (from IDL)
@@ -63,7 +63,7 @@ class LetsBonkInstructionBuilder(InstructionBuilder):
             user,  # payer
             user,  # owner  
             token_info.mint,  # mint
-            address_provider.TOKEN_PROGRAM_ID,  # token program
+            SystemAddresses.TOKEN_PROGRAM,  # token program
         )
         instructions.append(ata_instruction)
         
@@ -83,7 +83,7 @@ class LetsBonkInstructionBuilder(InstructionBuilder):
                 seed=wsol_seed,
                 lamports=total_lamports,
                 space=165,  # Size of a token account
-                owner=address_provider.TOKEN_PROGRAM_ID
+                owner=SystemAddresses.TOKEN_PROGRAM
             )
         )
         instructions.append(create_wsol_ix)
@@ -91,7 +91,7 @@ class LetsBonkInstructionBuilder(InstructionBuilder):
         # 3. Initialize WSOL account
         initialize_wsol_ix = self._create_initialize_account_instruction(
             wsol_account, 
-            address_provider.WSOL_MINT, 
+            SystemAddresses.SOL_MINT, 
             user,
             address_provider
         )
@@ -183,7 +183,7 @@ class LetsBonkInstructionBuilder(InstructionBuilder):
                 seed=wsol_seed,
                 lamports=account_creation_lamports,
                 space=165,  # Size of a token account
-                owner=address_provider.TOKEN_PROGRAM_ID
+                owner=SystemAddresses.TOKEN_PROGRAM
             )
         )
         instructions.append(create_wsol_ix)
@@ -191,7 +191,7 @@ class LetsBonkInstructionBuilder(InstructionBuilder):
         # 2. Initialize WSOL account
         initialize_wsol_ix = self._create_initialize_account_instruction(
             wsol_account, 
-            address_provider.WSOL_MINT, 
+            SystemAddresses.SOL_MINT, 
             user,
             address_provider
         )
@@ -334,14 +334,14 @@ class LetsBonkInstructionBuilder(InstructionBuilder):
             AccountMeta(pubkey=account, is_signer=False, is_writable=True),
             AccountMeta(pubkey=mint, is_signer=False, is_writable=False),
             AccountMeta(pubkey=owner, is_signer=False, is_writable=False),
-            AccountMeta(pubkey=address_provider.SYSTEM_RENT_PROGRAM_ID, is_signer=False, is_writable=False),
+            AccountMeta(pubkey=SystemAddresses.RENT, is_signer=False, is_writable=False),
         ]
         
         # InitializeAccount instruction discriminator (instruction 1 in Token Program)
         data = bytes([1])
         
         return Instruction(
-            program_id=address_provider.TOKEN_PROGRAM_ID,
+            program_id=SystemAddresses.TOKEN_PROGRAM,
             data=data,
             accounts=accounts
         )
@@ -374,7 +374,7 @@ class LetsBonkInstructionBuilder(InstructionBuilder):
         data = bytes([9])
         
         return Instruction(
-            program_id=address_provider.TOKEN_PROGRAM_ID,
+            program_id=SystemAddresses.TOKEN_PROGRAM,
             data=data,
             accounts=accounts
         )

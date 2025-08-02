@@ -4,8 +4,9 @@ Event processing for pump.fun tokens using PumpPortal data.
 
 from solders.pubkey import Pubkey
 
-from core.pubkeys import PumpAddresses, SystemAddresses
-from trading.base import TokenInfo
+from core.pubkeys import SystemAddresses
+from interfaces.core import Platform, TokenInfo
+from platforms.pumpfun.address_provider import PumpFunAddresses
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -14,13 +15,13 @@ logger = get_logger(__name__)
 class PumpPortalEventProcessor:
     """Processes token creation events from PumpPortal WebSocket."""
 
-    def __init__(self, pump_program: Pubkey):
+    def __init__(self, pump_program: Pubkey | None = None):
         """Initialize event processor.
 
         Args:
-            pump_program: Pump.fun program address
+            pump_program: Pump.fun program address (optional, will use default if None)
         """
-        self.pump_program = pump_program
+        self.pump_program = pump_program or PumpFunAddresses.PROGRAM
 
     def process_token_data(self, token_data: dict) -> TokenInfo | None:
         """Process token data from PumpPortal and extract token creation info.
@@ -71,6 +72,7 @@ class PumpPortalEventProcessor:
                 symbol=symbol,
                 uri=uri,
                 mint=mint,
+                platform=Platform.PUMP_FUN,
                 bonding_curve=bonding_curve,
                 associated_bonding_curve=associated_bonding_curve,
                 user=user,
@@ -118,6 +120,6 @@ class PumpPortalEventProcessor:
         """
         derived_address, _ = Pubkey.find_program_address(
             [b"creator-vault", bytes(creator)],
-            PumpAddresses.PROGRAM,
+            PumpFunAddresses.PROGRAM,
         )
         return derived_address

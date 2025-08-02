@@ -14,8 +14,9 @@ import base58
 from solders.pubkey import Pubkey
 from solders.transaction import VersionedTransaction
 
-from core.pubkeys import PumpAddresses, SystemAddresses
+from core.pubkeys import SystemAddresses
 from interfaces.core import EventParser, Platform, TokenInfo
+from platforms.pumpfun.address_provider import PumpFunAddresses
 
 
 class PumpFunEventParser(EventParser):
@@ -180,7 +181,7 @@ class PumpFunEventParser(EventParser):
         Returns:
             Pump.fun program ID
         """
-        return PumpAddresses.PROGRAM
+        return PumpFunAddresses.PROGRAM
     
     def get_instruction_discriminators(self) -> list[bytes]:
         """Get instruction discriminators for token creation.
@@ -310,7 +311,7 @@ class PumpFunEventParser(EventParser):
         """
         derived_address, _ = Pubkey.find_program_address(
             [b"creator-vault", bytes(creator)],
-            PumpAddresses.PROGRAM,
+            PumpFunAddresses.PROGRAM,
         )
         return derived_address
     

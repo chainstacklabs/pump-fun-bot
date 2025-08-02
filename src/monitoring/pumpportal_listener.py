@@ -9,9 +9,10 @@ from collections.abc import Awaitable, Callable
 import websockets
 from solders.pubkey import Pubkey
 
+from interfaces.core import TokenInfo
 from monitoring.base_listener import BaseTokenListener
 from monitoring.pumpportal_event_processor import PumpPortalEventProcessor
-from trading.base import TokenInfo
+from platforms.pumpfun.address_provider import PumpFunAddresses
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -22,18 +23,19 @@ class PumpPortalListener(BaseTokenListener):
 
     def __init__(
         self,
-        pump_program: Pubkey,
+        pump_program: Pubkey | None = None,
         pumpportal_url: str = "wss://pumpportal.fun/api/data",
     ):
         """Initialize token listener.
 
         Args:
-            pump_program: Pump.fun program address
+            pump_program: Pump.fun program address (optional, will use default if None)
             pumpportal_url: PumpPortal WebSocket URL
         """
-        self.pump_program = pump_program
+        super().__init__()
+        self.pump_program = pump_program or PumpFunAddresses.PROGRAM
         self.pumpportal_url = pumpportal_url
-        self.event_processor = PumpPortalEventProcessor(pump_program)
+        self.event_processor = PumpPortalEventProcessor(self.pump_program)
         self.ping_interval = 20  # seconds
 
     async def listen_for_tokens(

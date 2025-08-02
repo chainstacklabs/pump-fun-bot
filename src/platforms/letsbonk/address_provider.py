@@ -5,27 +5,28 @@ This module provides all LetsBonk (Raydium LaunchLab) specific addresses and PDA
 by implementing the AddressProvider interface.
 """
 
+from dataclasses import dataclass
+from typing import Final
 
 from solders.pubkey import Pubkey
 from spl.token.instructions import get_associated_token_address
 
+from core.pubkeys import SystemAddresses
 from interfaces.core import AddressProvider, Platform, TokenInfo
+
+
+@dataclass
+class LetsBonkAddresses:
+    """LetsBonk (Raydium LaunchLab) program addresses."""
+    
+    # Raydium LaunchLab program addresses
+    PROGRAM: Final[Pubkey] = Pubkey.from_string("LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj")
+    GLOBAL_CONFIG: Final[Pubkey] = Pubkey.from_string("6s1xP3hpbAfFoNtUNF8mfHsjr2Bd97JxFJRWLbL6aHuX")
+    PLATFORM_CONFIG: Final[Pubkey] = Pubkey.from_string("FfYek5vEz23cMkWsdJwG2oa6EphsvXSHrGpdALN4g6W1")
 
 
 class LetsBonkAddressProvider(AddressProvider):
     """LetsBonk (Raydium LaunchLab) implementation of AddressProvider interface."""
-    
-    # Raydium LaunchLab program addresses
-    RAYDIUM_LAUNCHLAB_PROGRAM_ID = Pubkey.from_string("LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj")
-    GLOBAL_CONFIG = Pubkey.from_string("6s1xP3hpbAfFoNtUNF8mfHsjr2Bd97JxFJRWLbL6aHuX")
-    LETSBONK_PLATFORM_CONFIG = Pubkey.from_string("FfYek5vEz23cMkWsdJwG2oa6EphsvXSHrGpdALN4g6W1")
-    
-    # System program addresses
-    TOKEN_PROGRAM_ID = Pubkey.from_string("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
-    SYSTEM_PROGRAM_ID = Pubkey.from_string("11111111111111111111111111111111")
-    WSOL_MINT = Pubkey.from_string("So11111111111111111111111111111111111111112")
-    ASSOCIATED_TOKEN_PROGRAM_ID = Pubkey.from_string("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL")
-    SYSTEM_RENT_PROGRAM_ID = Pubkey.from_string("SysvarRent111111111111111111111111111111111")
     
     @property
     def platform(self) -> Platform:
@@ -35,7 +36,7 @@ class LetsBonkAddressProvider(AddressProvider):
     @property
     def program_id(self) -> Pubkey:
         """Get the main program ID for this platform."""
-        return self.RAYDIUM_LAUNCHLAB_PROGRAM_ID
+        return LetsBonkAddresses.PROGRAM
     
     def get_system_addresses(self) -> dict[str, Pubkey]:
         """Get all system addresses required for LetsBonk.
@@ -43,19 +44,19 @@ class LetsBonkAddressProvider(AddressProvider):
         Returns:
             Dictionary mapping address names to Pubkey objects
         """
-        return {
+        # Get system addresses from the single source of truth
+        system_addresses = SystemAddresses.get_all_system_addresses()
+        
+        # Add LetsBonk specific addresses
+        letsbonk_addresses = {
             # Raydium LaunchLab specific addresses
-            "program": self.RAYDIUM_LAUNCHLAB_PROGRAM_ID,
-            "global_config": self.GLOBAL_CONFIG,
-            "platform_config": self.LETSBONK_PLATFORM_CONFIG,
-            
-            # System addresses
-            "system_program": self.SYSTEM_PROGRAM_ID,
-            "token_program": self.TOKEN_PROGRAM_ID,
-            "associated_token_program": self.ASSOCIATED_TOKEN_PROGRAM_ID,
-            "rent": self.SYSTEM_RENT_PROGRAM_ID,
-            "wsol_mint": self.WSOL_MINT,
+            "program": LetsBonkAddresses.PROGRAM,
+            "global_config": LetsBonkAddresses.GLOBAL_CONFIG,
+            "platform_config": LetsBonkAddresses.PLATFORM_CONFIG,
         }
+        
+        # Combine system and platform-specific addresses
+        return {**system_addresses, **letsbonk_addresses}
     
     def derive_pool_address(self, base_mint: Pubkey, quote_mint: Pubkey | None = None) -> Pubkey:
         """Derive the pool state address for a token pair.
@@ -70,11 +71,11 @@ class LetsBonkAddressProvider(AddressProvider):
             Pool state address
         """
         if quote_mint is None:
-            quote_mint = self.WSOL_MINT
+            quote_mint = SystemAddresses.SOL_MINT
             
         pool_state, _ = Pubkey.find_program_address(
             [b"pool", bytes(base_mint), bytes(quote_mint)],
-            self.RAYDIUM_LAUNCHLAB_PROGRAM_ID
+            LetsBonkAddresses.PROGRAM
         )
         return pool_state
     
@@ -134,7 +135,7 @@ class LetsBonkAddressProvider(AddressProvider):
         AUTH_SEED = b"vault_auth_seed"
         authority_pda, _ = Pubkey.find_program_address(
             [AUTH_SEED],
-            self.RAYDIUM_LAUNCHLAB_PROGRAM_ID
+            LetsBonkAddresses.PROGRAM
         )
         return authority_pda
     
@@ -149,7 +150,7 @@ class LetsBonkAddressProvider(AddressProvider):
         EVENT_AUTHORITY_SEED = b"__event_authority"
         event_authority_pda, _ = Pubkey.find_program_address(
             [EVENT_AUTHORITY_SEED],
-            self.RAYDIUM_LAUNCHLAB_PROGRAM_ID
+            LetsBonkAddresses.PROGRAM
         )
         return event_authority_pda
     
@@ -163,7 +164,7 @@ class LetsBonkAddressProvider(AddressProvider):
         Returns:
             New WSOL account address
         """
-        return Pubkey.create_with_seed(payer, seed, self.TOKEN_PROGRAM_ID)
+        return Pubkey.create_with_seed(payer, seed, SystemAddresses.TOKEN_PROGRAM)
     
     def get_buy_instruction_accounts(self, token_info: TokenInfo, user: Pubkey) -> dict[str, Pubkey]:
         """Get all accounts needed for a buy instruction.
@@ -180,18 +181,18 @@ class LetsBonkAddressProvider(AddressProvider):
         return {
             "payer": user,
             "authority": additional_accounts["authority"],
-            "global_config": self.GLOBAL_CONFIG,
-            "platform_config": self.LETSBONK_PLATFORM_CONFIG,
+            "global_config": LetsBonkAddresses.GLOBAL_CONFIG,
+            "platform_config": LetsBonkAddresses.PLATFORM_CONFIG,
             "pool_state": additional_accounts["pool_state"],
             "user_base_token": self.derive_user_token_account(user, token_info.mint),
             "base_vault": additional_accounts.get("base_vault", token_info.base_vault),
             "quote_vault": additional_accounts.get("quote_vault", token_info.quote_vault),
             "base_token_mint": token_info.mint,
-            "quote_token_mint": self.WSOL_MINT,
-            "base_token_program": self.TOKEN_PROGRAM_ID,
-            "quote_token_program": self.TOKEN_PROGRAM_ID,
+            "quote_token_mint": SystemAddresses.SOL_MINT,
+            "base_token_program": SystemAddresses.TOKEN_PROGRAM,
+            "quote_token_program": SystemAddresses.TOKEN_PROGRAM,
             "event_authority": additional_accounts["event_authority"],
-            "program": self.RAYDIUM_LAUNCHLAB_PROGRAM_ID,
+            "program": LetsBonkAddresses.PROGRAM,
         }
     
     def get_sell_instruction_accounts(self, token_info: TokenInfo, user: Pubkey) -> dict[str, Pubkey]:
@@ -209,18 +210,18 @@ class LetsBonkAddressProvider(AddressProvider):
         return {
             "payer": user,
             "authority": additional_accounts["authority"],
-            "global_config": self.GLOBAL_CONFIG,
-            "platform_config": self.LETSBONK_PLATFORM_CONFIG,
+            "global_config": LetsBonkAddresses.GLOBAL_CONFIG,
+            "platform_config": LetsBonkAddresses.PLATFORM_CONFIG,
             "pool_state": additional_accounts["pool_state"],
             "user_base_token": self.derive_user_token_account(user, token_info.mint),
             "base_vault": additional_accounts.get("base_vault", token_info.base_vault),
             "quote_vault": additional_accounts.get("quote_vault", token_info.quote_vault),
             "base_token_mint": token_info.mint,
-            "quote_token_mint": self.WSOL_MINT,
-            "base_token_program": self.TOKEN_PROGRAM_ID,
-            "quote_token_program": self.TOKEN_PROGRAM_ID,
+            "quote_token_mint": SystemAddresses.SOL_MINT,
+            "base_token_program": SystemAddresses.TOKEN_PROGRAM,
+            "quote_token_program": SystemAddresses.TOKEN_PROGRAM,
             "event_authority": additional_accounts["event_authority"],
-            "program": self.RAYDIUM_LAUNCHLAB_PROGRAM_ID,
+            "program": LetsBonkAddresses.PROGRAM,
         }
     
     def get_wsol_account_creation_accounts(self, user: Pubkey, wsol_account: Pubkey) -> dict[str, Pubkey]:
@@ -236,9 +237,9 @@ class LetsBonkAddressProvider(AddressProvider):
         return {
             "payer": user,
             "wsol_account": wsol_account,
-            "wsol_mint": self.WSOL_MINT,
+            "wsol_mint": SystemAddresses.SOL_MINT,
             "owner": user,
-            "system_program": self.SYSTEM_PROGRAM_ID,
-            "token_program": self.TOKEN_PROGRAM_ID,
-            "rent": self.SYSTEM_RENT_PROGRAM_ID,
+            "system_program": SystemAddresses.SYSTEM_PROGRAM,
+            "token_program": SystemAddresses.TOKEN_PROGRAM,
+            "rent": SystemAddresses.RENT,
         }

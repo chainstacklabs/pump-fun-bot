@@ -5,12 +5,66 @@ This module provides all pump.fun-specific addresses and PDA derivations
 by implementing the AddressProvider interface.
 """
 
+from dataclasses import dataclass
+from typing import Final
 
 from solders.pubkey import Pubkey
 from spl.token.instructions import get_associated_token_address
 
-from core.pubkeys import PumpAddresses, SystemAddresses
+from core.pubkeys import SystemAddresses
 from interfaces.core import AddressProvider, Platform, TokenInfo
+
+
+@dataclass
+class PumpFunAddresses:
+    """Pump.fun program addresses."""
+
+    PROGRAM: Final[Pubkey] = Pubkey.from_string(
+        "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
+    )
+    GLOBAL: Final[Pubkey] = Pubkey.from_string(
+        "4wTV1YmiEkRvAtNtsSGPtUrqRYQMe5SKy2uB4Jjaxnjf"
+    )
+    EVENT_AUTHORITY: Final[Pubkey] = Pubkey.from_string(
+        "Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1"
+    )
+    FEE: Final[Pubkey] = Pubkey.from_string(
+        "CebN5WGQ4jvEPvsVU4EoHEpgzq1VV7AbicfhtW4xC9iM"
+    )
+    LIQUIDITY_MIGRATOR: Final[Pubkey] = Pubkey.from_string(
+        "39azUYFWPz3VHgKCf3VChUwbpURdCHRxjWVowf5jUJjg"
+    )
+
+    @staticmethod
+    def find_global_volume_accumulator() -> Pubkey:
+        """
+        Derive the Program Derived Address (PDA) for the global volume accumulator.
+        
+        Returns:
+            Pubkey of the derived global volume accumulator account
+        """
+        derived_address, _ = Pubkey.find_program_address(
+            [b"global_volume_accumulator"],
+            PumpFunAddresses.PROGRAM,
+        )
+        return derived_address
+
+    @staticmethod
+    def find_user_volume_accumulator(user: Pubkey) -> Pubkey:
+        """
+        Derive the Program Derived Address (PDA) for a user's volume accumulator.
+        
+        Args:
+            user: Pubkey of the user account
+            
+        Returns:
+            Pubkey of the derived user volume accumulator account
+        """
+        derived_address, _ = Pubkey.find_program_address(
+            [b"user_volume_accumulator", bytes(user)],
+            PumpFunAddresses.PROGRAM,
+        )
+        return derived_address
 
 
 class PumpFunAddressProvider(AddressProvider):
@@ -24,7 +78,7 @@ class PumpFunAddressProvider(AddressProvider):
     @property
     def program_id(self) -> Pubkey:
         """Get the main program ID for this platform."""
-        return PumpAddresses.PROGRAM
+        return PumpFunAddresses.PROGRAM
     
     def get_system_addresses(self) -> dict[str, Pubkey]:
         """Get all system addresses required for pump.fun.
@@ -32,21 +86,21 @@ class PumpFunAddressProvider(AddressProvider):
         Returns:
             Dictionary mapping address names to Pubkey objects
         """
-        return {
+        # Get system addresses from the single source of truth
+        system_addresses = SystemAddresses.get_all_system_addresses()
+        
+        # Add pump.fun specific addresses
+        pumpfun_addresses = {
             # Pump.fun specific addresses
-            "program": PumpAddresses.PROGRAM,
-            "global": PumpAddresses.GLOBAL,
-            "event_authority": PumpAddresses.EVENT_AUTHORITY,
-            "fee": PumpAddresses.FEE,
-            "liquidity_migrator": PumpAddresses.LIQUIDITY_MIGRATOR,
-            
-            # System addresses
-            "system_program": SystemAddresses.PROGRAM,
-            "token_program": SystemAddresses.TOKEN_PROGRAM,
-            "associated_token_program": SystemAddresses.ASSOCIATED_TOKEN_PROGRAM,
-            "rent": SystemAddresses.RENT,
-            "sol_mint": SystemAddresses.SOL,
+            "program": PumpFunAddresses.PROGRAM,
+            "global": PumpFunAddresses.GLOBAL,
+            "event_authority": PumpFunAddresses.EVENT_AUTHORITY,
+            "fee": PumpFunAddresses.FEE,
+            "liquidity_migrator": PumpFunAddresses.LIQUIDITY_MIGRATOR,
         }
+        
+        # Combine system and platform-specific addresses
+        return {**system_addresses, **pumpfun_addresses}
     
     def derive_pool_address(self, base_mint: Pubkey, quote_mint: Pubkey | None = None) -> Pubkey:
         """Derive the bonding curve address for a token.
@@ -62,7 +116,7 @@ class PumpFunAddressProvider(AddressProvider):
         """
         bonding_curve, _ = Pubkey.find_program_address(
             [b"bonding-curve", bytes(base_mint)],
-            PumpAddresses.PROGRAM
+            PumpFunAddresses.PROGRAM
         )
         return bonding_curve
     
@@ -136,7 +190,7 @@ class PumpFunAddressProvider(AddressProvider):
         """
         creator_vault, _ = Pubkey.find_program_address(
             [b"creator-vault", bytes(creator)],
-            PumpAddresses.PROGRAM
+            PumpFunAddresses.PROGRAM
         )
         return creator_vault
     
@@ -146,7 +200,7 @@ class PumpFunAddressProvider(AddressProvider):
         Returns:
             Global volume accumulator address
         """
-        return PumpAddresses.find_global_volume_accumulator()
+        return PumpFunAddresses.find_global_volume_accumulator()
     
     def derive_user_volume_accumulator(self, user: Pubkey) -> Pubkey:
         """Derive the user volume accumulator PDA.
@@ -157,7 +211,7 @@ class PumpFunAddressProvider(AddressProvider):
         Returns:
             User volume accumulator address
         """
-        return PumpAddresses.find_user_volume_accumulator(user)
+        return PumpFunAddresses.find_user_volume_accumulator(user)
     
     def get_buy_instruction_accounts(self, token_info: TokenInfo, user: Pubkey) -> dict[str, Pubkey]:
         """Get all accounts needed for a buy instruction.
@@ -172,18 +226,18 @@ class PumpFunAddressProvider(AddressProvider):
         additional_accounts = self.get_additional_accounts(token_info)
         
         return {
-            "global": PumpAddresses.GLOBAL,
-            "fee": PumpAddresses.FEE,
+            "global": PumpFunAddresses.GLOBAL,
+            "fee": PumpFunAddresses.FEE,
             "mint": token_info.mint,
             "bonding_curve": additional_accounts.get("bonding_curve", token_info.bonding_curve),
             "associated_bonding_curve": additional_accounts.get("associated_bonding_curve", token_info.associated_bonding_curve),
             "user_token_account": self.derive_user_token_account(user, token_info.mint),
             "user": user,
-            "system_program": SystemAddresses.PROGRAM,
+            "system_program": SystemAddresses.SYSTEM_PROGRAM,
             "token_program": SystemAddresses.TOKEN_PROGRAM,
             "creator_vault": additional_accounts.get("creator_vault", token_info.creator_vault),
-            "event_authority": PumpAddresses.EVENT_AUTHORITY,
-            "program": PumpAddresses.PROGRAM,
+            "event_authority": PumpFunAddresses.EVENT_AUTHORITY,
+            "program": PumpFunAddresses.PROGRAM,
             "global_volume_accumulator": self.derive_global_volume_accumulator(),
             "user_volume_accumulator": self.derive_user_volume_accumulator(user),
         }
@@ -201,16 +255,16 @@ class PumpFunAddressProvider(AddressProvider):
         additional_accounts = self.get_additional_accounts(token_info)
         
         return {
-            "global": PumpAddresses.GLOBAL,
-            "fee": PumpAddresses.FEE,
+            "global": PumpFunAddresses.GLOBAL,
+            "fee": PumpFunAddresses.FEE,
             "mint": token_info.mint,
             "bonding_curve": additional_accounts.get("bonding_curve", token_info.bonding_curve),
             "associated_bonding_curve": additional_accounts.get("associated_bonding_curve", token_info.associated_bonding_curve),
             "user_token_account": self.derive_user_token_account(user, token_info.mint),
             "user": user,
-            "system_program": SystemAddresses.PROGRAM,
+            "system_program": SystemAddresses.SYSTEM_PROGRAM,
             "creator_vault": additional_accounts.get("creator_vault", token_info.creator_vault),
             "token_program": SystemAddresses.TOKEN_PROGRAM,
-            "event_authority": PumpAddresses.EVENT_AUTHORITY,
-            "program": PumpAddresses.PROGRAM,
+            "event_authority": PumpFunAddresses.EVENT_AUTHORITY,
+            "program": PumpFunAddresses.PROGRAM,
         }

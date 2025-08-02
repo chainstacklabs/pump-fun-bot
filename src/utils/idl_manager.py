@@ -33,7 +33,7 @@ class IDLManager:
         # Define IDL paths for each platform
         self._idl_paths = {
             Platform.LETS_BONK: os.path.join(project_root, "idl", "raydium_launchlab_idl.json"),
-            # Platform.PUMP_FUN: os.path.join(project_root, "idl", "pump_fun_idl.json"),  # Future
+            Platform.PUMP_FUN: os.path.join(project_root, "idl", "pump_fun_idl.json"),
         }
     
     def get_parser(self, platform: Platform, verbose: bool = False) -> IDLParser:

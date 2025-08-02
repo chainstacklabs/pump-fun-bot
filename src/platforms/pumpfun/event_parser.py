@@ -2,32 +2,43 @@
 Pump.Fun implementation of EventParser interface.
 
 This module parses pump.fun-specific token creation events from various sources
-by implementing the EventParser interface.
+by implementing the EventParser interface with IDL-based parsing.
 """
 
 import base64
 import struct
 from time import monotonic
-from typing import Any, Final
+from typing import Any
 
-import base58
 from solders.pubkey import Pubkey
 from solders.transaction import VersionedTransaction
 
 from core.pubkeys import SystemAddresses
 from interfaces.core import EventParser, Platform, TokenInfo
 from platforms.pumpfun.address_provider import PumpFunAddresses
+from utils.idl_parser import IDLParser
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class PumpFunEventParser(EventParser):
-    """Pump.Fun implementation of EventParser interface."""
+    """Pump.Fun implementation of EventParser interface with IDL-based parsing."""
     
-    # Discriminators for pump.fun instructions
-    CREATE_DISCRIMINATOR: Final[int] = 8576854823835016728
-    CREATE_DISCRIMINATOR_BYTES: Final[bytes] = struct.pack("<Q", CREATE_DISCRIMINATOR)
-    
-    # Discriminator for program logs
-    LOGS_CREATE_DISCRIMINATOR: Final[int] = 8530921459188068891
+    def __init__(self, idl_parser: IDLParser):
+        """Initialize pump.fun event parser with injected IDL parser.
+        
+        Args:
+            idl_parser: Pre-loaded IDL parser for pump.fun platform
+        """
+        self._idl_parser = idl_parser
+        
+        # Get discriminators from injected IDL parser
+        discriminators = self._idl_parser.get_instruction_discriminators()
+        self._create_discriminator_bytes = discriminators["create"]
+        self._create_discriminator = struct.unpack("<Q", self._create_discriminator_bytes)[0]
+        
+        logger.info("Pump.Fun event parser initialized with injected IDL parser")
     
     @property
     def platform(self) -> Platform:
@@ -74,7 +85,7 @@ class PumpFunEventParser(EventParser):
         accounts: list[int],
         account_keys: list[bytes]
     ) -> TokenInfo | None:
-        """Parse token creation from pump.fun instruction data.
+        """Parse token creation from pump.fun instruction data using injected IDL parser.
         
         Args:
             instruction_data: Raw instruction data
@@ -84,7 +95,7 @@ class PumpFunEventParser(EventParser):
         Returns:
             TokenInfo if token creation found, None otherwise
         """
-        if not instruction_data.startswith(self.CREATE_DISCRIMINATOR_BYTES):
+        if not instruction_data.startswith(self._create_discriminator_bytes):
             return None
 
         try:
@@ -97,12 +108,14 @@ class PumpFunEventParser(EventParser):
                     return None
                 return Pubkey.from_bytes(account_keys[account_index])
 
-            # Parse instruction data
-            token_data = self._parse_create_instruction_data(instruction_data)
-            if not token_data:
+            # Parse instruction data using injected IDL parser
+            decoded = self._idl_parser.decode_instruction(instruction_data, account_keys, accounts)
+            if not decoded or decoded['instruction_name'] != 'create':
                 return None
-
-            # Extract account information
+            
+            args = decoded.get('args', {})
+            
+            # Extract account information based on IDL account order
             mint = get_account_key(0)
             bonding_curve = get_account_key(2)
             associated_bonding_curve = get_account_key(3)
@@ -112,13 +125,13 @@ class PumpFunEventParser(EventParser):
                 return None
 
             # Create creator vault
-            creator = Pubkey.from_string(token_data["creator"]) if token_data.get("creator") else user
+            creator = Pubkey.from_string(args.get("creator", str(user))) if args.get("creator") else user
             creator_vault = self._derive_creator_vault(creator)
 
             return TokenInfo(
-                name=token_data["name"],
-                symbol=token_data["symbol"],
-                uri=token_data["uri"],
+                name=args.get("name", ""),
+                symbol=args.get("symbol", ""),
+                uri=args.get("uri", ""),
                 mint=mint,
                 platform=Platform.PUMP_FUN,
                 bonding_curve=bonding_curve,
@@ -129,7 +142,8 @@ class PumpFunEventParser(EventParser):
                 creation_timestamp=monotonic(),
             )
 
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Failed to parse create instruction: {e}")
             return None
     
     def parse_token_creation_from_geyser(
@@ -172,7 +186,8 @@ class PumpFunEventParser(EventParser):
 
             return None
 
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Failed to parse geyser transaction: {e}")
             return None
     
     def get_program_id(self) -> Pubkey:
@@ -189,7 +204,7 @@ class PumpFunEventParser(EventParser):
         Returns:
             List of discriminator bytes to match
         """
-        return [self.CREATE_DISCRIMINATOR_BYTES]
+        return [self._create_discriminator_bytes]
     
     def parse_token_creation_from_block(self, block_data: dict) -> TokenInfo | None:
         """Parse token creation from block data (for block listener).
@@ -208,43 +223,96 @@ class PumpFunEventParser(EventParser):
                 if not isinstance(tx, dict) or "transaction" not in tx:
                     continue
 
-                # Decode base64 transaction data
-                tx_data_encoded = tx["transaction"][0]
-                tx_data_decoded = base64.b64decode(tx_data_encoded)
-                transaction = VersionedTransaction.from_bytes(tx_data_decoded)
-
-                for ix in transaction.message.instructions:
-                    program_id = transaction.message.account_keys[ix.program_id_index]
-                    
-                    # Check if instruction is from pump.fun program
-                    if str(program_id) != str(self.get_program_id()):
-                        continue
-
-                    ix_data = bytes(ix.data)
-                    
-                    # Check for create discriminator
-                    if len(ix_data) >= 8:
-                        discriminator = struct.unpack("<Q", ix_data[:8])[0]
+                # Decode base64 transaction data if needed
+                tx_data = tx["transaction"]
+                if isinstance(tx_data, list) and len(tx_data) > 0:
+                    try:
+                        tx_data_encoded = tx_data[0]
+                        tx_data_decoded = base64.b64decode(tx_data_encoded)
+                        transaction = VersionedTransaction.from_bytes(tx_data_decoded)
                         
-                        if discriminator == self.CREATE_DISCRIMINATOR:
-                            # Token creation should have substantial data and many accounts
-                            if len(ix_data) <= 8 or len(ix.accounts) < 10:
+                        for ix in transaction.message.instructions:
+                            program_id = transaction.message.account_keys[ix.program_id_index]
+                            
+                            # Check if instruction is from pump.fun program
+                            if str(program_id) != str(self.get_program_id()):
+                                continue
+
+                            ix_data = bytes(ix.data)
+                            
+                            # Check for create discriminator
+                            if len(ix_data) >= 8:
+                                discriminator = struct.unpack("<Q", ix_data[:8])[0]
+                                
+                                if discriminator == self._create_discriminator:
+                                    # Token creation should have substantial data and many accounts
+                                    if len(ix_data) <= 8 or len(ix.accounts) < 10:
+                                        continue
+                                    
+                                    # Parse the instruction
+                                    token_info = self.parse_token_creation_from_instruction(
+                                        ix_data, ix.accounts, transaction.message.account_keys
+                                    )
+                                    if token_info:
+                                        return token_info
+                                        
+                    except Exception as e:
+                        logger.debug(f"Failed to parse block transaction: {e}")
+                        continue
+                
+                # Handle already decoded transaction data
+                elif isinstance(tx_data, dict) and "message" in tx_data:
+                    try:
+                        message = tx_data["message"]
+                        if "instructions" not in message or "accountKeys" not in message:
+                            continue
+                            
+                        for ix in message["instructions"]:
+                            if "programIdIndex" not in ix or "accounts" not in ix or "data" not in ix:
+                                continue
+                                
+                            program_idx = ix["programIdIndex"]
+                            if program_idx >= len(message["accountKeys"]):
+                                continue
+                                
+                            program_id_str = message["accountKeys"][program_idx]
+                            if program_id_str != str(self.get_program_id()):
                                 continue
                             
-                            # Parse the instruction
-                            token_info = self.parse_token_creation_from_instruction(
-                                ix_data, ix.accounts, transaction.message.account_keys
-                            )
-                            if token_info:
-                                return token_info
+                            # Decode instruction data
+                            ix_data = base64.b64decode(ix["data"])
+                            
+                            if len(ix_data) >= 8:
+                                discriminator = struct.unpack("<Q", ix_data[:8])[0]
+                                
+                                if discriminator == self._create_discriminator:
+                                    if len(ix_data) <= 8 or len(ix["accounts"]) < 10:
+                                        continue
+                                    
+                                    # Convert account keys to bytes for parsing
+                                    account_keys_bytes = [
+                                        Pubkey.from_string(key).to_bytes() 
+                                        for key in message["accountKeys"]
+                                    ]
+                                    
+                                    token_info = self.parse_token_creation_from_instruction(
+                                        ix_data, ix["accounts"], account_keys_bytes
+                                    )
+                                    if token_info:
+                                        return token_info
+                                        
+                    except Exception as e:
+                        logger.debug(f"Failed to parse decoded block transaction: {e}")
+                        continue
 
             return None
 
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Failed to parse block data: {e}")
             return None
     
     def _parse_create_instruction_data(self, data: bytes) -> dict | None:
-        """Parse the create instruction data from pump.fun.
+        """Parse the create instruction data from pump.fun using injected IDL parser.
         
         Args:
             data: Raw instruction data
@@ -257,47 +325,30 @@ class PumpFunEventParser(EventParser):
 
         # Check for the correct instruction discriminator
         discriminator = struct.unpack("<Q", data[:8])[0]
-        if discriminator not in [self.CREATE_DISCRIMINATOR, self.LOGS_CREATE_DISCRIMINATOR]:
+        if discriminator != self._create_discriminator:
             return None
 
-        offset = 8
-        parsed_data = {}
-
         try:
-            # Parse fields based on CreateEvent structure
-            fields = [
-                ("name", "string"),
-                ("symbol", "string"),
-                ("uri", "string"),
-            ]
+            # Use IDL parser to decode the instruction data
+            # For log data parsing, we need to create dummy account info
+            dummy_accounts = list(range(20))  # Assume enough accounts
+            dummy_account_keys = [b'\x00' * 32] * 20  # Dummy keys
             
-            # For instruction data, we also have creator info
-            if discriminator == self.CREATE_DISCRIMINATOR:
-                fields.extend([
-                    ("creator", "publicKey"),
-                ])
-
-            for field_name, field_type in fields:
-                if field_type == "string":
-                    if offset + 4 > len(data):
-                        return None
-                    length = struct.unpack("<I", data[offset : offset + 4])[0]
-                    offset += 4
-                    if offset + length > len(data):
-                        return None
-                    value = data[offset : offset + length].decode("utf-8")
-                    offset += length
-                elif field_type == "publicKey":
-                    if offset + 32 > len(data):
-                        return None
-                    value = base58.b58encode(data[offset : offset + 32]).decode("utf-8")
-                    offset += 32
-
-                parsed_data[field_name] = value
-
-            return parsed_data
+            decoded = self._idl_parser.decode_instruction(data, dummy_account_keys, dummy_accounts)
+            if not decoded or decoded['instruction_name'] != 'create':
+                return None
             
-        except Exception:
+            # Extract the arguments
+            args = decoded.get('args', {})
+            return {
+                "name": args.get("name", ""),
+                "symbol": args.get("symbol", ""),
+                "uri": args.get("uri", ""),
+                "creator": args.get("creator", ""),
+            }
+            
+        except Exception as e:
+            logger.debug(f"Failed to parse instruction data with IDL: {e}")
             return None
     
     def _derive_creator_vault(self, creator: Pubkey) -> Pubkey:

@@ -2,11 +2,10 @@
 Pump.Fun implementation of InstructionBuilder interface.
 
 This module builds pump.fun-specific buy and sell instructions
-by implementing the InstructionBuilder interface.
+by implementing the InstructionBuilder interface with IDL-based discriminators.
 """
 
 import struct
-from typing import Final
 
 from solders.instruction import AccountMeta, Instruction
 from solders.pubkey import Pubkey
@@ -14,14 +13,29 @@ from spl.token.instructions import create_idempotent_associated_token_account
 
 from core.pubkeys import TOKEN_DECIMALS, SystemAddresses
 from interfaces.core import AddressProvider, InstructionBuilder, Platform, TokenInfo
+from utils.idl_parser import IDLParser
+from utils.logger import get_logger
 
-# Discriminators for pump.fun instructions
-BUY_DISCRIMINATOR: Final[bytes] = struct.pack("<Q", 16927863322537952870)
-SELL_DISCRIMINATOR: Final[bytes] = struct.pack("<Q", 12502976635542562355)
+logger = get_logger(__name__)
 
 
 class PumpFunInstructionBuilder(InstructionBuilder):
-    """Pump.Fun implementation of InstructionBuilder interface."""
+    """Pump.Fun implementation of InstructionBuilder interface with IDL-based discriminators."""
+    
+    def __init__(self, idl_parser: IDLParser):
+        """Initialize pump.fun instruction builder with injected IDL parser.
+        
+        Args:
+            idl_parser: Pre-loaded IDL parser for pump.fun platform
+        """
+        self._idl_parser = idl_parser
+        
+        # Get discriminators from injected IDL parser
+        discriminators = self._idl_parser.get_instruction_discriminators()
+        self._buy_discriminator = discriminators["buy"]
+        self._sell_discriminator = discriminators["sell"]
+        
+        logger.info("Pump.Fun instruction builder initialized with injected IDL parser")
     
     @property
     def platform(self) -> Platform:
@@ -82,7 +96,7 @@ class PumpFunInstructionBuilder(InstructionBuilder):
         
         # Build instruction data: discriminator + token_amount + max_sol_cost
         instruction_data = (
-            BUY_DISCRIMINATOR +
+            self._buy_discriminator +
             struct.pack("<Q", minimum_amount_out) +  # token amount in raw units
             struct.pack("<Q", amount_in)             # max SOL cost in lamports
         )
@@ -139,7 +153,7 @@ class PumpFunInstructionBuilder(InstructionBuilder):
         
         # Build instruction data: discriminator + token_amount + min_sol_output
         instruction_data = (
-            SELL_DISCRIMINATOR +
+            self._sell_discriminator +
             struct.pack("<Q", amount_in) +           # token amount in raw units
             struct.pack("<Q", minimum_amount_out)    # min SOL output in lamports
         )

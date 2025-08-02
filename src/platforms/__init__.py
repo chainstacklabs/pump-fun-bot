@@ -107,12 +107,12 @@ class PlatformRegistry:
         address_provider = impl_classes['address_provider']()
         
         # For platforms with IDL support, pass the parser to relevant classes
-        if idl_parser and platform in [Platform.LETS_BONK]:  # Add other IDL-supported platforms here
+        if idl_parser and platform in [Platform.LETS_BONK, Platform.PUMP_FUN]:
             instruction_builder = impl_classes['instruction_builder'](idl_parser=idl_parser)
             curve_manager = impl_classes['curve_manager'](client, idl_parser=idl_parser)
             event_parser = impl_classes['event_parser'](idl_parser=idl_parser)
         else:
-            # Fallback for platforms without IDL support (like pump.fun)
+            # Fallback for platforms without IDL support
             instruction_builder = impl_classes['instruction_builder']()
             curve_manager = impl_classes['curve_manager'](client)
             event_parser = impl_classes['event_parser']()

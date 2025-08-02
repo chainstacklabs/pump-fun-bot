@@ -1,9 +1,19 @@
+"""
+Updated configuration validation with platform support.
+
+This extends the existing config_loader.py to support platform selection
+and validation while maintaining backward compatibility.
+"""
+
 import os
 from typing import Any
 
 import yaml
 from dotenv import load_dotenv
 
+from interfaces.core import Platform
+
+# Existing validation rules (keeping all existing ones)
 REQUIRED_FIELDS = [
     "name",
     "rpc_endpoint",
@@ -64,17 +74,19 @@ CONFIG_VALIDATION_RULES = [
     ),
 ]
 
-# Valid values for enum-like fields
+# Valid values for enum-like fields (extended with platform support)
 VALID_VALUES = {
     "filters.listener_type": ["logs", "blocks", "geyser", "pumpportal"],
     "cleanup.mode": ["disabled", "on_fail", "after_sell", "post_session"],
     "trade.exit_strategy": ["time_based", "tp_sl", "manual"],
+    "platform": ["pump_fun", "lets_bonk"],  # New platform validation
 }
 
 
 def load_bot_config(path: str) -> dict:
     """
     Load and validate a bot configuration from a YAML file.
+    Extended to support platform selection with backward compatibility.
 
     Args:
         path: Path to the YAML configuration file (relative or absolute)
@@ -99,6 +111,11 @@ def load_bot_config(path: str) -> dict:
             load_dotenv(env_file, override=True)
 
     resolve_env_vars(config)
+    
+    # Set default platform if not specified (backward compatibility)
+    if "platform" not in config:
+        config["platform"] = "pump_fun"
+    
     validate_config(config)
 
     return config
@@ -157,6 +174,7 @@ def get_nested_value(config: dict, path: str) -> Any:
 def validate_config(config: dict) -> None:
     """
     Validate the configuration against defined rules.
+    Extended to include platform-specific validation.
 
     Args:
         config: Configuration dictionary to validate
@@ -164,9 +182,11 @@ def validate_config(config: dict) -> None:
     Raises:
         ValueError: If the configuration is invalid
     """
+    # Validate required fields
     for field in REQUIRED_FIELDS:
         get_nested_value(config, field)
 
+    # Validate config rules
     for path, expected_type, min_val, max_val, error_msg in CONFIG_VALIDATION_RULES:
         try:
             value = get_nested_value(config, path)
@@ -206,15 +226,70 @@ def validate_config(config: dict) -> None:
         # Skip if one of the fields is missing
         pass
 
+    # Platform-specific validation
+    platform_str = config.get("platform", "pump_fun")
+    try:
+        platform = Platform(platform_str)
+        validate_platform_config(config, platform)
+    except ValueError as e:
+        if "is not a valid" in str(e):
+            raise ValueError(f"Invalid platform '{platform_str}'. Must be one of: {[p.value for p in Platform]}")
+        raise
+
+
+def validate_platform_config(config: dict, platform: Platform) -> None:
+    """
+    Validate platform-specific configuration requirements.
+
+    Args:
+        config: Configuration dictionary
+        platform: Platform enum value
+
+    Raises:
+        ValueError: If platform-specific config is invalid
+    """
+    if platform == Platform.PUMP_FUN:
+        # pump.fun doesn't require additional config beyond base requirements
+        pass
+    
+    elif platform == Platform.LETS_BONK:
+        # LetsBonk may require additional configuration in the future
+        # For now, it uses the same base configuration as pump.fun
+        pass
+
+
+def get_platform_from_config(config: dict) -> Platform:
+    """
+    Extract platform enum from configuration.
+
+    Args:
+        config: Configuration dictionary
+
+    Returns:
+        Platform enum value
+
+    Raises:
+        ValueError: If platform is invalid
+    """
+    platform_str = config.get("platform", "pump_fun")
+    try:
+        return Platform(platform_str)
+    except ValueError:
+        raise ValueError(f"Invalid platform '{platform_str}'. Must be one of: {[p.value for p in Platform]}")
+
 
 def print_config_summary(config: dict) -> None:
     """
     Print a summary of the loaded configuration.
+    Extended to show platform information.
 
     Args:
         config: Configuration dictionary
     """
+    platform_str = config.get("platform", "pump_fun")
+    
     print(f"Bot name: {config.get('name', 'unnamed')}")
+    print(f"Platform: {platform_str}")
     print(
         f"Listener type: {config.get('filters', {}).get('listener_type', 'not configured')}"
     )
@@ -240,5 +315,9 @@ def print_config_summary(config: dict) -> None:
 
 
 if __name__ == "__main__":
+    # Example usage with platform configuration
     config = load_bot_config("bots/bot-sniper.yaml")
     print_config_summary(config)
+    
+    platform = get_platform_from_config(config)
+    print(f"Detected platform: {platform}")

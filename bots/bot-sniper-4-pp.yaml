@@ -11,6 +11,9 @@ private_key: "${SOLANA_PRIVATE_KEY}"
 enabled: false # You can turn off the bot w/o removing its config
 separate_process: true
 
+# Options: "pump_fun" (default), "lets_bonk"
+platform: "pump_fun"
+
 # PumpPortal configuration (optional - uses default URL if not specified)
 pumpportal:
   url: "wss://pumpportal.fun/api/data" # Default PumpPortal WebSocket URL

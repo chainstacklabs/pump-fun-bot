@@ -248,10 +248,15 @@ class PumpFunEventParser(EventParser):
                                     # Token creation should have substantial data and many accounts
                                     if len(ix_data) <= 8 or len(ix.accounts) < 10:
                                         continue
+
+                                    account_keys_bytes = [
+                                        bytes(key)
+                                        for key in transaction.message.account_keys
+                                    ]
                                     
                                     # Parse the instruction
                                     token_info = self.parse_token_creation_from_instruction(
-                                        ix_data, ix.accounts, transaction.message.account_keys
+                                        ix_data, ix.accounts, account_keys_bytes
                                     )
                                     if token_info:
                                         return token_info

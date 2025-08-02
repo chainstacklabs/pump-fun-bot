@@ -12,7 +12,7 @@ enabled: true # You can turn off the bot w/o removing its config
 separate_process: true
 
 # Options: "pump_fun" (default), "lets_bonk"
-platform: "pump_fun"
+platform: "lets_bonk"
 
 # Geyser configuration (fastest method for getting updates)
 geyser:

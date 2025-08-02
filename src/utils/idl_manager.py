@@ -6,6 +6,7 @@ duplicate loading across multiple platform implementation classes.
 """
 
 import os
+from typing import Any
 
 from interfaces.core import Platform
 from utils.idl_parser import IDLParser
@@ -68,7 +69,9 @@ class IDLManager:
         parser = IDLParser(idl_path, verbose=verbose)
         self._parsers[platform] = parser
         
-        logger.info(f"IDL parser loaded for {platform.value} with {len(parser.get_instruction_names())} instructions")
+        instruction_count = len(parser.get_instruction_names())
+        event_count = len(parser.get_event_names())
+        logger.info(f"IDL parser loaded for {platform.value} with {instruction_count} instructions and {event_count} events")
         
         return parser
     
@@ -119,6 +122,10 @@ class IDLManager:
         else:
             logger.debug(f"IDL parser for {platform.value} already loaded")
     
+    # --------------------------------------------------------------------------
+    # Instruction-related convenience methods
+    # --------------------------------------------------------------------------
+    
     def get_instruction_discriminators(self, platform: Platform) -> dict[str, bytes]:
         """Get instruction discriminators for a platform.
         
@@ -142,6 +149,110 @@ class IDLManager:
         """
         parser = self.get_parser(platform)
         return parser.get_instruction_names()
+    
+    # --------------------------------------------------------------------------
+    # Event-related convenience methods
+    # --------------------------------------------------------------------------
+    
+    def get_event_discriminators(self, platform: Platform) -> dict[str, bytes]:
+        """Get event discriminators for a platform.
+        
+        Args:
+            platform: Platform to get event discriminators for
+            
+        Returns:
+            Dictionary mapping event names to discriminator bytes
+        """
+        parser = self.get_parser(platform)
+        return parser.get_event_discriminators()
+    
+    def get_event_names(self, platform: Platform) -> list[str]:
+        """Get available event names for a platform.
+        
+        Args:
+            platform: Platform to get event names for
+            
+        Returns:
+            List of event names
+        """
+        parser = self.get_parser(platform)
+        return parser.get_event_names()
+    
+    def decode_event_from_logs(self, platform: Platform, logs: list[str], event_name: str | None = None) -> dict | None:
+        """Decode event data from transaction logs for a platform.
+        
+        Args:
+            platform: Platform to use for decoding
+            logs: List of log strings from transaction
+            event_name: Optional specific event name to look for
+            
+        Returns:
+            Decoded event data if found, None otherwise
+        """
+        parser = self.get_parser(platform)
+        return parser.find_event_in_logs(logs, event_name)
+    
+    def decode_event_data(self, platform: Platform, event_data: bytes, event_name: str | None = None) -> dict | None:
+        """Decode raw event data for a platform.
+        
+        Args:
+            platform: Platform to use for decoding
+            event_data: Raw event data bytes
+            event_name: Optional event name to decode as
+            
+        Returns:
+            Decoded event data if successful, None otherwise
+        """
+        parser = self.get_parser(platform)
+        return parser.decode_event_data(event_data, event_name)
+    
+    # --------------------------------------------------------------------------
+    # Platform information methods
+    # --------------------------------------------------------------------------
+    
+    def get_platform_capabilities(self, platform: Platform) -> dict[str, Any]:
+        """Get comprehensive capability information for a platform.
+        
+        Args:
+            platform: Platform to get capabilities for
+            
+        Returns:
+            Dictionary with platform capabilities
+        """
+        if not self.has_idl_support(platform):
+            return {
+                "platform": platform.value,
+                "has_idl_support": False,
+                "instructions": [],
+                "events": [],
+                "instruction_count": 0,
+                "event_count": 0,
+            }
+        
+        try:
+            parser = self.get_parser(platform)
+            instruction_names = parser.get_instruction_names()
+            event_names = parser.get_event_names()
+            
+            return {
+                "platform": platform.value,
+                "has_idl_support": True,
+                "instructions": instruction_names,
+                "events": event_names,
+                "instruction_count": len(instruction_names),
+                "event_count": len(event_names),
+            }
+        except Exception as e:
+            logger.error(f"Failed to get capabilities for {platform.value}: {e}")
+            return {
+                "platform": platform.value,
+                "has_idl_support": False,
+                "error": str(e),
+                "instructions": [],
+                "events": [],
+                "instruction_count": 0,
+                "event_count": 0,
+            }
 
 
 # Global IDL manager instance
@@ -193,3 +304,45 @@ def preload_platform_idl(platform: Platform, verbose: bool = False) -> None:
         verbose: Whether to enable verbose logging
     """
     get_idl_manager().preload_parser(platform, verbose)
+
+
+# --------------------------------------------------------------------------
+# Convenience functions for event handling
+# --------------------------------------------------------------------------
+
+def get_event_discriminators(platform: Platform) -> dict[str, bytes]:
+    """Convenience function to get event discriminators for a platform.
+    
+    Args:
+        platform: Platform to get event discriminators for
+        
+    Returns:
+        Dictionary mapping event names to discriminator bytes
+    """
+    return get_idl_manager().get_event_discriminators(platform)
+
+
+def get_event_names(platform: Platform) -> list[str]:
+    """Convenience function to get event names for a platform.
+    
+    Args:
+        platform: Platform to get event names for
+        
+    Returns:
+        List of event names
+    """
+    return get_idl_manager().get_event_names(platform)
+
+
+def decode_event_from_logs(platform: Platform, logs: list[str], event_name: str | None = None) -> dict | None:
+    """Convenience function to decode events from logs.
+    
+    Args:
+        platform: Platform to use for decoding
+        logs: List of log strings from transaction
+        event_name: Optional specific event name to look for
+        
+    Returns:
+        Decoded event data if found, None otherwise
+    """
+    return get_idl_manager().decode_event_from_logs(platform, logs, event_name)

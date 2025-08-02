@@ -2,7 +2,7 @@
 Pump.Fun implementation of EventParser interface.
 
 This module parses pump.fun-specific token creation events from various sources
-by implementing the EventParser interface with IDL-based parsing.
+by implementing the EventParser interface with IDL-based event parsing.
 """
 
 import base64
@@ -23,8 +23,8 @@ logger = get_logger(__name__)
 
 
 class PumpFunEventParser(EventParser):
-    """Pump.Fun implementation of EventParser interface with IDL-based parsing."""
-    
+    """Pump.Fun implementation of EventParser interface with IDL-based event parsing."""
+
     def __init__(self, idl_parser: IDLParser):
         """Initialize pump.fun event parser with injected IDL parser.
         
@@ -33,12 +33,17 @@ class PumpFunEventParser(EventParser):
         """
         self._idl_parser = idl_parser
         
-        # Get discriminators from injected IDL parser
-        discriminators = self._idl_parser.get_instruction_discriminators()
-        self._create_discriminator_bytes = discriminators["create"]
-        self._create_discriminator = struct.unpack("<Q", self._create_discriminator_bytes)[0]
+        event_discriminators = self._idl_parser.get_event_discriminators()
+        self._create_event_discriminator_bytes = event_discriminators["CreateEvent"]
+        self._create_event_discriminator = struct.unpack("<Q", self._create_event_discriminator_bytes)[0]
         
-        logger.info("Pump.Fun event parser initialized with injected IDL parser")
+        instruction_discriminators = self._idl_parser.get_instruction_discriminators()
+        self._create_instruction_discriminator_bytes = instruction_discriminators["create"]
+        self._create_instruction_discriminator = struct.unpack("<Q", self._create_instruction_discriminator_bytes)[0]
+        
+        logger.info("Pump.Fun event parser initialized with IDL-based event and instruction parsing")
+        logger.info(f"CreateEvent discriminator: {self._create_event_discriminator_bytes.hex()}")
+        logger.info(f"create instruction discriminator: {self._create_instruction_discriminator_bytes.hex()}")
     
     @property
     def platform(self) -> Platform:
@@ -50,7 +55,7 @@ class PumpFunEventParser(EventParser):
         logs: list[str],
         signature: str
     ) -> TokenInfo | None:
-        """Parse token creation from pump.fun transaction logs.
+        """Parse token creation from pump.fun transaction logs using IDL instruction parsing.
         
         Args:
             logs: List of log strings from transaction
@@ -59,25 +64,97 @@ class PumpFunEventParser(EventParser):
         Returns:
             TokenInfo if token creation found, None otherwise
         """
-        # Check if this is a token creation
+        # Check if this is a token creation transaction
         if not any("Program log: Instruction: Create" in log for log in logs):
             return None
 
-        # Skip swaps and other operations
+        # Skip swaps as the first condition may pass them
         if any("Program log: Instruction: CreateTokenAccount" in log for log in logs):
             return None
 
-        # Find and process program data
-        for log in logs:
-            if "Program data:" in log:
-                try:
-                    encoded_data = log.split(": ")[1]
-                    decoded_data = base64.b64decode(encoded_data)
-                    return self._parse_create_instruction_data(decoded_data)
-                except Exception:
-                    continue
-        
-        return None
+        # Look for event data in the logs (CreateEvent data!)
+        try:
+            for log in logs:
+                if "Program data:" in log:
+                    try:
+                        # Extract base64 encoded event data
+                        encoded_data = log.split("Program data: ")[1].strip()
+                        decoded_data = base64.b64decode(encoded_data)
+                        
+                        # Parse as event data (CreateEvent)
+                        # The "Program data:" in logs contains event data, not instruction data
+                        if len(decoded_data) < 8:
+                            continue
+                            
+                        # Check discriminator from program data
+                        discriminator = decoded_data[:8]
+                        discriminator_int = struct.unpack("<Q", discriminator)[0]
+                        
+                        # Debug: Print all discriminators
+                        print(f"🔍 Program data discriminator found: {discriminator.hex()} (int: {discriminator_int})")
+                        print(f"🎯 Expected CreateEvent discriminator: {self._create_event_discriminator_bytes.hex()} (int: {self._create_event_discriminator})")
+                        print(f"🛠️ Expected create instruction discriminator: {self._create_instruction_discriminator_bytes.hex()} (int: {self._create_instruction_discriminator})")
+                        
+                        # Check if it matches CreateEvent discriminator
+                        decoded_event = None
+                        if discriminator_int == self._create_event_discriminator:
+                            print("✅ Matches CreateEvent discriminator - proceeding with event parsing")
+                            # Use IDL parser to decode the event data
+                            decoded_event = self._idl_parser.decode_event_data(decoded_data, "CreateEvent")
+                            if not decoded_event or decoded_event['event_name'] != 'CreateEvent':
+                                print("❌ IDL parser failed to decode as CreateEvent")
+                                continue
+                        else:
+                            print(f"⚠️ Discriminator mismatch - found {discriminator_int}, expected {self._create_event_discriminator}")
+                            # Try to decode anyway (maybe the discriminator calculation is wrong)
+                            print("🔄 Trying to decode anyway...")
+                            decoded_event = self._idl_parser.decode_event_data(decoded_data, "CreateEvent")
+                            if not decoded_event or decoded_event['event_name'] != 'CreateEvent':
+                                print("❌ IDL parser also failed with mismatched discriminator")
+                                continue
+                            print("✅ IDL parser succeeded despite discriminator mismatch!")
+
+                        print(f"✅ Successfully decoded event: {decoded_event.get('event_name', 'Unknown')}")
+                        print(f"🔍 Event fields: {list(decoded_event.get('fields', {}).keys())}")
+
+                        fields = decoded_event.get('fields', {})
+                        if not fields:
+                            print("❌ No fields found in decoded event")
+                            continue
+                            
+                        # Convert to TokenInfo
+                        mint = Pubkey.from_string(fields["mint"])
+                        bonding_curve = Pubkey.from_string(fields["bonding_curve"])
+                        user = Pubkey.from_string(fields["user"])
+                        creator = Pubkey.from_string(fields["creator"])
+                        
+                        # Derive additional addresses
+                        associated_bonding_curve = self._derive_associated_bonding_curve(mint, bonding_curve)
+                        creator_vault = self._derive_creator_vault(creator)
+                        
+                        return TokenInfo(
+                            name=fields["name"],
+                            symbol=fields["symbol"],
+                            uri=fields["uri"],
+                            mint=mint,
+                            platform=Platform.PUMP_FUN,
+                            bonding_curve=bonding_curve,
+                            associated_bonding_curve=associated_bonding_curve,
+                            user=user,
+                            creator=creator,
+                            creator_vault=creator_vault,
+                            creation_timestamp=monotonic(),
+                        )
+                        
+                    except Exception as e:
+                        logger.debug(f"Failed to decode log data: {e}")
+                        continue
+            
+            return None
+            
+        except Exception as e:
+            logger.debug(f"Failed to parse token creation from logs: {e}")
+            return None
     
     def parse_token_creation_from_instruction(
         self,
@@ -95,7 +172,7 @@ class PumpFunEventParser(EventParser):
         Returns:
             TokenInfo if token creation found, None otherwise
         """
-        if not instruction_data.startswith(self._create_discriminator_bytes):
+        if not instruction_data.startswith(self._create_instruction_discriminator_bytes):
             return None
 
         try:
@@ -177,7 +254,6 @@ class PumpFunEventParser(EventParser):
                 if bytes(program_id) != bytes(self.get_program_id()):
                     continue
 
-                # Process instruction data
                 token_info = self.parse_token_creation_from_instruction(
                     ix.data, ix.accounts, msg.account_keys
                 )
@@ -204,7 +280,15 @@ class PumpFunEventParser(EventParser):
         Returns:
             List of discriminator bytes to match
         """
-        return [self._create_discriminator_bytes]
+        return [self._create_instruction_discriminator_bytes]
+    
+    def get_event_discriminators(self) -> list[bytes]:
+        """Get event discriminators for token creation.
+        
+        Returns:
+            List of event discriminator bytes to match
+        """
+        return [self._create_event_discriminator_bytes]
     
     def parse_token_creation_from_block(self, block_data: dict) -> TokenInfo | None:
         """Parse token creation from block data (for block listener).
@@ -244,7 +328,7 @@ class PumpFunEventParser(EventParser):
                             if len(ix_data) >= 8:
                                 discriminator = struct.unpack("<Q", ix_data[:8])[0]
                                 
-                                if discriminator == self._create_discriminator:
+                                if discriminator == self._create_instruction_discriminator:
                                     # Token creation should have substantial data and many accounts
                                     if len(ix_data) <= 8 or len(ix.accounts) < 10:
                                         continue
@@ -290,7 +374,7 @@ class PumpFunEventParser(EventParser):
                             if len(ix_data) >= 8:
                                 discriminator = struct.unpack("<Q", ix_data[:8])[0]
                                 
-                                if discriminator == self._create_discriminator:
+                                if discriminator == self._create_instruction_discriminator:
                                     if len(ix_data) <= 8 or len(ix["accounts"]) < 10:
                                         continue
                                     
@@ -315,47 +399,7 @@ class PumpFunEventParser(EventParser):
         except Exception as e:
             logger.debug(f"Failed to parse block data: {e}")
             return None
-    
-    def _parse_create_instruction_data(self, data: bytes) -> dict | None:
-        """Parse the create instruction data from pump.fun using injected IDL parser.
         
-        Args:
-            data: Raw instruction data
-            
-        Returns:
-            Dictionary of parsed data or None if parsing fails
-        """
-        if len(data) < 8:
-            return None
-
-        # Check for the correct instruction discriminator
-        discriminator = struct.unpack("<Q", data[:8])[0]
-        if discriminator != self._create_discriminator:
-            return None
-
-        try:
-            # Use IDL parser to decode the instruction data
-            # For log data parsing, we need to create dummy account info
-            dummy_accounts = list(range(20))  # Assume enough accounts
-            dummy_account_keys = [b'\x00' * 32] * 20  # Dummy keys
-            
-            decoded = self._idl_parser.decode_instruction(data, dummy_account_keys, dummy_accounts)
-            if not decoded or decoded['instruction_name'] != 'create':
-                return None
-            
-            # Extract the arguments
-            args = decoded.get('args', {})
-            return {
-                "name": args.get("name", ""),
-                "symbol": args.get("symbol", ""),
-                "uri": args.get("uri", ""),
-                "creator": args.get("creator", ""),
-            }
-            
-        except Exception as e:
-            logger.debug(f"Failed to parse instruction data with IDL: {e}")
-            return None
-    
     def _derive_creator_vault(self, creator: Pubkey) -> Pubkey:
         """Derive the creator vault for a creator.
         

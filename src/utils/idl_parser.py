@@ -1,8 +1,9 @@
 """
 IDL Parser module for Solana programs.
-Provides functionality to load and parse Anchor IDL files and decode instruction data.
+Provides functionality to load and parse Anchor IDL files and decode instruction data and events.
 """
 
+import base64
 import json
 import struct
 from typing import Any
@@ -17,7 +18,7 @@ ENUM_DISCRIMINATOR_SIZE = 1
 
 
 class IDLParser:
-    """Parser for automatically decoding instructions using IDL definitions."""
+    """Parser for automatically decoding instructions and events using IDL definitions."""
 
     # A single source of truth for primitive type information, mapping the type name
     # to its struct format character and size in bytes.
@@ -48,14 +49,16 @@ class IDLParser:
         with open(idl_path) as f:
             self.idl = json.load(f)
         self.instructions: dict[bytes, dict[str, Any]] = {}
+        self.events: dict[bytes, dict[str, Any]] = {}
         self.types: dict[str, dict[str, Any]] = {}
         self.instruction_min_sizes: dict[bytes, int] = {}
         self._build_instruction_map()
+        self._build_event_map()
         self._build_type_map()
         self._calculate_instruction_sizes()
 
     # --------------------------------------------------------------------------
-    # Public Methods (External API)
+    # Public Methods (External API) - Instructions
     # --------------------------------------------------------------------------
 
     def get_instruction_discriminators(self) -> dict[str, bytes]:
@@ -132,6 +135,108 @@ class IDLParser:
             'accounts': account_info
         }
 
+    # --------------------------------------------------------------------------
+    # Public Methods (External API) - Events
+    # --------------------------------------------------------------------------
+
+    def get_event_discriminators(self) -> dict[str, bytes]:
+        """Get a mapping of event names to their discriminators."""
+        return {event['name']: disc for disc, event in self.events.items()}
+
+    def get_event_names(self) -> list[str]:
+        """Get a list of all available event names."""
+        return [event['name'] for event in self.events.values()]
+
+    def decode_event_data(self, event_data: bytes, event_name: str | None = None) -> dict[str, Any] | None:
+        """
+        Decode event data using IDL event definitions.
+        
+        Args:
+            event_data: Raw event data bytes (typically from base64 decoded log data)
+            event_name: Optional event name to decode as. If None, will try to match discriminator.
+            
+        Returns:
+            Decoded event data as a dictionary, or None if decoding fails.
+        """
+        if len(event_data) < DISCRIMINATOR_SIZE:
+            return None
+
+        discriminator = event_data[:DISCRIMINATOR_SIZE]
+        
+        # If event_name provided, validate it matches the discriminator
+        if event_name:
+            event_discriminators = self.get_event_discriminators()
+            if event_name not in event_discriminators:
+                if self.verbose:
+                    print(f"Unknown event name: {event_name}")
+                return None
+            if event_discriminators[event_name] != discriminator:
+                if self.verbose:
+                    print(f"Event discriminator mismatch for {event_name}")
+                return None
+            event_def = self.events[discriminator]
+        else:
+            # Try to find event by discriminator
+            if discriminator not in self.events:
+                if self.verbose:
+                    print(f"Unknown event discriminator: {discriminator.hex()}")
+                return None
+            event_def = self.events[discriminator]
+
+        # Decode event fields
+        try:
+            event_fields = {}
+            data_part = event_data[DISCRIMINATOR_SIZE:]
+            decode_offset = 0
+            
+            for field in event_def.get('fields', []):
+                value, decode_offset = self._decode_type(data_part, decode_offset, field['type'])
+                event_fields[field['name']] = value
+
+            return {
+                'event_name': event_def['name'],
+                'fields': event_fields
+            }
+
+        except Exception as e:
+            if self.verbose:
+                print(f"❌ Error decoding event {event_def['name']}: {e}")
+            return None
+
+    def find_event_in_logs(self, logs: list[str], target_event_name: str | None = None) -> dict[str, Any] | None:
+        """
+        Find and decode event data from transaction logs.
+        
+        Args:
+            logs: List of log strings from a transaction
+            target_event_name: Optional specific event name to look for
+            
+        Returns:
+            Decoded event data if found, None otherwise
+        """
+        for log in logs:
+            if "Program data:" in log:
+                try:
+                    # Extract base64 encoded data
+                    encoded_data = log.split("Program data: ")[1].strip()
+                    decoded_data = base64.b64decode(encoded_data)
+                    
+                    # Try to decode as event
+                    event_data = self.decode_event_data(decoded_data, target_event_name)
+                    if event_data:
+                        return event_data
+                        
+                except Exception as e:
+                    if self.verbose:
+                        print(f"Failed to decode log data: {e}")
+                    continue
+        
+        return None
+
+    # --------------------------------------------------------------------------
+    # Public Methods (External API) - Account Data
+    # --------------------------------------------------------------------------
+
     def decode_account_data(self, account_data: bytes, account_type_name: str, skip_discriminator: bool = True) -> dict[str, Any] | None:
         """
         Decode account data using a specific account type from the IDL.
@@ -178,6 +283,15 @@ class IDLParser:
             # The discriminator from the JSON IDL is a list of u8 integers.
             discriminator = bytes(instruction['discriminator'])
             self.instructions[discriminator] = instruction
+
+    def _build_event_map(self):
+        """Build a map of discriminators to event definitions."""
+        for event in self.idl.get('events', []):
+            # The discriminator from the JSON IDL is a list of u8 integers.
+            discriminator = bytes(event['discriminator'])
+            self.events[discriminator] = event
+            if self.verbose:
+                print(f"📅 Loaded event: {event['name']} with discriminator {discriminator.hex()}")
 
     def _build_type_map(self):
         """Build a map of type names to their definitions."""

@@ -2,13 +2,13 @@
 LetsBonk implementation of InstructionBuilder interface.
 
 This module builds LetsBonk (Raydium LaunchLab) specific buy and sell instructions
-by implementing the InstructionBuilder interface.
+by implementing the InstructionBuilder interface with IDL-based discriminators.
 """
 
 import hashlib
+import os
 import struct
 import time
-from typing import Final
 
 from solders.instruction import AccountMeta, Instruction
 from solders.pubkey import Pubkey
@@ -17,16 +17,38 @@ from spl.token.instructions import create_idempotent_associated_token_account
 
 from core.pubkeys import TOKEN_DECIMALS, SystemAddresses
 from interfaces.core import AddressProvider, InstructionBuilder, Platform, TokenInfo
+from utils.idl_parser import IDLParser
+from utils.logger import get_logger
 
-# Instruction discriminators for LetsBonk (from IDL)
-BUY_EXACT_IN_DISCRIMINATOR: Final[bytes] = bytes([250, 234, 13, 123, 213, 156, 19, 236])
-BUY_EXACT_OUT_DISCRIMINATOR: Final[bytes] = bytes([24, 211, 116, 40, 105, 3, 153, 56])
-SELL_EXACT_IN_DISCRIMINATOR: Final[bytes] = bytes([149, 39, 222, 155, 211, 124, 152, 26])
-SELL_EXACT_OUT_DISCRIMINATOR: Final[bytes] = bytes([95, 200, 71, 34, 8, 9, 11, 166])
+logger = get_logger(__name__)
 
 
 class LetsBonkInstructionBuilder(InstructionBuilder):
-    """LetsBonk (Raydium LaunchLab) implementation of InstructionBuilder interface."""
+    """LetsBonk (Raydium LaunchLab) implementation of InstructionBuilder interface with IDL-based discriminators."""
+    
+    def __init__(self):
+        """Initialize LetsBonk instruction builder with IDL support."""
+        self._idl_parser = self._load_idl_parser()
+        
+        # Get discriminators from IDL
+        discriminators = self._idl_parser.get_instruction_discriminators()
+        self._buy_exact_in_discriminator = discriminators["buy_exact_in"]
+        self._sell_exact_in_discriminator = discriminators["sell_exact_in"]
+        
+        logger.info("LetsBonk instruction builder initialized with IDL-based discriminators")
+    
+    def _load_idl_parser(self) -> IDLParser:
+        """Load the IDL parser for LetsBonk (Raydium LaunchLab)."""
+        # Get the IDL file path relative to the project root
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.join(current_dir, "..", "..", "..")
+        idl_path = os.path.join(project_root, "idl", "raydium_launchlab_idl.json")
+        idl_path = os.path.normpath(idl_path)
+        
+        if not os.path.exists(idl_path):
+            raise FileNotFoundError(f"IDL file not found at {idl_path}")
+        
+        return IDLParser(idl_path, verbose=False)
     
     @property
     def platform(self) -> Platform:
@@ -119,7 +141,7 @@ class LetsBonkInstructionBuilder(InstructionBuilder):
         # Build instruction data: discriminator + amount_in + minimum_amount_out + share_fee_rate
         SHARE_FEE_RATE = 0  # No sharing fee
         instruction_data = (
-            BUY_EXACT_IN_DISCRIMINATOR +
+            self._buy_exact_in_discriminator +
             struct.pack("<Q", amount_in) +           # amount_in (u64) - SOL to spend
             struct.pack("<Q", minimum_amount_out) +  # minimum_amount_out (u64) - min tokens
             struct.pack("<Q", SHARE_FEE_RATE)        # share_fee_rate (u64): 0
@@ -219,7 +241,7 @@ class LetsBonkInstructionBuilder(InstructionBuilder):
         # Build instruction data: discriminator + amount_in + minimum_amount_out + share_fee_rate
         SHARE_FEE_RATE = 0  # No sharing fee
         instruction_data = (
-            SELL_EXACT_IN_DISCRIMINATOR +
+            self._sell_exact_in_discriminator +
             struct.pack("<Q", amount_in) +           # amount_in (u64) - tokens to sell
             struct.pack("<Q", minimum_amount_out) +  # minimum_amount_out (u64) - min SOL
             struct.pack("<Q", SHARE_FEE_RATE)        # share_fee_rate (u64): 0

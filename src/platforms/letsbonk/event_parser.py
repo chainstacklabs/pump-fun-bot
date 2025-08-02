@@ -2,34 +2,53 @@
 LetsBonk implementation of EventParser interface.
 
 This module parses LetsBonk-specific token creation events from various sources
-by implementing the EventParser interface.
+by implementing the EventParser interface with IDL-based parsing.
 """
 
 import base64
+import os
 import struct
 from time import monotonic
-from typing import Any, Final
+from typing import Any
 
 from solders.pubkey import Pubkey
 from solders.transaction import VersionedTransaction
 
 from interfaces.core import EventParser, Platform, TokenInfo
 from platforms.letsbonk.address_provider import LetsBonkAddressProvider
+from utils.idl_parser import IDLParser
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 
 class LetsBonkEventParser(EventParser):
-    """LetsBonk implementation of EventParser interface."""
-    
-    # Discriminator for initialize instruction from IDL
-    INITIALIZE_DISCRIMINATOR: Final[bytes] = bytes([175, 175, 109, 31, 13, 152, 155, 237])
-    INITIALIZE_DISCRIMINATOR_INT: Final[int] = struct.unpack("<Q", INITIALIZE_DISCRIMINATOR)[0]
+    """LetsBonk implementation of EventParser interface with IDL-based parsing."""
     
     def __init__(self):
-        """Initialize LetsBonk event parser."""
+        """Initialize LetsBonk event parser with IDL support."""
         self.address_provider = LetsBonkAddressProvider()
+        self._idl_parser = self._load_idl_parser()
+        
+        # Get discriminators from IDL
+        discriminators = self._idl_parser.get_instruction_discriminators()
+        self._initialize_discriminator_bytes = discriminators["initialize"]
+        self._initialize_discriminator = struct.unpack("<Q", self._initialize_discriminator_bytes)[0]
+        
+        logger.info("LetsBonk event parser initialized with IDL-based discriminators")
+    
+    def _load_idl_parser(self) -> IDLParser:
+        """Load the IDL parser for LetsBonk (Raydium LaunchLab)."""
+        # Get the IDL file path relative to the project root
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.join(current_dir, "..", "..", "..")
+        idl_path = os.path.join(project_root, "idl", "raydium_launchlab_idl.json")
+        idl_path = os.path.normpath(idl_path)
+        
+        if not os.path.exists(idl_path):
+            raise FileNotFoundError(f"IDL file not found at {idl_path}")
+        
+        return IDLParser(idl_path, verbose=False)
     
     @property
     def platform(self) -> Platform:
@@ -60,7 +79,7 @@ class LetsBonkEventParser(EventParser):
         accounts: list[int],
         account_keys: list[bytes]
     ) -> TokenInfo | None:
-        """Parse token creation from LetsBonk instruction data.
+        """Parse token creation from LetsBonk instruction data using IDL.
         
         Args:
             instruction_data: Raw instruction data
@@ -70,7 +89,7 @@ class LetsBonkEventParser(EventParser):
         Returns:
             TokenInfo if token creation found, None otherwise
         """
-        if not instruction_data.startswith(self.INITIALIZE_DISCRIMINATOR):
+        if not instruction_data.startswith(self._initialize_discriminator_bytes):
             return None
 
         try:
@@ -83,9 +102,16 @@ class LetsBonkEventParser(EventParser):
                     return None
                 return Pubkey.from_bytes(account_keys[account_index])
 
-            # Parse instruction data
-            token_data = self._parse_initialize_instruction_data(instruction_data)
-            if not token_data:
+            # Parse instruction data using IDL parser
+            decoded = self._idl_parser.decode_instruction(instruction_data, account_keys, accounts)
+            if not decoded or decoded['instruction_name'] != 'initialize':
+                return None
+            
+            args = decoded.get('args', {})
+            
+            # Extract MintParams from the decoded arguments
+            base_mint_param = args.get('base_mint_param', {})
+            if not base_mint_param:
                 return None
 
             # Extract account information based on IDL account order
@@ -99,9 +125,9 @@ class LetsBonkEventParser(EventParser):
                 return None
 
             return TokenInfo(
-                name=token_data["name"],
-                symbol=token_data["symbol"],
-                uri=token_data["uri"],
+                name=base_mint_param.get("name", ""),
+                symbol=base_mint_param.get("symbol", ""),
+                uri=base_mint_param.get("uri", ""),
                 mint=base_mint,
                 platform=Platform.LETS_BONK,
                 pool_state=pool_state,
@@ -112,7 +138,8 @@ class LetsBonkEventParser(EventParser):
                 creation_timestamp=monotonic(),
             )
 
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Failed to parse initialize instruction: {e}")
             return None
     
     def parse_token_creation_from_geyser(
@@ -151,7 +178,7 @@ class LetsBonkEventParser(EventParser):
                 for acc_idx in ix.accounts:
                     if acc_idx < len(msg.account_keys):
                         acc_key = msg.account_keys[acc_idx]
-                        if bytes(acc_key) == bytes(self.address_provider.LETSBONK_PLATFORM_CONFIG):
+                        if bytes(acc_key) == bytes(self.address_provider.get_system_addresses()["platform_config"]):
                             has_platform_config = True
                             break
                 
@@ -167,7 +194,8 @@ class LetsBonkEventParser(EventParser):
 
             return None
 
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Failed to parse geyser transaction: {e}")
             return None
     
     def get_program_id(self) -> Pubkey:
@@ -176,7 +204,7 @@ class LetsBonkEventParser(EventParser):
         Returns:
             Raydium LaunchLab program ID
         """
-        return self.address_provider.RAYDIUM_LAUNCHLAB_PROGRAM_ID
+        return self.address_provider.program_id
     
     def get_instruction_discriminators(self) -> list[bytes]:
         """Get instruction discriminators for token creation.
@@ -184,7 +212,7 @@ class LetsBonkEventParser(EventParser):
         Returns:
             List of discriminator bytes to match
         """
-        return [self.INITIALIZE_DISCRIMINATOR]
+        return [self._initialize_discriminator_bytes]
     
     def parse_token_creation_from_block(self, block_data: dict) -> TokenInfo | None:
         """Parse token creation from block data (for block listener).
@@ -224,7 +252,7 @@ class LetsBonkEventParser(EventParser):
                             if len(ix_data) >= 8:
                                 discriminator = struct.unpack("<Q", ix_data[:8])[0]
                                 
-                                if discriminator == self.INITIALIZE_DISCRIMINATOR_INT:
+                                if discriminator == self._initialize_discriminator:
                                     # Token creation should have substantial data and many accounts
                                     if len(ix_data) <= 8 or len(ix.accounts) < 10:
                                         continue
@@ -236,7 +264,8 @@ class LetsBonkEventParser(EventParser):
                                     if token_info:
                                         return token_info
                                         
-                    except Exception:
+                    except Exception as e:
+                        logger.debug(f"Failed to parse block transaction: {e}")
                         continue
                 
                 # Handle already decoded transaction data
@@ -264,7 +293,7 @@ class LetsBonkEventParser(EventParser):
                             if len(ix_data) >= 8:
                                 discriminator = struct.unpack("<Q", ix_data[:8])[0]
                                 
-                                if discriminator == self.INITIALIZE_DISCRIMINATOR_INT:
+                                if discriminator == self._initialize_discriminator:
                                     if len(ix_data) <= 8 or len(ix["accounts"]) < 10:
                                         continue
                                     
@@ -280,68 +309,12 @@ class LetsBonkEventParser(EventParser):
                                     if token_info:
                                         return token_info
                                         
-                    except Exception:
+                    except Exception as e:
+                        logger.debug(f"Failed to parse decoded block transaction: {e}")
                         continue
 
             return None
 
-        except Exception:
-            return None
-    
-    def _parse_initialize_instruction_data(self, data: bytes) -> dict | None:
-        """Parse the initialize instruction data from LetsBonk.
-        
-        Args:
-            data: Raw instruction data
-            
-        Returns:
-            Dictionary of parsed data or None if parsing fails
-        """
-        if len(data) < 8:
-            return None
-
-        # Check discriminator
-        discriminator = struct.unpack("<Q", data[:8])[0]
-        if discriminator != self.INITIALIZE_DISCRIMINATOR_INT:
-            return None
-
-        offset = 8
-        parsed_data = {}
-
-        try:
-            # Helper functions for reading data
-            def read_string():
-                nonlocal offset
-                if offset + 4 > len(data):
-                    raise ValueError("Not enough data for string length")
-                length = struct.unpack_from("<I", data, offset)[0]
-                offset += 4
-                if offset + length > len(data):
-                    raise ValueError("Not enough data for string")
-                value = data[offset:offset + length].decode('utf-8')
-                offset += length
-                return value
-            
-            def read_u8():
-                nonlocal offset
-                if offset + 1 > len(data):
-                    raise ValueError("Not enough data for u8")
-                value = struct.unpack_from("<B", data, offset)[0]
-                offset += 1
-                return value
-            
-            # Parse MintParams struct
-            decimals = read_u8()
-            name = read_string()
-            symbol = read_string()
-            uri = read_string()
-            
-            parsed_data["name"] = name
-            parsed_data["symbol"] = symbol
-            parsed_data["uri"] = uri
-            parsed_data["decimals"] = decimals
-            
-            return parsed_data
-            
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Failed to parse block data: {e}")
             return None

@@ -6,7 +6,7 @@ platform-specific implementations of the trading interfaces.
 """
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Type
+from typing import Any
 
 from core.client import SolanaClient
 from interfaces.core import (
@@ -16,8 +16,6 @@ from interfaces.core import (
     InstructionBuilder,
     Platform,
 )
-
-from . import letsbonk, pumpfun
 
 
 @dataclass
@@ -145,21 +143,45 @@ class PlatformFactory:
         self._setup_default_platforms()
     
     def _setup_default_platforms(self) -> None:
-        """Setup default platform registrations.
+        """Setup default platform registrations."""
+        # Import platform implementations dynamically to avoid circular imports
+        try:
+            from platforms.pumpfun import (
+                PumpFunAddressProvider,
+                PumpFunCurveManager,
+                PumpFunEventParser,
+                PumpFunInstructionBuilder,
+            )
+            
+            self.registry.register_platform(
+                Platform.PUMP_FUN,
+                PumpFunAddressProvider,
+                PumpFunInstructionBuilder,
+                PumpFunCurveManager,
+                PumpFunEventParser
+            )
+            
+        except ImportError as e:
+            print(f"Warning: Could not register pump.fun platform: {e}")
         
-        This will be populated as we implement each platform.
-        """
-        # Platforms will be registered here as they are implemented
-        # Example:
-        # from platforms.pumpfun import PumpFunAddressProvider, PumpFunInstructionBuilder, ...
-        # self.registry.register_platform(
-        #     Platform.PUMP_FUN,
-        #     PumpFunAddressProvider,
-        #     PumpFunInstructionBuilder,
-        #     PumpFunCurveManager,
-        #     PumpFunEventParser
-        # )
-        pass
+        try:
+            from platforms.letsbonk import (
+                LetsBonkAddressProvider,
+                LetsBonkCurveManager,
+                LetsBonkEventParser,
+                LetsBonkInstructionBuilder,
+            )
+            
+            self.registry.register_platform(
+                Platform.LETS_BONK,
+                LetsBonkAddressProvider,
+                LetsBonkInstructionBuilder,
+                LetsBonkCurveManager,
+                LetsBonkEventParser
+            )
+            
+        except ImportError as e:
+            print(f"Warning: Could not register LetsBonk platform: {e}")
     
     def create_for_platform(
         self,

@@ -1,6 +1,6 @@
 """
-Main trading coordinator for pump.fun tokens.
-Refactored PumpTrader to only process fresh tokens from WebSocket.
+Universal trading coordinator that works with any platform.
+Replaces PumpTrader with platform-agnostic implementation.
 """
 
 import asyncio
@@ -18,18 +18,14 @@ from cleanup.modes import (
     handle_cleanup_post_session,
 )
 from core.client import SolanaClient
-from core.curve import BondingCurveManager
 from core.priority_fee.manager import PriorityFeeManager
-from core.pubkeys import PumpAddresses
 from core.wallet import Wallet
-from monitoring.block_listener import BlockListener
-from monitoring.geyser_listener import GeyserListener
-from monitoring.logs_listener import LogsListener
-from monitoring.pumpportal_listener import PumpPortalListener
-from trading.base import TokenInfo, TradeResult
-from trading.buyer import TokenBuyer
+from interfaces.core import Platform, TokenInfo
+from monitoring.listener_factory import ListenerFactory
+from platforms import get_platform_implementations
+from trading.base import TradeResult
+from trading.platform_aware import PlatformAwareBuyer, PlatformAwareSeller
 from trading.position import Position
-from trading.seller import TokenSeller
 from utils.logger import get_logger
 
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
@@ -37,8 +33,8 @@ asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 logger = get_logger(__name__)
 
 
-class PumpTrader:
-    """Coordinates trading operations for pump.fun tokens with focus on freshness."""
+class UniversalTrader:
+    """Universal trading coordinator that works with any supported platform."""
 
     def __init__(
         self,
@@ -48,11 +44,15 @@ class PumpTrader:
         buy_amount: float,
         buy_slippage: float,
         sell_slippage: float,
+        # Platform configuration
+        platform: Platform | str = Platform.PUMP_FUN,
+        # Listener configuration
         listener_type: str = "logs",
         geyser_endpoint: str | None = None,
         geyser_api_token: str | None = None,
         geyser_auth_type: str = "x-token",
         pumpportal_url: str = "wss://pumpportal.fun/api/data",
+        # Trading configuration
         extreme_fast_mode: bool = False,
         extreme_fast_token_amount: int = 30,
         # Exit strategy configuration
@@ -69,7 +69,7 @@ class PumpTrader:
         hard_cap_prior_fee: int = 200_000,
         # Retry and timeout settings
         max_retries: int = 3,
-        wait_time_after_creation: int = 15,  # here and further - seconds
+        wait_time_after_creation: int = 15,
         wait_time_after_buy: int = 15,
         wait_time_before_new_token: int = 15,
         max_token_age: int | float = 0.001,
@@ -84,7 +84,8 @@ class PumpTrader:
         marry_mode: bool = False,
         yolo_mode: bool = False,
     ):
-        """Initialize the pump trader.
+        """Initialize the universal trader.
+        
         Args:
             rpc_endpoint: RPC endpoint URL
             wss_endpoint: WebSocket endpoint URL
@@ -92,47 +93,12 @@ class PumpTrader:
             buy_amount: Amount of SOL to spend on buys
             buy_slippage: Slippage tolerance for buys
             sell_slippage: Slippage tolerance for sells
-
-            listener_type: Type of listener to use ('logs', 'blocks', 'geyser', or 'pumpportal')
-            geyser_endpoint: Geyser endpoint URL (required for geyser listener)
-            geyser_api_token: Geyser API token (required for geyser listener)
-            geyser_auth_type: Geyser authentication type ('x-token' or 'basic')
-            pumpportal_url: PumpPortal WebSocket URL (default: wss://pumpportal.fun/api/data)
-
-            extreme_fast_mode: Whether to enable extreme fast mode
-            extreme_fast_token_amount: Maximum token amount for extreme fast mode
-
-            exit_strategy: Exit strategy ("time_based", "tp_sl", or "manual")
-            take_profit_percentage: Take profit percentage (0.5 = 50% profit)
-            stop_loss_percentage: Stop loss percentage (0.2 = 20% loss)
-            max_hold_time: Maximum hold time in seconds
-            price_check_interval: How often to check price for TP/SL (seconds)
-
-            enable_dynamic_priority_fee: Whether to enable dynamic priority fees
-            enable_fixed_priority_fee: Whether to enable fixed priority fees
-            fixed_priority_fee: Fixed priority fee amount
-            extra_priority_fee: Extra percentage for priority fees
-            hard_cap_prior_fee: Hard cap for priority fees
-
-            max_retries: Maximum number of retry attempts
-            wait_time_after_creation: Time to wait after token creation (seconds)
-            wait_time_after_buy: Time to wait after buying a token (seconds)
-            wait_time_before_new_token: Time to wait before processing a new token (seconds)
-            max_token_age: Maximum age of token to process (seconds)
-            token_wait_timeout: Timeout for waiting for a token in single-token mode (seconds)
-
-            cleanup_mode: Cleanup mode ("disabled", "auto", or "manual")
-            cleanup_force_close_with_burn: Whether to force close with burn during cleanup
-            cleanup_with_priority_fee: Whether to use priority fees during cleanup
-
-            match_string: Optional string to match in token name/symbol
-            bro_address: Optional creator address to filter by
-            marry_mode: If True, only buy tokens and skip selling
-            yolo_mode: If True, trade continuously
+            platform: Platform to trade on (Platform enum or string)
+            ... (other args same as PumpTrader)
         """
+        # Core components
         self.solana_client = SolanaClient(rpc_endpoint)
         self.wallet = Wallet(private_key)
-        self.curve_manager = BondingCurveManager(self.solana_client)
         self.priority_fee_manager = PriorityFeeManager(
             client=self.solana_client,
             enable_dynamic_fee=enable_dynamic_priority_fee,
@@ -141,10 +107,24 @@ class PumpTrader:
             extra_fee=extra_priority_fee,
             hard_cap=hard_cap_prior_fee,
         )
-        self.buyer = TokenBuyer(
+
+        # Platform setup
+        if isinstance(platform, str):
+            self.platform = Platform(platform)
+        else:
+            self.platform = platform
+
+        logger.info(f"Initialized Universal Trader for platform: {self.platform.value}")
+
+        # Get platform-specific implementations
+        self.platform_implementations = get_platform_implementations(
+            self.platform, self.solana_client
+        )
+
+        # Create platform-aware traders
+        self.buyer = PlatformAwareBuyer(
             self.solana_client,
             self.wallet,
-            self.curve_manager,
             self.priority_fee_manager,
             buy_amount,
             buy_slippage,
@@ -152,41 +132,25 @@ class PumpTrader:
             extreme_fast_token_amount,
             extreme_fast_mode,
         )
-        self.seller = TokenSeller(
+        
+        self.seller = PlatformAwareSeller(
             self.solana_client,
             self.wallet,
-            self.curve_manager,
             self.priority_fee_manager,
             sell_slippage,
             max_retries,
         )
 
-        # Initialize the appropriate listener type
-        listener_type = listener_type.lower()
-        if listener_type == "geyser":
-            if not geyser_endpoint or not geyser_api_token:
-                raise ValueError(
-                    "Geyser endpoint and API token are required for geyser listener"
-                )
-
-            self.token_listener = GeyserListener(
-                geyser_endpoint,
-                geyser_api_token,
-                geyser_auth_type,
-                PumpAddresses.PROGRAM,
-            )
-            logger.info("Using Geyser listener for token monitoring")
-        elif listener_type == "logs":
-            self.token_listener = LogsListener(wss_endpoint, PumpAddresses.PROGRAM)
-            logger.info("Using logsSubscribe listener for token monitoring")
-        elif listener_type == "pumpportal":
-            self.token_listener = PumpPortalListener(
-                PumpAddresses.PROGRAM, pumpportal_url
-            )
-            logger.info("Using PumpPortal listener for token monitoring")
-        else:
-            self.token_listener = BlockListener(wss_endpoint, PumpAddresses.PROGRAM)
-            logger.info("Using blockSubscribe listener for token monitoring")
+        # Initialize the appropriate listener
+        self.token_listener = ListenerFactory.create_listener(
+            listener_type=listener_type,
+            wss_endpoint=wss_endpoint,
+            geyser_endpoint=geyser_endpoint,
+            geyser_api_token=geyser_api_token,
+            geyser_auth_type=geyser_auth_type,
+            pumpportal_url=pumpportal_url,
+            platforms=[self.platform],  # Only listen for our platform
+        )
 
         # Trading parameters
         self.buy_amount = buy_amount
@@ -230,26 +194,18 @@ class PumpTrader:
 
     async def start(self) -> None:
         """Start the trading bot and listen for new tokens."""
-        logger.info("Starting pump.fun trader")
-        logger.info(
-            f"Match filter: {self.match_string if self.match_string else 'None'}"
-        )
-        logger.info(
-            f"Creator filter: {self.bro_address if self.bro_address else 'None'}"
-        )
+        logger.info(f"Starting Universal Trader for {self.platform.value}")
+        logger.info(f"Match filter: {self.match_string if self.match_string else 'None'}")
+        logger.info(f"Creator filter: {self.bro_address if self.bro_address else 'None'}")
         logger.info(f"Marry mode: {self.marry_mode}")
         logger.info(f"YOLO mode: {self.yolo_mode}")
         logger.info(f"Exit strategy: {self.exit_strategy}")
+        
         if self.exit_strategy == "tp_sl":
-            logger.info(
-                f"Take profit: {self.take_profit_percentage * 100 if self.take_profit_percentage else 'None'}%"
-            )
-            logger.info(
-                f"Stop loss: {self.stop_loss_percentage * 100 if self.stop_loss_percentage else 'None'}%"
-            )
-            logger.info(
-                f"Max hold time: {self.max_hold_time if self.max_hold_time else 'None'} seconds"
-            )
+            logger.info(f"Take profit: {self.take_profit_percentage * 100 if self.take_profit_percentage else 'None'}%")
+            logger.info(f"Stop loss: {self.stop_loss_percentage * 100 if self.stop_loss_percentage else 'None'}%")
+            logger.info(f"Max hold time: {self.max_hold_time if self.max_hold_time else 'None'} seconds")
+        
         logger.info(f"Max token age: {self.max_token_age} seconds")
 
         try:
@@ -262,22 +218,16 @@ class PumpTrader:
             # Choose operating mode based on yolo_mode
             if not self.yolo_mode:
                 # Single token mode: process one token and exit
-                logger.info(
-                    "Running in single token mode - will process one token and exit"
-                )
+                logger.info("Running in single token mode - will process one token and exit")
                 token_info = await self._wait_for_token()
                 if token_info:
                     await self._handle_token(token_info)
                     logger.info("Finished processing single token. Exiting...")
                 else:
-                    logger.info(
-                        f"No suitable token found within timeout period ({self.token_wait_timeout}s). Exiting..."
-                    )
+                    logger.info(f"No suitable token found within timeout period ({self.token_wait_timeout}s). Exiting...")
             else:
                 # Continuous mode: process tokens until interrupted
-                logger.info(
-                    "Running in continuous mode - will process tokens until interrupted"
-                )
+                logger.info("Running in continuous mode - will process tokens until interrupted")
                 processor_task = asyncio.create_task(self._process_token_queue())
 
                 try:
@@ -300,7 +250,7 @@ class PumpTrader:
 
         finally:
             await self._cleanup_resources()
-            logger.info("Pump trader has shut down")
+            logger.info("Universal Trader has shut down")
 
     async def _wait_for_token(self) -> TokenInfo | None:
         """Wait for a single token to be detected.
@@ -334,16 +284,12 @@ class PumpTrader:
 
         # Wait for a token with a timeout
         try:
-            logger.info(
-                f"Waiting for a suitable token (timeout: {self.token_wait_timeout}s)..."
-            )
+            logger.info(f"Waiting for a suitable token (timeout: {self.token_wait_timeout}s)...")
             await asyncio.wait_for(token_found.wait(), timeout=self.token_wait_timeout)
             logger.info(f"Found token: {found_token.symbol} ({found_token.mint})")
             return found_token
         except TimeoutError:
-            logger.info(
-                f"Timed out after waiting {self.token_wait_timeout}s for a token"
-            )
+            logger.info(f"Timed out after waiting {self.token_wait_timeout}s for a token")
             return None
         finally:
             listener_task.cancel()
@@ -391,7 +337,7 @@ class PumpTrader:
         self.token_timestamps[token_key] = monotonic()
 
         await self.token_queue.put(token_info)
-        logger.info(f"Queued new token: {token_info.symbol} ({token_info.mint})")
+        logger.info(f"Queued new token: {token_info.symbol} ({token_info.mint}) on {token_info.platform.value}")
 
     async def _process_token_queue(self) -> None:
         """Continuously process tokens from the queue, only if they're fresh."""
@@ -402,21 +348,15 @@ class PumpTrader:
 
                 # Check if token is still "fresh"
                 current_time = monotonic()
-                token_age = current_time - self.token_timestamps.get(
-                    token_key, current_time
-                )
+                token_age = current_time - self.token_timestamps.get(token_key, current_time)
 
                 if token_age > self.max_token_age:
-                    logger.info(
-                        f"Skipping token {token_info.symbol} - too old ({token_age:.1f}s > {self.max_token_age}s)"
-                    )
+                    logger.info(f"Skipping token {token_info.symbol} - too old ({token_age:.1f}s > {self.max_token_age}s)")
                     continue
 
                 self.processed_tokens.add(token_key)
 
-                logger.info(
-                    f"Processing fresh token: {token_info.symbol} (age: {token_age:.1f}s)"
-                )
+                logger.info(f"Processing fresh token: {token_info.symbol} (age: {token_age:.1f}s)")
                 await self._handle_token(token_info)
 
             except asyncio.CancelledError:
@@ -435,19 +375,19 @@ class PumpTrader:
             token_info: Token information
         """
         try:
-            # Wait for bonding curve to stabilize (unless in extreme fast mode)
+            # Validate that token is for our platform
+            if token_info.platform != self.platform:
+                logger.warning(f"Token platform mismatch: expected {self.platform.value}, got {token_info.platform.value}")
+                return
+
+            # Wait for pool/curve to stabilize (unless in extreme fast mode)
             if not self.extreme_fast_mode:
-                # Save token info to file
-                # await self._save_token_info(token_info)
-                logger.info(
-                    f"Waiting for {self.wait_time_after_creation} seconds for the bonding curve to stabilize..."
-                )
+                await self._save_token_info(token_info)
+                logger.info(f"Waiting for {self.wait_time_after_creation} seconds for the pool/curve to stabilize...")
                 await asyncio.sleep(self.wait_time_after_creation)
 
             # Buy token
-            logger.info(
-                f"Buying {self.buy_amount:.6f} SOL worth of {token_info.symbol}..."
-            )
+            logger.info(f"Buying {self.buy_amount:.6f} SOL worth of {token_info.symbol} on {token_info.platform.value}...")
             buy_result: TradeResult = await self.buyer.execute(token_info)
 
             if buy_result.success:
@@ -457,31 +397,21 @@ class PumpTrader:
 
             # Only wait for next token in yolo mode
             if self.yolo_mode:
-                logger.info(
-                    f"YOLO mode enabled. Waiting {self.wait_time_before_new_token} seconds before looking for next token..."
-                )
+                logger.info(f"YOLO mode enabled. Waiting {self.wait_time_before_new_token} seconds before looking for next token...")
                 await asyncio.sleep(self.wait_time_before_new_token)
 
         except Exception as e:
             logger.error(f"Error handling token {token_info.symbol}: {e!s}")
 
-    async def _handle_successful_buy(
-        self, token_info: TokenInfo, buy_result: TradeResult
-    ) -> None:
+    async def _handle_successful_buy(self, token_info: TokenInfo, buy_result: TradeResult) -> None:
         """Handle successful token purchase.
 
         Args:
             token_info: Token information
             buy_result: The result of the buy operation
         """
-        logger.info(f"Successfully bought {token_info.symbol}")
-        self._log_trade(
-            "buy",
-            token_info,
-            buy_result.price,  # type: ignore
-            buy_result.amount,  # type: ignore
-            buy_result.tx_signature,
-        )
+        logger.info(f"Successfully bought {token_info.symbol} on {token_info.platform.value}")
+        self._log_trade("buy", token_info, buy_result.price, buy_result.amount, buy_result.tx_signature)
         self.traded_mints.add(token_info.mint)
 
         # Choose exit strategy
@@ -495,9 +425,7 @@ class PumpTrader:
         else:
             logger.info("Marry mode enabled. Skipping sell operation.")
 
-    async def _handle_failed_buy(
-        self, token_info: TokenInfo, buy_result: TradeResult
-    ) -> None:
+    async def _handle_failed_buy(self, token_info: TokenInfo, buy_result: TradeResult) -> None:
         """Handle failed token purchase.
 
         Args:
@@ -516,9 +444,7 @@ class PumpTrader:
             self.cleanup_force_close_with_burn,
         )
 
-    async def _handle_tp_sl_exit(
-        self, token_info: TokenInfo, buy_result: TradeResult
-    ) -> None:
+    async def _handle_tp_sl_exit(self, token_info: TokenInfo, buy_result: TradeResult) -> None:
         """Handle take profit/stop loss exit strategy.
 
         Args:
@@ -529,8 +455,8 @@ class PumpTrader:
         position = Position.create_from_buy_result(
             mint=token_info.mint,
             symbol=token_info.symbol,
-            entry_price=buy_result.price,  # type: ignore
-            quantity=buy_result.amount,  # type: ignore
+            entry_price=buy_result.price,
+            quantity=buy_result.amount,
             take_profit_percentage=self.take_profit_percentage,
             stop_loss_percentage=self.stop_loss_percentage,
             max_hold_time=self.max_hold_time,
@@ -559,13 +485,7 @@ class PumpTrader:
 
         if sell_result.success:
             logger.info(f"Successfully sold {token_info.symbol}")
-            self._log_trade(
-                "sell",
-                token_info,
-                sell_result.price,  # type: ignore
-                sell_result.amount,  # type: ignore
-                sell_result.tx_signature,
-            )
+            self._log_trade("sell", token_info, sell_result.price, sell_result.amount, sell_result.tx_signature)
             # Close ATA if enabled
             await handle_cleanup_after_sell(
                 self.solana_client,
@@ -577,29 +497,25 @@ class PumpTrader:
                 self.cleanup_force_close_with_burn,
             )
         else:
-            logger.error(
-                f"Failed to sell {token_info.symbol}: {sell_result.error_message}"
-            )
+            logger.error(f"Failed to sell {token_info.symbol}: {sell_result.error_message}")
 
-    async def _monitor_position_until_exit(
-        self, token_info: TokenInfo, position: Position
-    ) -> None:
+    async def _monitor_position_until_exit(self, token_info: TokenInfo, position: Position) -> None:
         """Monitor a position until exit conditions are met.
 
         Args:
             token_info: Token information
             position: Position to monitor
         """
-        logger.info(
-            f"Starting position monitoring (check interval: {self.price_check_interval}s)"
-        )
+        logger.info(f"Starting position monitoring (check interval: {self.price_check_interval}s)")
+
+        # Get pool address for price monitoring
+        pool_address = self._get_pool_address(token_info)
+        curve_manager = self.platform_implementations.curve_manager
 
         while position.is_active:
             try:
-                # Get current price from bonding curve
-                current_price = await self.curve_manager.calculate_price(
-                    token_info.bonding_curve
-                )
+                # Get current price from pool/curve
+                current_price = await curve_manager.calculate_price(pool_address)
 
                 # Check if position should be exited
                 should_exit, exit_reason = position.should_exit(current_price)
@@ -610,33 +526,21 @@ class PumpTrader:
 
                     # Log PnL before exit
                     pnl = position.get_pnl(current_price)
-                    logger.info(
-                        f"Position PnL: {pnl['price_change_pct']:.2f}% ({pnl['unrealized_pnl_sol']:.6f} SOL)"
-                    )
+                    logger.info(f"Position PnL: {pnl['price_change_pct']:.2f}% ({pnl['unrealized_pnl_sol']:.6f} SOL)")
 
                     # Execute sell
                     sell_result = await self.seller.execute(token_info)
 
                     if sell_result.success:
                         # Close position with actual exit price
-                        position.close_position(sell_result.price, exit_reason)  # type: ignore
+                        position.close_position(sell_result.price, exit_reason)
 
-                        logger.info(
-                            f"Successfully exited position: {exit_reason.value}"
-                        )
-                        self._log_trade(
-                            "sell",
-                            token_info,
-                            sell_result.price,  # type: ignore
-                            sell_result.amount,  # type: ignore
-                            sell_result.tx_signature,
-                        )
+                        logger.info(f"Successfully exited position: {exit_reason.value}")
+                        self._log_trade("sell", token_info, sell_result.price, sell_result.amount, sell_result.tx_signature)
 
                         # Log final PnL
                         final_pnl = position.get_pnl()
-                        logger.info(
-                            f"Final PnL: {final_pnl['price_change_pct']:.2f}% ({final_pnl['unrealized_pnl_sol']:.6f} SOL)"
-                        )
+                        logger.info(f"Final PnL: {final_pnl['price_change_pct']:.2f}% ({final_pnl['unrealized_pnl_sol']:.6f} SOL)")
 
                         # Close ATA if enabled
                         await handle_cleanup_after_sell(
@@ -649,27 +553,40 @@ class PumpTrader:
                             self.cleanup_force_close_with_burn,
                         )
                     else:
-                        logger.error(
-                            f"Failed to exit position: {sell_result.error_message}"
-                        )
+                        logger.error(f"Failed to exit position: {sell_result.error_message}")
                         # Keep monitoring in case sell can be retried
 
                     break
                 else:
                     # Log current status
                     pnl = position.get_pnl(current_price)
-                    logger.debug(
-                        f"Position status: {current_price:.8f} SOL ({pnl['price_change_pct']:+.2f}%)"
-                    )
+                    logger.debug(f"Position status: {current_price:.8f} SOL ({pnl['price_change_pct']:+.2f}%)")
 
                 # Wait before next price check
                 await asyncio.sleep(self.price_check_interval)
 
             except Exception as e:
                 logger.error(f"Error monitoring position: {e}")
-                await asyncio.sleep(
-                    self.price_check_interval
-                )  # Continue monitoring despite errors
+                await asyncio.sleep(self.price_check_interval)  # Continue monitoring despite errors
+
+    def _get_pool_address(self, token_info: TokenInfo) -> Pubkey:
+        """Get the pool/curve address for price monitoring.
+        
+        Args:
+            token_info: Token information
+            
+        Returns:
+            Pool/curve address
+        """
+        address_provider = self.platform_implementations.address_provider
+        
+        if token_info.platform == Platform.PUMP_FUN:
+            return token_info.bonding_curve or address_provider.derive_pool_address(token_info.mint)
+        elif token_info.platform == Platform.LETS_BONK:
+            return token_info.pool_state or address_provider.derive_pool_address(token_info.mint)
+        else:
+            # Fallback to deriving the address
+            return address_provider.derive_pool_address(token_info.mint)
 
     async def _save_token_info(self, token_info: TokenInfo) -> None:
         """Save token information to a file.
@@ -681,21 +598,32 @@ class PumpTrader:
             os.makedirs("trades", exist_ok=True)
             file_name = os.path.join("trades", f"{token_info.mint}.txt")
 
+            # Convert to dictionary for saving
+            token_dict = {
+                "name": token_info.name,
+                "symbol": token_info.symbol,
+                "uri": token_info.uri,
+                "mint": str(token_info.mint),
+                "platform": token_info.platform.value,
+                "user": str(token_info.user) if token_info.user else None,
+                "creator": str(token_info.creator) if token_info.creator else None,
+                # Platform-specific fields
+                "bonding_curve": str(token_info.bonding_curve) if token_info.bonding_curve else None,
+                "associated_bonding_curve": str(token_info.associated_bonding_curve) if token_info.associated_bonding_curve else None,
+                "creator_vault": str(token_info.creator_vault) if token_info.creator_vault else None,
+                "pool_state": str(token_info.pool_state) if token_info.pool_state else None,
+                "base_vault": str(token_info.base_vault) if token_info.base_vault else None,
+                "quote_vault": str(token_info.quote_vault) if token_info.quote_vault else None,
+            }
+
             with open(file_name, "w") as file:
-                file.write(json.dumps(token_info.to_dict(), indent=2))
+                file.write(json.dumps(token_dict, indent=2))
 
             logger.info(f"Token information saved to {file_name}")
         except Exception as e:
             logger.error(f"Failed to save token information: {e!s}")
 
-    def _log_trade(
-        self,
-        action: str,
-        token_info: TokenInfo,
-        price: float,
-        amount: float,
-        tx_hash: str | None,
-    ) -> None:
+    def _log_trade(self, action: str, token_info: TokenInfo, price: float, amount: float, tx_hash: str | None) -> None:
         """Log trade information.
 
         Args:
@@ -711,6 +639,7 @@ class PumpTrader:
             log_entry = {
                 "timestamp": datetime.utcnow().isoformat(),
                 "action": action,
+                "platform": token_info.platform.value,
                 "token_address": str(token_info.mint),
                 "symbol": token_info.symbol,
                 "price": price,
@@ -722,3 +651,7 @@ class PumpTrader:
                 log_file.write(json.dumps(log_entry) + "\n")
         except Exception as e:
             logger.error(f"Failed to log trade information: {e!s}")
+
+
+# Backward compatibility alias
+PumpTrader = UniversalTrader  # Legacy name for backward compatibility

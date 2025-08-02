@@ -79,7 +79,7 @@ VALID_VALUES = {
     "filters.listener_type": ["logs", "blocks", "geyser", "pumpportal"],
     "cleanup.mode": ["disabled", "on_fail", "after_sell", "post_session"],
     "trade.exit_strategy": ["time_based", "tp_sl", "manual"],
-    "platform": ["pump_fun", "lets_bonk"],  # New platform validation
+    "platform": ["pump_fun", "lets_bonk"],  # Platform validation
 }
 
 

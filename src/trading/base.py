@@ -12,13 +12,76 @@ from typing import Any
 
 from solders.pubkey import Pubkey
 
-from interfaces.core import Platform
-
-# Import the new enhanced TokenInfo and Platform from interfaces
-from interfaces.core import TokenInfo as EnhancedTokenInfo
+# Import from interfaces to avoid duplication
+from interfaces.core import Platform, TokenInfo
 
 
-# Keep the original TokenInfo structure for backward compatibility
+@dataclass
+class TradeResult:
+    """Enhanced result of a trading operation with platform support."""
+    success: bool
+    platform: Platform = Platform.PUMP_FUN  # Add platform tracking
+    tx_signature: str | None = None
+    error_message: str | None = None
+    amount: float | None = None
+    price: float | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for logging/serialization.
+        
+        Returns:
+            Dictionary representation of the trade result
+        """
+        return {
+            "success": self.success,
+            "platform": self.platform.value,
+            "tx_signature": self.tx_signature,
+            "error_message": self.error_message,
+            "amount": self.amount,
+            "price": self.price,
+        }
+
+
+class Trader(ABC):
+    """Enhanced base interface for trading operations with platform support."""
+
+    @abstractmethod
+    async def execute(self, token_info: TokenInfo, *args, **kwargs) -> TradeResult:
+        """Execute trading operation.
+
+        Args:
+            token_info: Enhanced token information with platform support
+            
+        Returns:
+            TradeResult with operation outcome including platform info
+        """
+        pass
+
+    def _get_relevant_accounts(self, token_info: TokenInfo) -> list[Pubkey]:
+        """
+        Get the list of accounts relevant for calculating the priority fee.
+        
+        This is now platform-agnostic and should be overridden by platform-specific traders.
+
+        Args:
+            token_info: Enhanced token information
+
+        Returns:
+            List of relevant accounts (basic implementation)
+        """
+        # Basic implementation - platform-specific traders should override this
+        accounts = [token_info.mint]
+        
+        if token_info.bonding_curve:
+            accounts.append(token_info.bonding_curve)
+            
+        if token_info.pool_state:  # For other platforms
+            accounts.append(token_info.pool_state)
+        
+        return accounts
+
+
+# Legacy TokenInfo for backward compatibility (keep pump.fun specific)
 @dataclass
 class TokenInfo_Legacy:
     """Legacy token information structure for backward compatibility."""
@@ -71,86 +134,6 @@ class TokenInfo_Legacy:
             "creator": str(self.creator),
             "creatorVault": str(self.creator_vault),
         }
-
-
-@dataclass
-class TradeResult:
-    """Enhanced result of a trading operation with platform support."""
-    success: bool
-    platform: Platform = Platform.PUMP_FUN  # Add platform tracking
-    tx_signature: str | None = None
-    error_message: str | None = None
-    amount: float | None = None
-    price: float | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for logging/serialization.
-        
-        Returns:
-            Dictionary representation of the trade result
-        """
-        return {
-            "success": self.success,
-            "platform": self.platform.value,
-            "tx_signature": self.tx_signature,
-            "error_message": self.error_message,
-            "amount": self.amount,
-            "price": self.price,
-        }
-
-
-class Trader(ABC):
-    """Enhanced base interface for trading operations with platform support."""
-
-    @abstractmethod
-    async def execute(self, token_info: "TokenInfo", *args, **kwargs) -> TradeResult:
-        """Execute trading operation.
-
-        Args:
-            token_info: Enhanced token information with platform support
-            
-        Returns:
-            TradeResult with operation outcome including platform info
-        """
-        pass
-
-    def _get_relevant_accounts(self, token_info: "TokenInfo") -> list[Pubkey]:
-        """
-        Get the list of accounts relevant for calculating the priority fee.
-        
-        This is now platform-agnostic and should be overridden by platform-specific traders.
-
-        Args:
-            token_info: Enhanced token information
-
-        Returns:
-            List of relevant accounts (default implementation for pump.fun compatibility)
-        """
-        # Default implementation maintains pump.fun compatibility
-        from core.pubkeys import PumpAddresses
-        
-        accounts = [token_info.mint]
-        
-        if token_info.bonding_curve:
-            accounts.append(token_info.bonding_curve)
-            
-        if token_info.pool_state:  # For other platforms
-            accounts.append(token_info.pool_state)
-            
-        # Add platform program
-        if token_info.platform == Platform.PUMP_FUN:
-            accounts.extend([
-                PumpAddresses.PROGRAM,
-                PumpAddresses.FEE,
-            ])
-        # Other platforms would add their specific accounts here
-        
-        return accounts
-
-
-# Use the enhanced TokenInfo as the main TokenInfo class
-# This provides the new functionality while maintaining the same import path
-TokenInfo = EnhancedTokenInfo
 
 
 def upgrade_token_info(legacy_token_info: TokenInfo_Legacy) -> TokenInfo:
@@ -246,18 +229,11 @@ def create_pump_fun_token_info(
     Returns:
         Enhanced TokenInfo configured for pump.fun
     """
-    from core.pubkeys import PumpAddresses
-    
-    # Default creator to user if not provided
-    if creator is None:
-        creator = user
-    
-    # Derive creator vault if not provided
-    if creator_vault is None:
-        creator_vault, _ = Pubkey.find_program_address(
-            [b"creator-vault", bytes(creator)],
-            PumpAddresses.PROGRAM,
-        )
+    # Derive creator vault if not provided (import here to avoid circular imports)
+    if creator_vault is None and creator:
+        # We can't import PumpAddresses here, so this will need to be handled elsewhere
+        # For now, leave it as None and let the platform implementation handle it
+        pass
     
     return TokenInfo(
         name=name,
@@ -268,7 +244,7 @@ def create_pump_fun_token_info(
         bonding_curve=bonding_curve,
         associated_bonding_curve=associated_bonding_curve,
         user=user,
-        creator=creator,
+        creator=creator or user,
         creator_vault=creator_vault,
         **kwargs
     )
@@ -303,10 +279,6 @@ def create_lets_bonk_token_info(
     Returns:
         Enhanced TokenInfo configured for LetsBonk
     """
-    # Default creator to user if not provided
-    if creator is None:
-        creator = user
-    
     return TokenInfo(
         name=name,
         symbol=symbol,
@@ -317,7 +289,7 @@ def create_lets_bonk_token_info(
         base_vault=base_vault,
         quote_vault=quote_vault,
         user=user,
-        creator=creator,
+        creator=creator or user,
         **kwargs
     )
 
@@ -406,7 +378,6 @@ def validate_token_info(token_info: TokenInfo) -> bool:
 
 
 # Backward compatibility exports
-# This allows existing imports to continue working
 __all__ = [
     'Platform',            # Platform enum
     'TokenInfo',           # Enhanced TokenInfo (main export)
@@ -415,13 +386,10 @@ __all__ = [
     'Trader',              # Enhanced Trader base class
     'create_legacy_token_info',
     'create_lets_bonk_token_info',
-    # Convenience functions
     'create_pump_fun_token_info',
     'get_platform_specific_fields',
     'is_lets_bonk_token',
-    # Utility functions
     'is_pump_fun_token',
-    # Conversion functions
     'upgrade_token_info',
     'validate_token_info',
 ]

@@ -1,5 +1,5 @@
 """
-Geyser monitoring for pump.fun tokens.
+Universal Geyser listener that works with any platform through the interface system.
 """
 
 import asyncio
@@ -9,34 +9,36 @@ import grpc
 from solders.pubkey import Pubkey
 
 from geyser.generated import geyser_pb2, geyser_pb2_grpc
+from interfaces.core import Platform, TokenInfo
 from monitoring.base_listener import BaseTokenListener
-from monitoring.geyser_event_processor import GeyserEventProcessor
-from trading.base import TokenInfo
+from platforms import get_platform_implementations
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 
-class GeyserListener(BaseTokenListener):
-    """Geyser listener for pump.fun token creation events."""
+class UniversalGeyserListener(BaseTokenListener):
+    """Universal Geyser listener that works with any platform."""
 
     def __init__(
         self,
         geyser_endpoint: str,
         geyser_api_token: str,
         geyser_auth_type: str,
-        pump_program: Pubkey,
+        platforms: list[Platform] | None = None,
     ):
-        """Initialize token listener.
+        """Initialize universal Geyser listener.
 
         Args:
             geyser_endpoint: Geyser gRPC endpoint URL
             geyser_api_token: API token for authentication
             geyser_auth_type: authentication type ('x-token' or 'basic')
-            pump_program: Pump.fun program address
+            platforms: List of platforms to monitor (if None, monitor all supported platforms)
         """
+        super().__init__()
         self.geyser_endpoint = geyser_endpoint
         self.geyser_api_token = geyser_api_token
+        
         valid_auth_types = {"x-token", "basic"}
         self.auth_type: str = (geyser_auth_type or "x-token").lower()
         if self.auth_type not in valid_auth_types:
@@ -44,8 +46,35 @@ class GeyserListener(BaseTokenListener):
                 f"Unsupported auth_type={self.auth_type!r}. "
                 f"Expected one of {valid_auth_types}"
             )
-        self.pump_program = pump_program
-        self.event_processor = GeyserEventProcessor(pump_program)
+        
+        # Import platform factory and get supported platforms
+        from platforms import platform_factory
+        
+        if platforms is None:
+            # Monitor all supported platforms
+            self.platforms = platform_factory.get_supported_platforms()
+        else:
+            self.platforms = platforms
+            
+        # Get event parsers for all platforms
+        self.platform_parsers = {}
+        self.platform_program_ids = set()
+        
+        for platform in self.platforms:
+            try:
+                # We'll need a dummy client for getting the parser - this is a design issue we should fix
+                from core.client import SolanaClient
+                dummy_client = SolanaClient("http://localhost")  # Won't be used for parsing
+                
+                implementations = get_platform_implementations(platform, dummy_client)
+                parser = implementations.event_parser
+                self.platform_parsers[platform] = parser
+                self.platform_program_ids.add(parser.get_program_id())
+                
+                logger.info(f"Registered platform {platform.value} with program ID {parser.get_program_id()}")
+                
+            except Exception as e:
+                logger.warning(f"Could not register platform {platform.value}: {e}")
 
     async def _create_geyser_connection(self):
         """Establish a secure connection to the Geyser endpoint."""
@@ -66,12 +95,15 @@ class GeyserListener(BaseTokenListener):
         return geyser_pb2_grpc.GeyserStub(channel), channel
 
     def _create_subscription_request(self):
-        """Create a subscription request for Pump.fun transactions."""
+        """Create a subscription request for all monitored platforms."""
         request = geyser_pb2.SubscribeRequest()
-        request.transactions["pump_filter"].account_include.append(
-            str(self.pump_program)
-        )
-        request.transactions["pump_filter"].failed = False
+        
+        # Add all platform program IDs to the filter
+        for program_id in self.platform_program_ids:
+            filter_name = f"platform_filter_{program_id}"
+            request.transactions[filter_name].account_include.append(str(program_id))
+            request.transactions[filter_name].failed = False
+            
         request.commitment = geyser_pb2.CommitmentLevel.PROCESSED
         return request
 
@@ -88,15 +120,18 @@ class GeyserListener(BaseTokenListener):
             match_string: Optional string to match in token name/symbol
             creator_address: Optional creator address to filter by
         """
+        if not self.platform_parsers:
+            logger.error("No platform parsers available. Cannot listen for tokens.")
+            return
+
         while True:
             try:
                 stub, channel = await self._create_geyser_connection()
                 request = self._create_subscription_request()
 
                 logger.info(f"Connected to Geyser endpoint: {self.geyser_endpoint}")
-                logger.info(
-                    f"Monitoring for transactions involving program: {self.pump_program}"
-                )
+                logger.info(f"Monitoring platforms: {[p.value for p in self.platforms]}")
+                logger.info(f"Monitoring program IDs: {[str(pid) for pid in self.platform_program_ids]}")
 
                 try:
                     async for update in stub.Subscribe(iter([request])):
@@ -105,9 +140,10 @@ class GeyserListener(BaseTokenListener):
                             continue
 
                         logger.info(
-                            f"New token detected: {token_info.name} ({token_info.symbol})"
+                            f"New token detected: {token_info.name} ({token_info.symbol}) on {token_info.platform.value}"
                         )
 
+                        # Apply filters
                         if match_string and not (
                             match_string.lower() in token_info.name.lower()
                             or match_string.lower() in token_info.symbol.lower()
@@ -156,21 +192,22 @@ class GeyserListener(BaseTokenListener):
                 return None
 
             for ix in msg.instructions:
-                # Skip non-Pump.fun program instructions
+                # Check which platform this instruction belongs to
                 program_idx = ix.program_id_index
                 if program_idx >= len(msg.account_keys):
                     continue
 
-                program_id = msg.account_keys[program_idx]
-                if bytes(program_id) != bytes(self.pump_program):
-                    continue
-
-                # Process instruction data
-                token_info = self.event_processor.process_transaction_data(
-                    ix.data, ix.accounts, msg.account_keys
-                )
-                if token_info:
-                    return token_info
+                program_id = Pubkey.from_bytes(msg.account_keys[program_idx])
+                
+                # Find the matching platform parser
+                for platform, parser in self.platform_parsers.items():
+                    if program_id == parser.get_program_id():
+                        # Use the platform's event parser
+                        token_info = parser.parse_token_creation_from_instruction(
+                            ix.data, ix.accounts, msg.account_keys
+                        )
+                        if token_info:
+                            return token_info
 
             return None
 

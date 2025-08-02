@@ -49,9 +49,20 @@ class UniversalBlockListener(BaseTokenListener):
         
         for platform in self.platforms:
             try:
-                # We'll need a dummy client for getting the parser
+                # Create a simple dummy client that doesn't start blockhash updater
                 from core.client import SolanaClient
-                dummy_client = SolanaClient("http://localhost")  # Won't be used for parsing
+                
+                # Create a mock client class to avoid network operations
+                class DummyClient(SolanaClient):
+                    def __init__(self):
+                        # Skip SolanaClient.__init__ to avoid starting blockhash updater
+                        self.rpc_endpoint = "http://dummy"
+                        self._client = None
+                        self._cached_blockhash = None
+                        self._blockhash_lock = None
+                        self._blockhash_updater_task = None
+                
+                dummy_client = DummyClient()
                 
                 implementations = get_platform_implementations(platform, dummy_client)
                 parser = implementations.event_parser

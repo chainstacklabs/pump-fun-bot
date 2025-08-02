@@ -50,13 +50,24 @@ class UniversalGeyserListener(BaseTokenListener):
         self.platform_parsers = {}
         self.platform_program_ids = set()
         
-        # Create a temporary client for getting parsers
-        from core.client import SolanaClient
-        temp_client = SolanaClient("http://temp")
-        
         for platform in self.platforms:
             try:
-                implementations = platform_factory.create_for_platform(platform, temp_client)
+                # Create a simple dummy client that doesn't start blockhash updater
+                from core.client import SolanaClient
+                
+                # Create a mock client class to avoid network operations
+                class DummyClient(SolanaClient):
+                    def __init__(self):
+                        # Skip SolanaClient.__init__ to avoid starting blockhash updater
+                        self.rpc_endpoint = "http://dummy"
+                        self._client = None
+                        self._cached_blockhash = None
+                        self._blockhash_lock = None
+                        self._blockhash_updater_task = None
+                
+                dummy_client = DummyClient()
+                
+                implementations = platform_factory.create_for_platform(platform, dummy_client)
                 parser = implementations.event_parser
                 self.platform_parsers[platform] = parser
                 self.platform_program_ids.add(parser.get_program_id())

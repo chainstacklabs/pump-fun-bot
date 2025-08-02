@@ -132,6 +132,6 @@ class ListenerFactory:
         if platform == Platform.PUMP_FUN:
             return ["logs", "blocks", "geyser", "pumpportal"]
         elif platform == Platform.LETS_BONK:
-            return ["logs", "blocks", "geyser"]  # PumpPortal is pump.fun only
+            return ["blocks", "geyser"]  # LetsBonk only supports geyser and blocks
         else:
-            return ["logs", "blocks", "geyser"]  # Default universal listeners
+            return ["blocks", "geyser"]  # Default universal listeners

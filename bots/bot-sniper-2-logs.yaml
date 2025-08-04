@@ -28,9 +28,9 @@ trade:
   sell_slippage: 0.3
 
   # Exit strategy configuration
-  exit_strategy: "tp_sl" # Options: "time_based", "tp_sl", "manual"
-  take_profit_percentage: 0.2 # Take profit at 20% gain (0.2 = 20%)
-  stop_loss_percentage: 0.2 # Stop loss at 20% loss (0.2 = 20%)
+  exit_strategy: "time_based" # Options: "time_based", "tp_sl", "manual"
+  take_profit_percentage: 0.4 # Take profit at 40% gain (0.4 = 40%)
+  stop_loss_percentage: 0.4 # Stop loss at 40% loss (0.4 = 40%)
   max_hold_time: 60 # Maximum hold time in seconds
   price_check_interval: 2 # Check price every 2 seconds
 

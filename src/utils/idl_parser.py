@@ -163,44 +163,78 @@ class IDLParser:
 
         discriminator = event_data[:DISCRIMINATOR_SIZE]
         
-        # If event_name provided, validate it matches the discriminator
-        if event_name:
-            event_discriminators = self.get_event_discriminators()
-            if event_name not in event_discriminators:
-                if self.verbose:
-                    print(f"Unknown event name: {event_name}")
-                return None
-            if event_discriminators[event_name] != discriminator:
-                if self.verbose:
-                    print(f"Event discriminator mismatch for {event_name}")
-                return None
-            event_def = self.events[discriminator]
-        else:
-            # Try to find event by discriminator
-            if discriminator not in self.events:
-                if self.verbose:
-                    print(f"Unknown event discriminator: {discriminator.hex()}")
-                return None
-            event_def = self.events[discriminator]
+        # Find event definition by discriminator in events section
+        if discriminator not in self.events:
+            if self.verbose:
+                print(f"Unknown event discriminator: {discriminator.hex()}")
+            return None
+        
+        event_def = self.events[discriminator]
+        
+        # If event_name provided, validate it matches
+        if event_name and event_def['name'] != event_name:
+            if self.verbose:
+                print(f"Event name mismatch: expected {event_name}, got {event_def['name']}")
+            return None
 
+        # Get the actual structure definition from types section
+        event_name_actual = event_def['name']
+        if event_name_actual not in self.types:
+            if self.verbose:
+                print(f"Event type {event_name_actual} not found in types section")
+            return None
+        
+        type_def = self.types[event_name_actual]
+        event_type = type_def.get('type', {})
+        
         # Decode event fields
         try:
             event_fields = {}
             data_part = event_data[DISCRIMINATOR_SIZE:]
             decode_offset = 0
             
-            for field in event_def.get('fields', []):
-                value, decode_offset = self._decode_type(data_part, decode_offset, field['type'])
-                event_fields[field['name']] = value
+            if event_type.get('kind') != 'struct':
+                if self.verbose:
+                    print(f"Event {event_name_actual} is not a struct type: {event_type.get('kind', 'NO KIND')}")
+                    print(f"Available keys in type_def: {list(type_def.keys())}")
+                    print(f"Event type structure: {event_type}")
+                return None
+            
+            # Decode each field in the struct
+            fields = event_type.get('fields', [])
+            if self.verbose:
+                print(f"Decoding {len(fields)} fields for event {event_name_actual}")
+            
+            for field in fields:
+                if self.verbose:
+                    print(f"Decoding field: {field['name']} ({field['type']})")
+                
+                try:
+                    value, decode_offset = self._decode_type(data_part, decode_offset, field['type'])
+                    event_fields[field['name']] = value
+                    
+                    if self.verbose:
+                        if field['type'] == 'string':
+                            print(f"  -> '{value}'")
+                        elif field['type'] == 'pubkey':
+                            print(f"  -> {value}")
+                        else:
+                            print(f"  -> {value}")
+                            
+                except Exception as e:
+                    if self.verbose:
+                        print(f"Error decoding field {field['name']}: {e}")
+                    # Don't return None here, continue with other fields
+                    continue
 
             return {
-                'event_name': event_def['name'],
+                'event_name': event_name_actual,
                 'fields': event_fields
             }
 
         except Exception as e:
             if self.verbose:
-                print(f"❌ Error decoding event {event_def['name']}: {e}")
+                print(f"❌ Error decoding event {event_name_actual}: {e}")
             return None
 
     def find_event_in_logs(self, logs: list[str], target_event_name: str | None = None) -> dict[str, Any] | None:

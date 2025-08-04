@@ -55,7 +55,7 @@ class PumpFunEventParser(EventParser):
         logs: list[str],
         signature: str
     ) -> TokenInfo | None:
-        """Parse token creation from pump.fun transaction logs using IDL instruction parsing.
+        """Parse token creation from pump.fun transaction logs using IDL event parsing.
         
         Args:
             logs: List of log strings from transaction
@@ -72,88 +72,127 @@ class PumpFunEventParser(EventParser):
         if any("Program log: Instruction: CreateTokenAccount" in log for log in logs):
             return None
 
+        logger.info(f"🔍 Parsing token creation from logs for signature: {signature}")
+        
         # Look for event data in the logs (CreateEvent data!)
+        # We need to find the Program data that comes after "Instruction: Create"
         try:
-            for log in logs:
-                if "Program data:" in log:
+            create_instruction_found = False
+            program_data_entries = []
+            
+            # First, collect all Program data entries and note when Create instruction happens
+            for i, log in enumerate(logs):
+                if "Program log: Instruction: Create" in log:
+                    create_instruction_found = True
+                    logger.info(f"📝 Found Create instruction at log index {i}")
+                elif "Program data:" in log:
+                    # Extract base64 encoded event data
+                    encoded_data = log.split("Program data: ")[1].strip()
+                    program_data_entries.append((i, encoded_data, log))
+                    logger.info(f"📊 Found Program data at log index {i}, length: {len(encoded_data)}")
+            
+            if not create_instruction_found:
+                logger.info("❌ No Create instruction found in logs")
+                return None
+                
+            if not program_data_entries:
+                logger.info("❌ No Program data entries found in logs")
+                return None
+            
+            logger.info(f"🔍 Found {len(program_data_entries)} Program data entries to check")
+            
+            # Try each Program data entry
+            for entry_idx, (log_idx, encoded_data, full_log) in enumerate(program_data_entries):
+                try:
+                    logger.info(f"🧪 Trying Program data entry {entry_idx + 1}/{len(program_data_entries)} (log index {log_idx})")
+                    
+                    decoded_data = base64.b64decode(encoded_data)
+                    
+                    if len(decoded_data) < 8:
+                        logger.info(f"⚠️ Program data too short: {len(decoded_data)} bytes")
+                        continue
+                        
+                    # Check discriminator from program data
+                    discriminator = decoded_data[:8]
+                    discriminator_int = struct.unpack("<Q", discriminator)[0]
+                    
+                    logger.info(f"🔍 Program data discriminator: {discriminator.hex()} (int: {discriminator_int})")
+                    logger.info(f"🎯 Expected CreateEvent discriminator: {self._create_event_discriminator_bytes.hex()} (int: {self._create_event_discriminator})")
+                    
+                    # Try to decode as CreateEvent using IDL parser
+                    decoded_event = self._idl_parser.decode_event_data(decoded_data, "CreateEvent")
+                    
+                    if not decoded_event:
+                        logger.info("❌ IDL parser returned None for CreateEvent")
+                        continue
+                        
+                    if decoded_event.get('event_name') != 'CreateEvent':
+                        logger.info(f"❌ Wrong event type: {decoded_event.get('event_name', 'None')}")
+                        continue
+
+                    logger.info(f"✅ Successfully decoded event: {decoded_event.get('event_name', 'Unknown')}")
+                    logger.info(f"🔍 Event fields: {list(decoded_event.get('fields', {}).keys())}")
+
+                    fields = decoded_event.get('fields', {})
+                    if not fields:
+                        logger.info("❌ No fields found in decoded event")
+                        continue
+                    
+                    # Validate required fields exist
+                    required_fields = ["mint", "bonding_curve", "user", "creator", "name", "symbol", "uri"]
+                    missing_fields = [field for field in required_fields if field not in fields]
+                    if missing_fields:
+                        logger.info(f"❌ Missing required fields: {missing_fields}")
+                        continue
+                        
+                    logger.info(f"🎯 Token found: {fields.get('symbol', 'Unknown')} ({fields.get('name', 'Unknown')})")
+                        
+                    # Convert string representations to Pubkey objects
+                    # Note: IDL parser returns pubkeys as base58 strings
                     try:
-                        # Extract base64 encoded event data
-                        encoded_data = log.split("Program data: ")[1].strip()
-                        decoded_data = base64.b64decode(encoded_data)
+                        mint = Pubkey.from_string(fields["mint"]) if isinstance(fields["mint"], str) else fields["mint"]
+                        bonding_curve = Pubkey.from_string(fields["bonding_curve"]) if isinstance(fields["bonding_curve"], str) else fields["bonding_curve"]
+                        user = Pubkey.from_string(fields["user"]) if isinstance(fields["user"], str) else fields["user"]
+                        creator = Pubkey.from_string(fields["creator"]) if isinstance(fields["creator"], str) else fields["creator"]
                         
-                        # Parse as event data (CreateEvent)
-                        # The "Program data:" in logs contains event data, not instruction data
-                        if len(decoded_data) < 8:
-                            continue
-                            
-                        # Check discriminator from program data
-                        discriminator = decoded_data[:8]
-                        discriminator_int = struct.unpack("<Q", discriminator)[0]
-                        
-                        # Debug: Print all discriminators
-                        print(f"🔍 Program data discriminator found: {discriminator.hex()} (int: {discriminator_int})")
-                        print(f"🎯 Expected CreateEvent discriminator: {self._create_event_discriminator_bytes.hex()} (int: {self._create_event_discriminator})")
-                        print(f"🛠️ Expected create instruction discriminator: {self._create_instruction_discriminator_bytes.hex()} (int: {self._create_instruction_discriminator})")
-                        
-                        # Check if it matches CreateEvent discriminator
-                        decoded_event = None
-                        if discriminator_int == self._create_event_discriminator:
-                            print("✅ Matches CreateEvent discriminator - proceeding with event parsing")
-                            # Use IDL parser to decode the event data
-                            decoded_event = self._idl_parser.decode_event_data(decoded_data, "CreateEvent")
-                            if not decoded_event or decoded_event['event_name'] != 'CreateEvent':
-                                print("❌ IDL parser failed to decode as CreateEvent")
-                                continue
-                        else:
-                            print(f"⚠️ Discriminator mismatch - found {discriminator_int}, expected {self._create_event_discriminator}")
-                            # Try to decode anyway (maybe the discriminator calculation is wrong)
-                            print("🔄 Trying to decode anyway...")
-                            decoded_event = self._idl_parser.decode_event_data(decoded_data, "CreateEvent")
-                            if not decoded_event or decoded_event['event_name'] != 'CreateEvent':
-                                print("❌ IDL parser also failed with mismatched discriminator")
-                                continue
-                            print("✅ IDL parser succeeded despite discriminator mismatch!")
-
-                        print(f"✅ Successfully decoded event: {decoded_event.get('event_name', 'Unknown')}")
-                        print(f"🔍 Event fields: {list(decoded_event.get('fields', {}).keys())}")
-
-                        fields = decoded_event.get('fields', {})
-                        if not fields:
-                            print("❌ No fields found in decoded event")
-                            continue
-                            
-                        # Convert to TokenInfo
-                        mint = Pubkey.from_string(fields["mint"])
-                        bonding_curve = Pubkey.from_string(fields["bonding_curve"])
-                        user = Pubkey.from_string(fields["user"])
-                        creator = Pubkey.from_string(fields["creator"])
-                        
-                        # Derive additional addresses
-                        associated_bonding_curve = self._derive_associated_bonding_curve(mint, bonding_curve)
-                        creator_vault = self._derive_creator_vault(creator)
-                        
-                        return TokenInfo(
-                            name=fields["name"],
-                            symbol=fields["symbol"],
-                            uri=fields["uri"],
-                            mint=mint,
-                            platform=Platform.PUMP_FUN,
-                            bonding_curve=bonding_curve,
-                            associated_bonding_curve=associated_bonding_curve,
-                            user=user,
-                            creator=creator,
-                            creator_vault=creator_vault,
-                            creation_timestamp=monotonic(),
-                        )
+                        logger.info(f"🔑 Mint: {mint}")
+                        logger.info(f"🔑 Bonding Curve: {bonding_curve}")
+                        logger.info(f"🔑 User: {user}")
+                        logger.info(f"🔑 Creator: {creator}")
                         
                     except Exception as e:
-                        logger.debug(f"Failed to decode log data: {e}")
+                        logger.info(f"❌ Failed to convert pubkey fields: {e}")
                         continue
+                    
+                    # Derive additional addresses
+                    associated_bonding_curve = self._derive_associated_bonding_curve(mint, bonding_curve)
+                    creator_vault = self._derive_creator_vault(creator)
+                    
+                    logger.info(f"✅ Successfully parsed CreateEvent for token: {fields.get('symbol', 'Unknown')}")
+                    
+                    return TokenInfo(
+                        name=fields["name"],
+                        symbol=fields["symbol"],
+                        uri=fields["uri"],
+                        mint=mint,
+                        platform=Platform.PUMP_FUN,
+                        bonding_curve=bonding_curve,
+                        associated_bonding_curve=associated_bonding_curve,
+                        user=user,
+                        creator=creator,
+                        creator_vault=creator_vault,
+                        creation_timestamp=monotonic(),
+                    )
+                    
+                except Exception as e:
+                    logger.info(f"❌ Failed to decode Program data entry {entry_idx + 1}: {e}")
+                    continue
             
+            logger.info("❌ No valid CreateEvent found in any Program data entries")
             return None
             
         except Exception as e:
-            logger.debug(f"Failed to parse token creation from logs: {e}")
+            logger.error(f"Failed to parse token creation from logs: {e}")
             return None
     
     def parse_token_creation_from_instruction(
@@ -434,3 +473,13 @@ class PumpFunEventParser(EventParser):
             SystemAddresses.ASSOCIATED_TOKEN_PROGRAM,
         )
         return derived_address
+
+    @property 
+    def verbose(self) -> bool:
+        """Check if verbose logging is enabled."""
+        return getattr(self, '_verbose', False)
+    
+    @verbose.setter
+    def verbose(self, value: bool) -> None:
+        """Set verbose logging."""
+        self._verbose = value

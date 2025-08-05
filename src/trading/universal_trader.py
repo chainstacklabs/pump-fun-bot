@@ -5,8 +5,8 @@ Cleaned up to remove all platform-specific hardcoding.
 
 import asyncio
 import json
-import os
 from datetime import datetime
+from pathlib import Path
 from time import monotonic
 
 import uvloop
@@ -546,8 +546,9 @@ class UniversalTrader:
     async def _save_token_info(self, token_info: TokenInfo) -> None:
         """Save token information to a file."""
         try:
-            os.makedirs("trades", exist_ok=True)
-            file_name = os.path.join("trades", f"{token_info.mint}.txt")
+            trades_dir = Path("trades")
+            trades_dir.mkdir(exist_ok=True)
+            file_path = trades_dir / f"{token_info.mint}.txt"
 
             # Convert to dictionary for saving - platform-agnostic
             token_dict = {
@@ -575,17 +576,17 @@ class UniversalTrader:
                 if field_value is not None:
                     token_dict[field_name] = str(field_value)
 
-            with open(file_name, "w") as file:
-                file.write(json.dumps(token_dict, indent=2))
+            file_path.write_text(json.dumps(token_dict, indent=2))
 
-            logger.info(f"Token information saved to {file_name}")
-        except Exception as e:
-            logger.error(f"Failed to save token information: {e!s}")
+            logger.info(f"Token information saved to {file_path}")
+        except OSError:
+            logger.exception("Failed to save token information")
 
     def _log_trade(self, action: str, token_info: TokenInfo, price: float, amount: float, tx_hash: str | None) -> None:
         """Log trade information."""
         try:
-            os.makedirs("trades", exist_ok=True)
+            trades_dir = Path("trades")
+            trades_dir.mkdir(exist_ok=True)
 
             log_entry = {
                 "timestamp": datetime.utcnow().isoformat(),
@@ -598,10 +599,11 @@ class UniversalTrader:
                 "tx_hash": str(tx_hash) if tx_hash else None,
             }
 
-            with open("trades/trades.log", "a") as log_file:
+            log_file_path = trades_dir / "trades.log"
+            with log_file_path.open("a", encoding="utf-8") as log_file:
                 log_file.write(json.dumps(log_entry) + "\n")
-        except Exception as e:
-            logger.error(f"Failed to log trade information: {e!s}")
+        except OSError:
+            logger.exception("Failed to log trade information")
 
 
 # Backward compatibility alias

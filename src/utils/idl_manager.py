@@ -5,7 +5,7 @@ This module provides a single point of IDL loading and management to avoid
 duplicate loading across multiple platform implementation classes.
 """
 
-import os
+from pathlib import Path
 from typing import Any
 
 from interfaces.core import Platform
@@ -27,14 +27,13 @@ class IDLManager:
     def _setup_platform_idl_paths(self) -> None:
         """Setup IDL file paths for each platform."""
         # Get the project root directory (3 levels up from this file)
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        project_root = os.path.join(current_dir, "..", "..")
-        project_root = os.path.normpath(project_root)
+        current_file = Path(__file__)
+        project_root = current_file.parent.parent.parent
         
         # Define IDL paths for each platform
         self._idl_paths = {
-            Platform.LETS_BONK: os.path.join(project_root, "idl", "raydium_launchlab_idl.json"),
-            Platform.PUMP_FUN: os.path.join(project_root, "idl", "pump_fun_idl.json"),
+            Platform.LETS_BONK: project_root / "idl" / "raydium_launchlab_idl.json",
+            Platform.PUMP_FUN: project_root / "idl" / "pump_fun_idl.json",
         }
     
     def get_parser(self, platform: Platform, verbose: bool = False) -> IDLParser:
@@ -61,7 +60,7 @@ class IDLManager:
         idl_path = self._idl_paths[platform]
         
         # Verify IDL file exists
-        if not os.path.exists(idl_path):
+        if not idl_path.exists():
             raise FileNotFoundError(f"IDL file not found for {platform.value} at {idl_path}")
         
         # Load and cache the parser

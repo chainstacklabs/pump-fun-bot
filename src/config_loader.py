@@ -2,8 +2,8 @@
 Updated configuration validation with comprehensive platform support.
 """
 
-import glob
 import os
+from pathlib import Path
 from typing import Any
 
 import yaml
@@ -52,13 +52,15 @@ PLATFORM_LISTENER_COMPATIBILITY = {
 
 def load_bot_config(path: str) -> dict:
     """Load and validate a bot configuration from a YAML file."""
-    with open(path) as f:
+    config_path = Path(path)
+    with config_path.open() as f:
         config = yaml.safe_load(f)
 
     env_file = config.get("env_file")
     if env_file:
-        env_path = os.path.join(os.path.dirname(path), env_file)
-        if os.path.exists(env_path):
+        config_path = Path(path)
+        env_path = config_path.parent / env_file
+        if env_path.exists():
             load_dotenv(env_path, override=True)
         else:
             load_dotenv(env_file, override=True)
@@ -295,7 +297,7 @@ def validate_all_platform_configs(config_dir: str = "bots") -> dict[str, Any]:
         "listener_distribution": {},
     }
     
-    config_files = glob.glob(os.path.join(config_dir, "*.yaml"))
+    config_files = list(Path(config_dir).glob("*.yaml"))
     
     for config_file in config_files:
         try:

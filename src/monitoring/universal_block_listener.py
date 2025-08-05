@@ -129,8 +129,8 @@ class UniversalBlockListener(BaseTokenListener):
                         logger.warning("WebSocket connection closed. Reconnecting...")
                         ping_task.cancel()
 
-            except Exception as e:
-                logger.error(f"WebSocket connection error: {e!s}")
+            except Exception:
+                logger.exception("WebSocket connection error")
                 logger.info("Reconnecting in 5 seconds...")
                 await asyncio.sleep(5)
 
@@ -183,8 +183,8 @@ class UniversalBlockListener(BaseTokenListener):
                     return
         except asyncio.CancelledError:
             pass
-        except Exception as e:
-            logger.error(f"Ping error: {e!s}")
+        except Exception:
+            logger.exception("Ping error")
 
     async def _wait_for_token_creation(self, websocket) -> TokenInfo | None:
         """Wait for token creation event from any platform.
@@ -234,7 +234,7 @@ class UniversalBlockListener(BaseTokenListener):
         except websockets.exceptions.ConnectionClosed:
             logger.warning("WebSocket connection closed")
             raise
-        except Exception as e:
-            logger.error(f"Error processing WebSocket message: {e!s}")
+        except Exception:
+            logger.exception("Error processing WebSocket message")
 
         return None

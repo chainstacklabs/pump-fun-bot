@@ -160,18 +160,17 @@ class UniversalGeyserListener(BaseTokenListener):
                         await token_callback(token_info)
 
                 except Exception as e:
-                    import grpc
                     if isinstance(e, grpc.aio.AioRpcError):
-                        logger.error(f"gRPC error: {e.details()}")
+                        logger.exception(f"gRPC error: {e.details()}")
                     else:
-                        logger.error(f"Geyser error: {e}")
+                        logger.exception("Geyser error occurred")
                     await asyncio.sleep(5)
 
                 finally:
                     await channel.close()
 
-            except Exception as e:
-                logger.error(f"Geyser connection error: {e}")
+            except Exception:
+                logger.exception("Geyser connection error")
                 logger.info("Reconnecting in 10 seconds...")
                 await asyncio.sleep(10)
 
@@ -208,6 +207,6 @@ class UniversalGeyserListener(BaseTokenListener):
 
             return None
 
-        except Exception as e:
-            logger.error(f"Error processing Geyser update: {e}")
+        except Exception:
+            logger.exception("Error processing Geyser update")
             return None

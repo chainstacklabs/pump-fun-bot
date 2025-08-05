@@ -60,7 +60,7 @@ class LetsBonkCurveManager(CurveManager):
             return pool_state_data
             
         except Exception as e:
-            logger.error(f"Failed to get pool state: {e!s}")
+            logger.exception("Failed to get pool state")
             raise ValueError(f"Invalid pool state: {e!s}")
     
     async def calculate_price(self, pool_address: Pubkey) -> float:
@@ -239,6 +239,6 @@ class LetsBonkCurveManager(CurveManager):
             
             return True
             
-        except Exception as e:
-            logger.error(f"Pool state validation failed: {e}")
+        except Exception:
+            logger.exception("Pool state validation failed")
             return False

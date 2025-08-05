@@ -156,8 +156,8 @@ class UniversalPumpPortalListener(BaseTokenListener):
                     return
         except asyncio.CancelledError:
             pass
-        except Exception as e:
-            logger.error(f"Ping error: {e}")
+        except Exception:
+            logger.exception("Ping error")
 
     async def _wait_for_token_creation(self, websocket) -> TokenInfo | None:
         """Wait for token creation event from PumpPortal.
@@ -208,9 +208,9 @@ class UniversalPumpPortalListener(BaseTokenListener):
         except websockets.exceptions.ConnectionClosed:
             logger.warning("PumpPortal WebSocket connection closed")
             raise
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to decode PumpPortal message: {e}")
-        except Exception as e:
-            logger.error(f"Error processing PumpPortal WebSocket message: {e}")
+        except json.JSONDecodeError:
+            logger.exception("Failed to decode PumpPortal message")
+        except Exception:
+            logger.exception("Error processing PumpPortal WebSocket message")
 
         return None

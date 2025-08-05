@@ -113,6 +113,6 @@ class LetsBonkPumpPortalProcessor:
                 creator=creator,
             )
 
-        except Exception as e:
-            logger.error(f"Failed to process PumpPortal LetsBonk token data: {e}")
+        except Exception:
+            logger.exception("Failed to process PumpPortal LetsBonk token data")
             return None

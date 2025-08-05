@@ -58,7 +58,7 @@ class PumpFunCurveManager(CurveManager):
             return curve_state_data
             
         except Exception as e:
-            logger.error(f"Failed to get curve state: {e!s}")
+            logger.exception("Failed to get curve state")
             raise ValueError(f"Invalid bonding curve state: {e!s}")
     
     async def calculate_price(self, pool_address: Pubkey) -> float:
@@ -317,6 +317,6 @@ class PumpFunCurveManager(CurveManager):
             
             return True
             
-        except Exception as e:
-            logger.error(f"Curve state validation failed: {e}")
+        except Exception:
+            logger.exception("Curve state validation failed")
             return False

@@ -242,7 +242,7 @@ class IDLManager:
                 "event_count": len(event_names),
             }
         except Exception as e:
-            logger.error(f"Failed to get capabilities for {platform.value}: {e}")
+            logger.exception(f"Failed to get capabilities for {platform.value}")
             return {
                 "platform": platform.value,
                 "has_idl_support": False,

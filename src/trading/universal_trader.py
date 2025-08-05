@@ -110,8 +110,8 @@ class UniversalTrader:
             from platforms import platform_factory
             if not platform_factory.registry.is_platform_supported(self.platform):
                 raise ValueError(f"Platform {self.platform.value} is not supported")
-        except Exception as e:
-            logger.error(f"Platform validation failed: {e}")
+        except Exception:
+            logger.exception("Platform validation failed")
             raise
 
         # Get platform-specific implementations
@@ -234,8 +234,8 @@ class UniversalTrader:
                         self.match_string,
                         self.bro_address,
                     )
-                except Exception as e:
-                    logger.error(f"Token listening stopped due to error: {e!s}")
+                except Exception:
+                    logger.exception("Token listening stopped due to error")
                 finally:
                     processor_task.cancel()
                     try:
@@ -243,8 +243,8 @@ class UniversalTrader:
                     except asyncio.CancelledError:
                         pass
 
-        except Exception as e:
-            logger.error(f"Trading stopped due to error: {e!s}")
+        except Exception:
+            logger.exception("Trading stopped due to error")
 
         finally:
             await self._cleanup_resources()
@@ -306,8 +306,8 @@ class UniversalTrader:
                     self.cleanup_with_priority_fee,
                     self.cleanup_force_close_with_burn,
                 )
-            except Exception as e:
-                logger.error(f"Error during cleanup: {e!s}")
+            except Exception:
+                logger.exception("Error during cleanup")
 
         old_keys = {k for k in self.token_timestamps if k not in self.processed_tokens}
         for key in old_keys:
@@ -352,8 +352,8 @@ class UniversalTrader:
             except asyncio.CancelledError:
                 logger.info("Token queue processor was cancelled")
                 break
-            except Exception as e:
-                logger.error(f"Error in token queue processor: {e!s}")
+            except Exception:
+                logger.exception("Error in token queue processor")
             finally:
                 self.token_queue.task_done()
 
@@ -385,8 +385,8 @@ class UniversalTrader:
                 logger.info(f"YOLO mode enabled. Waiting {self.wait_time_before_new_token} seconds before looking for next token...")
                 await asyncio.sleep(self.wait_time_before_new_token)
 
-        except Exception as e:
-            logger.error(f"Error handling token {token_info.symbol}: {e!s}")
+        except Exception:
+            logger.exception(f"Error handling token {token_info.symbol}")
 
     async def _handle_successful_buy(self, token_info: TokenInfo, buy_result: TradeResult) -> None:
         """Handle successful token purchase."""
@@ -526,8 +526,8 @@ class UniversalTrader:
                 # Wait before next price check
                 await asyncio.sleep(self.price_check_interval)
 
-            except Exception as e:
-                logger.error(f"Error monitoring position: {e}")
+            except Exception:
+                logger.exception("Error monitoring position")
                 await asyncio.sleep(self.price_check_interval)  # Continue monitoring despite errors
 
     def _get_pool_address(self, token_info: TokenInfo) -> Pubkey:

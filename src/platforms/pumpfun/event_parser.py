@@ -191,8 +191,8 @@ class PumpFunEventParser(EventParser):
             logger.info("❌ No valid CreateEvent found in any Program data entries")
             return None
             
-        except Exception as e:
-            logger.error(f"Failed to parse token creation from logs: {e}")
+        except Exception:
+            logger.exception("Failed to parse token creation from logs")
             return None
     
     def parse_token_creation_from_instruction(

@@ -99,6 +99,6 @@ class PumpFunPumpPortalProcessor:
                 creator_vault=creator_vault,
             )
 
-        except Exception as e:
-            logger.error(f"Failed to process PumpPortal token data: {e}")
+        except Exception:
+            logger.exception("Failed to process PumpPortal token data")
             return None

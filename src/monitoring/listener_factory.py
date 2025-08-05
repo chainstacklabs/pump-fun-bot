@@ -21,7 +21,6 @@ class ListenerFactory:
         geyser_auth_type: str = "x-token",
         pumpportal_url: str = "wss://pumpportal.fun/api/data",
         platforms: list[Platform] | None = None,
-        **kwargs
     ) -> BaseTokenListener:
         """Create a token listener based on the specified type.
 
@@ -33,7 +32,6 @@ class ListenerFactory:
             geyser_auth_type: Geyser authentication type
             pumpportal_url: PumpPortal WebSocket URL (for pumpportal listener)
             platforms: List of platforms to monitor (if None, monitor all)
-            **kwargs: Additional arguments
 
         Returns:
             Configured token listener

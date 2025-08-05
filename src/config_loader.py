@@ -132,8 +132,9 @@ def validate_config(config: dict) -> None:
             value = get_nested_value(config, path)
             if value not in valid_values:
                 raise ValueError(f"{path} must be one of {valid_values}")
-        except ValueError:
-            continue
+        except ValueError as e:
+            if "Missing required config key" not in str(e):
+                raise
 
     # Cannot enable both dynamic and fixed priority fees
     try:
@@ -141,8 +142,9 @@ def validate_config(config: dict) -> None:
         fixed = get_nested_value(config, "priority_fees.enable_fixed")
         if dynamic and fixed:
             raise ValueError("Cannot enable both dynamic and fixed priority fees simultaneously")
-    except ValueError:
-        pass
+    except ValueError as e:
+        if "Missing required config key" not in str(e):
+            raise
 
     # Platform-specific validation
     platform_str = config.get("platform", "pump_fun")
@@ -176,8 +178,9 @@ def validate_platform_config(config: dict, platform: Platform) -> None:
                 f"Listener type '{listener_type}' is not compatible with platform '{platform.value}'. "
                 f"Compatible listeners: {compatible_listeners}"
             )
-    except ValueError:
-        pass
+    except ValueError as e:
+        if "Missing required config key" not in str(e):
+            raise
 
     # Platform-specific configuration validation
     if platform == Platform.PUMP_FUN:

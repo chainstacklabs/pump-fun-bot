@@ -41,7 +41,7 @@ class PlatformAwareBuyer(Trader):
         self.extreme_fast_mode = extreme_fast_mode
         self.extreme_fast_token_amount = extreme_fast_token_amount
 
-    async def execute(self, token_info: TokenInfo, *args, **kwargs) -> TradeResult:
+    async def execute(self, token_info: TokenInfo) -> TradeResult:
         """Execute buy operation using platform-specific implementations."""
         try:
             # Get platform-specific implementations
@@ -123,7 +123,7 @@ class PlatformAwareBuyer(Trader):
                 )
 
         except Exception as e:
-            logger.error(f"Buy operation failed: {e!s}")
+            logger.exception("Buy operation failed")
             return TradeResult(
                 success=False, 
                 platform=token_info.platform,
@@ -162,7 +162,7 @@ class PlatformAwareSeller(Trader):
         self.slippage = slippage
         self.max_retries = max_retries
 
-    async def execute(self, token_info: TokenInfo, *args, **kwargs) -> TradeResult:
+    async def execute(self, token_info: TokenInfo) -> TradeResult:
         """Execute sell operation using platform-specific implementations."""
         try:
             # Get platform-specific implementations
@@ -249,7 +249,7 @@ class PlatformAwareSeller(Trader):
                 )
 
         except Exception as e:
-            logger.error(f"Sell operation failed: {e!s}")
+            logger.exception("Sell operation failed")
             return TradeResult(
                 success=False, 
                 platform=token_info.platform,

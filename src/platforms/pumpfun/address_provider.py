@@ -177,7 +177,15 @@ class PumpFunAddressProvider(AddressProvider):
         Returns:
             Associated bonding curve address
         """
-        return get_associated_token_address(bonding_curve, mint)
+        derived_address, _ = Pubkey.find_program_address(
+            [
+                bytes(bonding_curve),
+                bytes(SystemAddresses.TOKEN_PROGRAM),
+                bytes(mint),
+            ],
+            SystemAddresses.ASSOCIATED_TOKEN_PROGRAM,
+        )
+        return derived_address
     
     def derive_creator_vault(self, creator: Pubkey) -> Pubkey:
         """Derive the creator vault address.

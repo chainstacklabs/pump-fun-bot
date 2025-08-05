@@ -2,6 +2,7 @@
 Updated configuration validation with comprehensive platform support.
 """
 
+import glob
 import os
 from typing import Any
 
@@ -287,9 +288,6 @@ def validate_all_platform_configs(config_dir: str = "bots") -> dict[str, Any]:
     Returns:
         Dictionary with validation results
     """
-    import glob
-    import os
-    
     results = {
         "valid_configs": [],
         "invalid_configs": [],

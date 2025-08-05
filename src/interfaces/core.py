@@ -345,6 +345,21 @@ class EventParser(ABC):
         pass
     
     @abstractmethod
+    def parse_token_creation_from_block(
+        self,
+        block_data: dict[str, Any]
+    ) -> TokenInfo | None:
+        """Parse token creation from block data.
+        
+        Args:
+            block_data: Block data containing transactions
+            
+        Returns:
+            TokenInfo if token creation found, None otherwise
+        """
+        pass
+    
+    @abstractmethod
     def get_program_id(self) -> Pubkey:
         """Get the program ID this parser monitors.
         

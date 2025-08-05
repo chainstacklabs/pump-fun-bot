@@ -6,6 +6,7 @@ Note: creator fee upgrade introduced updates in bonding curve structure.
 https://github.com/pump-fun/pump-public-docs/blob/main/docs/PUMP_CREATOR_FEE_README.md
 """
 
+import argparse
 import asyncio
 import os
 import struct
@@ -21,7 +22,7 @@ load_dotenv()
 RPC_ENDPOINT = os.environ.get("SOLANA_NODE_RPC_ENDPOINT")
 
 # Change to token you want to query
-TOKEN_MINT = "xWrzYY4c1LnbSkLrd2LDUg9vw7YtVyJhGmw7MABpump"
+TOKEN_MINT = "..."
 
 # Constants
 PUMP_PROGRAM_ID: Final[Pubkey] = Pubkey.from_string("6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P")
@@ -172,11 +173,11 @@ async def check_token_status(mint_address: str) -> None:
 
 def main() -> None:
     """Main entry point for the token status checker."""
-    #parser = argparse.ArgumentParser(description="Check token bonding curve status")
-    #parser.add_argument("mint_address", help="The token mint address"
-    #args = parser.parse_args()
+    parser = argparse.ArgumentParser(description="Check token bonding curve status")
+    parser.add_argument("mint_address", nargs='?', help="The token mint address", default=TOKEN_MINT)
+    args = parser.parse_args()
     
-    asyncio.run(check_token_status(TOKEN_MINT))
+    asyncio.run(check_token_status(args.mint_address))
 
 
 if __name__ == "__main__":

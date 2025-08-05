@@ -12,7 +12,7 @@
   • <a target="_blank" href="https://console.chainstack.com/user/account/create">Start for free</a> •
 </p>
 
-The project allows you to create bots for trading on pump.fun. Its core feature is to snipe new tokens. Besides that, learning examples contain a lot of useful scripts for different types of listeners (new tokens, migrations) and deep dive into calculations required for trading.
+The project allows you to create bots for trading on pump.fun and letsbonk.fun. Its core feature is to snipe new tokens. Besides that, learning examples contain a lot of useful scripts for different types of listeners (new tokens, migrations) and deep dive into calculations required for trading.
 
 For the full walkthrough, see [Solana: Creating a trading and sniping pump.fun bot](https://docs.chainstack.com/docs/solana-creating-a-pumpfun-bot).
 
@@ -82,7 +82,7 @@ uv pip install -e .
 pump_bot
 
 # Option 2: run directly
-python -m src.bot_runner
+uv run src/bot_runner.py
 ```
 
 > **You're all set! 🎉** 
@@ -111,23 +111,27 @@ Also, here's a quick doc: [Listening to pump.fun migrations to Raydium](https://
 
 ## Bonding curve state check
 
-`check_boding_curve_status.py` — checks the state of the bonding curve associated with a token. When the bonding curve state is completed, the token is migrated to Raydium.
+`get_bonding_curve_status.py` — checks the state of the bonding curve associated with a token. When the bonding curve state is completed, the token is migrated to Raydium.
 
 To run:
 
-`python check_boding_curve_status.py TOKEN_ADDRESS`
+`uv run learning-examples/bonding-curve-progress/get_bonding_curve_status.py TOKEN_ADDRESS`
 
-## Listening to the Raydium migration
+## Listening to the Pump AMM migration
 
-When the bonding curve state completes, the liquidity and the token graduate to Raydium.
+When the bonding curve state completes, the liquidity and the token graduate to Pump AMM (PumpSwap).
 
-`listen_to_raydium_migration.py` — listens to the migration events of the tokens from pump_fun to Raydium and prints the signature of the migration, the token address, and the liquidity pool address on Raydium.
+`listen_logsubscribe.py` — listens to the migration events of the tokens from bonding curves to AMM and prints the signature of the migration, the token address, and the liquidity pool address on Pump AMM.
+
+`listen_blocksubscribe_old_raydium.py` — listens to the migration events of the tokens from bonding curves to AMM and prints the signature of the migration, the token address, and the liquidity pool address on Pump AMM (previously, tokens migrated to Raydium).
 
 Note that it's using the [blockSubscribe]([url](https://docs.chainstack.com/reference/blocksubscribe-solana)) method that not all providers support, but Chainstack does and I (although obviously biased) found it pretty reliable.
 
 To run:
 
-`python listen_to_raydium_migration.py`
+`uv run learning-examples/listen-migrations/listen_logsubscribe.py`
+
+`uv run learning-examples/listen-migrations/listen_blocksubscribe_old_raydium.py`
 
 **The following two new additions are based on this question [associatedBondingCurve #26](https://github.com/chainstacklabs/pump-fun-bot/issues/26)**
 
@@ -152,17 +156,19 @@ The following script showcase the implementation.
 
 To run:
 
-`python compute_associated_bonding_curve.py` and then enter the token mint address.
+`uv run learning-examples/compute_associated_bonding_curve.py` and then enter the token mint address.
 
-## Listen to new direct full details
+## Listen to new tokens
 
-`listen_new_direct_full_details.py` — listens to the new direct full details events and prints the signature, the token address, the user, the bonding curve address, and the associated bonding curve address using just the `logsSubscribe` method. Basically everything you need for sniping using just `logsSubscribe` and no extra calls like doing `getTransaction` to get the missing data. It's just computed on the fly now.
+`listen_logsubscribe_abc.py` — listens to new tokens and prints the signature, the token address, the user, the bonding curve address, and the associated bonding curve address using just the `logsSubscribe` method. Basically everything you need for sniping using just `logsSubscribe` (with some [limitations](https://github.com/chainstacklabs/pump-fun-bot/issues/87)) and no extra calls like doing `getTransaction` to get the missing data. It's just computed on the fly now.
 
 To run:
 
-`python listen_new_direct_full_details.py`
+`uv run learning-examples/listen-new-tokens/listen_logsubscribe_abc.py`
 
-So now you can run `listen_create_from_blocksubscribe.py` and `listen_new_direct_full_details.py` at the same time and see which one is faster.
+So now you can run `compare_listeners.py` see which one is faster.
+
+`uv run learning-examples/listen-new-tokens/compare_listeners.py`
 
 Also here's a doc on this: [Solana: Listening to pump.fun token mint using only logsSubscribe](https://docs.chainstack.com/docs/solana-listening-to-pumpfun-token-mint-using-only-logssubscribe)
 

@@ -10,6 +10,7 @@ import grpc
 from geyser.generated import geyser_pb2, geyser_pb2_grpc
 from interfaces.core import Platform, TokenInfo
 from monitoring.base_listener import BaseTokenListener
+from platforms import platform_factory
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -37,9 +38,6 @@ class UniversalGeyserListener(BaseTokenListener):
                 f"Unsupported auth_type={self.auth_type!r}. "
                 f"Expected one of {valid_auth_types}"
             )
-        
-        # Import platform factory and get supported platforms
-        from platforms import platform_factory
         
         if platforms is None:
             self.platforms = platform_factory.get_supported_platforms()

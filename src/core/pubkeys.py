@@ -12,6 +12,10 @@ from solders.pubkey import Pubkey
 LAMPORTS_PER_SOL: Final[int] = 1_000_000_000
 TOKEN_DECIMALS: Final[int] = 6
 
+# Token account constants
+TOKEN_ACCOUNT_SIZE: Final[int] = 165  # Size of a token account in bytes
+TOKEN_ACCOUNT_RENT_EXEMPT_RESERVE: Final[int] = 2_039_280  # Rent-exempt minimum for token accounts
+
 # Core system programs
 SYSTEM_PROGRAM: Final[Pubkey] = Pubkey.from_string("11111111111111111111111111111111")
 TOKEN_PROGRAM: Final[Pubkey] = Pubkey.from_string(

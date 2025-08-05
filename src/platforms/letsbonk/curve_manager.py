@@ -209,7 +209,7 @@ class LetsBonkCurveManager(CurveManager):
         
         return pool_data
     
-    def validate_pool_state_structure(self, pool_address: Pubkey) -> bool:
+    async def validate_pool_state_structure(self, pool_address: Pubkey) -> bool:
         """Validate that the pool state structure matches IDL expectations.
         
         Args:
@@ -221,7 +221,7 @@ class LetsBonkCurveManager(CurveManager):
         try:
             # This would be used during development/testing to ensure
             # the IDL parsing is working correctly
-            pool_state = self.get_pool_state(pool_address)
+            pool_state = await self.get_pool_state(pool_address)
             
             required_fields = [
                 "virtual_base", "virtual_quote", 

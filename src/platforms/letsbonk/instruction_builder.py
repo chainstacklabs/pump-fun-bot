@@ -14,7 +14,12 @@ from solders.pubkey import Pubkey
 from solders.system_program import CreateAccountWithSeedParams, create_account_with_seed
 from spl.token.instructions import create_idempotent_associated_token_account
 
-from core.pubkeys import TOKEN_DECIMALS, SystemAddresses
+from core.pubkeys import (
+    TOKEN_ACCOUNT_RENT_EXEMPT_RESERVE,
+    TOKEN_ACCOUNT_SIZE,
+    TOKEN_DECIMALS,
+    SystemAddresses,
+)
 from interfaces.core import AddressProvider, InstructionBuilder, Platform, TokenInfo
 from utils.idl_parser import IDLParser
 from utils.logger import get_logger
@@ -84,7 +89,7 @@ class LetsBonkInstructionBuilder(InstructionBuilder):
         wsol_account = address_provider.create_wsol_account_with_seed(user, wsol_seed)
         
         # Account creation cost + amount to spend
-        account_creation_lamports = 2_039_280  # Standard account creation cost
+        account_creation_lamports = TOKEN_ACCOUNT_RENT_EXEMPT_RESERVE
         total_lamports = amount_in + account_creation_lamports
         
         create_wsol_ix = create_account_with_seed(
@@ -94,7 +99,7 @@ class LetsBonkInstructionBuilder(InstructionBuilder):
                 base=user,
                 seed=wsol_seed,
                 lamports=total_lamports,
-                space=165,  # Size of a token account
+                space=TOKEN_ACCOUNT_SIZE,
                 owner=SystemAddresses.TOKEN_PROGRAM
             )
         )
@@ -184,7 +189,7 @@ class LetsBonkInstructionBuilder(InstructionBuilder):
         wsol_account = address_provider.create_wsol_account_with_seed(user, wsol_seed)
         
         # Minimal account creation cost
-        account_creation_lamports = 2_039_280
+        account_creation_lamports = TOKEN_ACCOUNT_RENT_EXEMPT_RESERVE
         
         create_wsol_ix = create_account_with_seed(
             CreateAccountWithSeedParams(
@@ -193,7 +198,7 @@ class LetsBonkInstructionBuilder(InstructionBuilder):
                 base=user,
                 seed=wsol_seed,
                 lamports=account_creation_lamports,
-                space=165,  # Size of a token account
+                space=TOKEN_ACCOUNT_SIZE,
                 owner=SystemAddresses.TOKEN_PROGRAM
             )
         )

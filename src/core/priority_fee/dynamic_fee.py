@@ -62,8 +62,6 @@ class DynamicPriorityFee(PriorityFeePlugin):
 
             return prior_fee
 
-        except Exception as e:
-            logger.error(
-                f"Failed to fetch recent priority fee: {str(e)}", exc_info=True
-            )
+        except Exception:
+            logger.exception("Failed to fetch recent priority fee")
             return None

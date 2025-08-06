@@ -186,7 +186,7 @@ class SolanaClient:
 
             except Exception as e:
                 if attempt == max_retries - 1:
-                    logger.error(
+                    logger.exception(
                         f"Failed to send transaction after {max_retries} attempts"
                     )
                     raise
@@ -215,8 +215,8 @@ class SolanaClient:
                 signature, commitment=commitment, sleep_seconds=1
             )
             return True
-        except Exception as e:
-            logger.error(f"Failed to confirm transaction {signature}: {e!s}")
+        except Exception:
+            logger.exception(f"Failed to confirm transaction {signature}")
             return False
 
     async def post_rpc(self, body: dict[str, Any]) -> dict[str, Any] | None:
@@ -238,9 +238,9 @@ class SolanaClient:
                 ) as response:
                     response.raise_for_status()
                     return await response.json()
-        except aiohttp.ClientError as e:
-            logger.error(f"RPC request failed: {e!s}", exc_info=True)
+        except aiohttp.ClientError:
+            logger.exception("RPC request failed")
             return None
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to decode RPC response: {e!s}", exc_info=True)
+        except json.JSONDecodeError:
+            logger.exception("Failed to decode RPC response")
             return None

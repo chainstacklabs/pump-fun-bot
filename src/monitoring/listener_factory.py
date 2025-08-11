@@ -48,7 +48,7 @@ class ListenerFactory:
                 )
 
             from monitoring.universal_geyser_listener import UniversalGeyserListener
-            
+
             listener = UniversalGeyserListener(
                 geyser_endpoint=geyser_endpoint,
                 geyser_api_token=geyser_api_token,
@@ -63,7 +63,7 @@ class ListenerFactory:
                 raise ValueError("WebSocket endpoint is required for logs listener")
 
             from monitoring.universal_logs_listener import UniversalLogsListener
-            
+
             listener = UniversalLogsListener(
                 wss_endpoint=wss_endpoint,
                 platforms=platforms,
@@ -76,7 +76,7 @@ class ListenerFactory:
                 raise ValueError("WebSocket endpoint is required for blocks listener")
 
             from monitoring.universal_block_listener import UniversalBlockListener
-            
+
             listener = UniversalBlockListener(
                 wss_endpoint=wss_endpoint,
                 platforms=platforms,
@@ -89,26 +89,36 @@ class ListenerFactory:
             from monitoring.universal_pumpportal_listener import (
                 UniversalPumpPortalListener,
             )
-            
+
             # Validate that requested platforms support PumpPortal
             supported_pumpportal_platforms = [Platform.PUMP_FUN, Platform.LETS_BONK]
-            
+
             if platforms:
-                unsupported = [p for p in platforms if p not in supported_pumpportal_platforms]
+                unsupported = [
+                    p for p in platforms if p not in supported_pumpportal_platforms
+                ]
                 if unsupported:
-                    logger.warning(f"Platforms {[p.value for p in unsupported]} do not support PumpPortal")
-                
+                    logger.warning(
+                        f"Platforms {[p.value for p in unsupported]} do not support PumpPortal"
+                    )
+
                 # Filter to only supported platforms
-                filtered_platforms = [p for p in platforms if p in supported_pumpportal_platforms]
+                filtered_platforms = [
+                    p for p in platforms if p in supported_pumpportal_platforms
+                ]
                 if not filtered_platforms:
-                    raise ValueError("No supported platforms specified for PumpPortal listener")
+                    raise ValueError(
+                        "No supported platforms specified for PumpPortal listener"
+                    )
                 platforms = filtered_platforms
-            
+
             listener = UniversalPumpPortalListener(
                 pumpportal_url=pumpportal_url,
                 platforms=platforms,
             )
-            logger.info(f"Created Universal PumpPortal listener for platforms: {[p.value for p in (platforms or supported_pumpportal_platforms)]}")
+            logger.info(
+                f"Created Universal PumpPortal listener for platforms: {[p.value for p in (platforms or supported_pumpportal_platforms)]}"
+            )
             return listener
 
         else:
@@ -146,7 +156,7 @@ class ListenerFactory:
     @staticmethod
     def get_pumpportal_supported_platforms() -> list[Platform]:
         """Get list of platforms that support PumpPortal listener.
-        
+
         Returns:
             List of platforms with PumpPortal support
         """

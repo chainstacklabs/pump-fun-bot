@@ -25,8 +25,10 @@ RPC_ENDPOINT = os.environ.get("SOLANA_NODE_RPC_ENDPOINT")
 PUMP_AMM_PROGRAM_ID = Pubkey.from_string("pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA")
 
 MARKET_ACCOUNT_LENGTH = 8 + 1 + 2 + 32 * 6 + 8  # total size of known market structure
-MARKET_DISCRIMINATOR = base58.b58encode(b'\xf1\x9am\x04\x11\xb1m\xbc').decode()
-QUOTE_MINT_SOL = base58.b58encode(bytes(Pubkey.from_string("So11111111111111111111111111111111111111112"))).decode()  
+MARKET_DISCRIMINATOR = base58.b58encode(b"\xf1\x9am\x04\x11\xb1m\xbc").decode()
+QUOTE_MINT_SOL = base58.b58encode(
+    bytes(Pubkey.from_string("So11111111111111111111111111111111111111112"))
+).decode()
 
 
 async def fetch_existing_market_pubkeys():
@@ -43,10 +45,10 @@ async def fetch_existing_market_pubkeys():
                 "filters": [
                     {"dataSize": MARKET_ACCOUNT_LENGTH},
                     {"memcmp": {"offset": 0, "bytes": MARKET_DISCRIMINATOR}},
-                    {"memcmp": {"offset": 75, "bytes": QUOTE_MINT_SOL}}
-                ]
-            }
-        ]
+                    {"memcmp": {"offset": 75, "bytes": QUOTE_MINT_SOL}},
+                ],
+            },
+        ],
     }
 
     async with aiohttp.ClientSession() as session:
@@ -69,21 +71,25 @@ def parse_market_account_data(data):
         ("pool_base_token_account", "pubkey"),
         ("pool_quote_token_account", "pubkey"),
         ("lp_supply", "u64"),
-        ("coin_creator", "pubkey")
+        ("coin_creator", "pubkey"),
     ]
 
     try:
         for field_name, field_type in fields:
             if field_type == "pubkey":
-                value = data[offset:offset + 32]
+                value = data[offset : offset + 32]
                 parsed_data[field_name] = base58.b58encode(value).decode("utf-8")
                 offset += 32
             elif field_type in {"u64", "i64"}:
-                value = struct.unpack("<Q", data[offset:offset + 8])[0] if field_type == "u64" else struct.unpack("<q", data[offset:offset + 8])[0]
+                value = (
+                    struct.unpack("<Q", data[offset : offset + 8])[0]
+                    if field_type == "u64"
+                    else struct.unpack("<q", data[offset : offset + 8])[0]
+                )
                 parsed_data[field_name] = value
                 offset += 8
             elif field_type == "u16":
-                value = struct.unpack("<H", data[offset:offset + 2])[0]
+                value = struct.unpack("<H", data[offset : offset + 2])[0]
                 parsed_data[field_name] = value
                 offset += 2
             elif field_type == "u8":
@@ -104,23 +110,30 @@ async def listen_new_markets():
         try:
             print("[INFO] Connecting to WebSocket...")
             async with websockets.connect(WSS_ENDPOINT) as ws:
-                sub_msg = json.dumps({
-                    "jsonrpc": "2.0",
-                    "id": 1,
-                    "method": "programSubscribe",
-                    "params": [
-                        str(PUMP_AMM_PROGRAM_ID),
-                        {
-                            "commitment": "processed",
-                            "encoding": "base64",
-                            "filters": [
-                                {"dataSize": MARKET_ACCOUNT_LENGTH},
-                                {"memcmp": {"offset": 0, "bytes": MARKET_DISCRIMINATOR}},
-                                {"memcmp": {"offset": 75, "bytes": QUOTE_MINT_SOL}}
-                            ]
-                        }
-                    ]
-                })
+                sub_msg = json.dumps(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": 1,
+                        "method": "programSubscribe",
+                        "params": [
+                            str(PUMP_AMM_PROGRAM_ID),
+                            {
+                                "commitment": "processed",
+                                "encoding": "base64",
+                                "filters": [
+                                    {"dataSize": MARKET_ACCOUNT_LENGTH},
+                                    {
+                                        "memcmp": {
+                                            "offset": 0,
+                                            "bytes": MARKET_DISCRIMINATOR,
+                                        }
+                                    },
+                                    {"memcmp": {"offset": 75, "bytes": QUOTE_MINT_SOL}},
+                                ],
+                            },
+                        ],
+                    }
+                )
                 await ws.send(sub_msg)
                 print(f"[INFO] Subscribed to: {PUMP_AMM_PROGRAM_ID}")
 
@@ -131,11 +144,13 @@ async def listen_new_markets():
                     if "method" in data and data["method"] == "programNotification":
                         message_value = data["params"]["result"]["value"]
                         pubkey = message_value["pubkey"]
-                        raw_account_data = message_value["account"].get("data", [None])[0]
+                        raw_account_data = message_value["account"].get("data", [None])[
+                            0
+                        ]
                         slot = data["params"]["result"]["context"]["slot"]
 
                         if pubkey in known_pubkeys:
-                            #print("[INFO] Skipping already existed market...")
+                            # print("[INFO] Skipping already existed market...")
                             continue
 
                         if not raw_account_data:
@@ -146,7 +161,9 @@ async def listen_new_markets():
                             account_data = base64.b64decode(raw_account_data)
                             parsed = parse_market_account_data(account_data)
 
-                            if Pubkey.from_string(parsed.get("creator", "")).is_on_curve():
+                            if Pubkey.from_string(
+                                parsed.get("creator", "")
+                            ).is_on_curve():
                                 print("[INFO] Skipping user-created market...")
                                 continue  # skip user-created pool
 

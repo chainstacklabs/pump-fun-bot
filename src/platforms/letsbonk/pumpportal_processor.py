@@ -14,39 +14,39 @@ logger = get_logger(__name__)
 
 class LetsBonkPumpPortalProcessor:
     """PumpPortal processor for LetsBonk tokens."""
-    
+
     def __init__(self):
         """Initialize the processor with address provider."""
         self.address_provider = LetsBonkAddressProvider()
-    
+
     @property
     def platform(self) -> Platform:
         """Get the platform this processor handles."""
         return Platform.LETS_BONK
-    
+
     @property
     def supported_pool_names(self) -> list[str]:
         """Get the pool names this processor supports from PumpPortal."""
         return ["bonk"]  # PumpPortal pool name for LetsBonk/bonk pools
-    
+
     def can_process(self, token_data: dict) -> bool:
         """Check if this processor can handle the given token data.
-        
+
         Args:
             token_data: Token data from PumpPortal
-            
+
         Returns:
             True if this processor can handle the token data
         """
         pool = token_data.get("pool", "").lower()
         return pool in self.supported_pool_names
-    
+
     def process_token_data(self, token_data: dict) -> TokenInfo | None:
         """Process LetsBonk token data from PumpPortal.
-        
+
         Args:
             token_data: Token data from PumpPortal WebSocket
-            
+
         Returns:
             TokenInfo if token creation found, None otherwise
         """
@@ -62,7 +62,9 @@ class LetsBonkPumpPortalProcessor:
             # This would need to be adjusted based on actual PumpPortal data for LetsBonk tokens
 
             if not all([name, symbol, mint_str, creator_str]):
-                logger.warning("Missing required fields in PumpPortal LetsBonk token data")
+                logger.warning(
+                    "Missing required fields in PumpPortal LetsBonk token data"
+                )
                 return None
 
             # Convert string addresses to Pubkey objects
@@ -72,7 +74,7 @@ class LetsBonkPumpPortalProcessor:
 
             # Derive LetsBonk-specific addresses
             pool_state = self.address_provider.derive_pool_address(mint)
-            
+
             # For LetsBonk, vault addresses might need to be derived differently
             # or provided in the PumpPortal data. For now, we'll derive them
             # using the standard pattern, but this might need adjustment
@@ -91,15 +93,15 @@ class LetsBonkPumpPortalProcessor:
                     quote_vault=None,  # Will be filled from additional_accounts
                 )
             )
-            
+
             # Extract vault addresses if available
             base_vault = additional_accounts.get("base_vault")
             quote_vault = additional_accounts.get("quote_vault")
-            
-            # If vaults aren't available from additional_accounts, 
+
+            # If vaults aren't available from additional_accounts,
             # we might need to derive them or leave them None
             # and let the trading logic handle the derivation
-            
+
             return TokenInfo(
                 name=name,
                 symbol=symbol,

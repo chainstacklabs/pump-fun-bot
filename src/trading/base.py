@@ -19,6 +19,7 @@ from interfaces.core import Platform, TokenInfo
 @dataclass
 class TradeResult:
     """Enhanced result of a trading operation with platform support."""
+
     success: bool
     platform: Platform = Platform.PUMP_FUN  # Add platform tracking
     tx_signature: str | None = None
@@ -28,7 +29,7 @@ class TradeResult:
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for logging/serialization.
-        
+
         Returns:
             Dictionary representation of the trade result
         """
@@ -51,7 +52,7 @@ class Trader(ABC):
 
         Args:
             token_info: Enhanced token information with platform support
-            
+
         Returns:
             TradeResult with operation outcome including platform info
         """
@@ -60,7 +61,7 @@ class Trader(ABC):
     def _get_relevant_accounts(self, token_info: TokenInfo) -> list[Pubkey]:
         """
         Get the list of accounts relevant for calculating the priority fee.
-        
+
         This is now platform-agnostic and should be overridden by platform-specific traders.
 
         Args:
@@ -71,13 +72,13 @@ class Trader(ABC):
         """
         # Basic implementation - platform-specific traders should override this
         accounts = [token_info.mint]
-        
+
         if token_info.bonding_curve:
             accounts.append(token_info.bonding_curve)
-            
+
         if token_info.pool_state:  # For other platforms
             accounts.append(token_info.pool_state)
-        
+
         return accounts
 
 
@@ -85,6 +86,7 @@ class Trader(ABC):
 @dataclass
 class TokenInfo_Legacy:
     """Legacy token information structure for backward compatibility."""
+
     name: str
     symbol: str
     uri: str
@@ -138,13 +140,13 @@ class TokenInfo_Legacy:
 
 def upgrade_token_info(legacy_token_info: TokenInfo_Legacy) -> TokenInfo:
     """Convert legacy TokenInfo to enhanced TokenInfo.
-    
+
     This function allows existing code that creates legacy TokenInfo objects
     to be upgraded to the new enhanced format.
-    
+
     Args:
         legacy_token_info: Legacy TokenInfo instance
-        
+
     Returns:
         Enhanced TokenInfo with platform information
     """
@@ -164,29 +166,31 @@ def upgrade_token_info(legacy_token_info: TokenInfo_Legacy) -> TokenInfo:
 
 def create_legacy_token_info(enhanced_token_info: TokenInfo) -> TokenInfo_Legacy:
     """Convert enhanced TokenInfo back to legacy TokenInfo if needed.
-    
+
     This function allows the enhanced TokenInfo to be used with existing
     code that expects the legacy format.
-    
+
     Args:
         enhanced_token_info: Enhanced TokenInfo instance
-        
+
     Returns:
         Legacy TokenInfo instance
-        
+
     Raises:
         ValueError: If enhanced TokenInfo doesn't have required pump.fun fields
     """
     if enhanced_token_info.platform != Platform.PUMP_FUN:
         raise ValueError("Can only convert pump.fun tokens to legacy format")
-        
-    if not all([
-        enhanced_token_info.bonding_curve,
-        enhanced_token_info.associated_bonding_curve,
-        enhanced_token_info.creator_vault
-    ]):
+
+    if not all(
+        [
+            enhanced_token_info.bonding_curve,
+            enhanced_token_info.associated_bonding_curve,
+            enhanced_token_info.creator_vault,
+        ]
+    ):
         raise ValueError("Enhanced TokenInfo missing required pump.fun fields")
-    
+
     return TokenInfo_Legacy(
         name=enhanced_token_info.name,
         symbol=enhanced_token_info.symbol,
@@ -210,10 +214,10 @@ def create_pump_fun_token_info(
     user: Pubkey,
     creator: Pubkey | None = None,
     creator_vault: Pubkey | None = None,
-    **kwargs
+    **kwargs,
 ) -> TokenInfo:
     """Convenience function to create pump.fun TokenInfo with proper platform setting.
-    
+
     Args:
         name: Token name
         symbol: Token symbol
@@ -225,7 +229,7 @@ def create_pump_fun_token_info(
         creator: Creator address (defaults to user if not provided)
         creator_vault: Creator vault address (will be derived if not provided)
         **kwargs: Additional fields for TokenInfo
-        
+
     Returns:
         Enhanced TokenInfo configured for pump.fun
     """
@@ -234,7 +238,7 @@ def create_pump_fun_token_info(
         # We can't import PumpAddresses here, so this will need to be handled elsewhere
         # For now, leave it as None and let the platform implementation handle it
         pass
-    
+
     return TokenInfo(
         name=name,
         symbol=symbol,
@@ -246,7 +250,7 @@ def create_pump_fun_token_info(
         user=user,
         creator=creator or user,
         creator_vault=creator_vault,
-        **kwargs
+        **kwargs,
     )
 
 
@@ -260,10 +264,10 @@ def create_lets_bonk_token_info(
     quote_vault: Pubkey,
     user: Pubkey,
     creator: Pubkey | None = None,
-    **kwargs
+    **kwargs,
 ) -> TokenInfo:
     """Convenience function to create LetsBonk TokenInfo with proper platform setting.
-    
+
     Args:
         name: Token name
         symbol: Token symbol
@@ -275,7 +279,7 @@ def create_lets_bonk_token_info(
         user: User/trader address
         creator: Creator address (defaults to user if not provided)
         **kwargs: Additional fields for TokenInfo
-        
+
     Returns:
         Enhanced TokenInfo configured for LetsBonk
     """
@@ -290,16 +294,16 @@ def create_lets_bonk_token_info(
         quote_vault=quote_vault,
         user=user,
         creator=creator or user,
-        **kwargs
+        **kwargs,
     )
 
 
 def is_pump_fun_token(token_info: TokenInfo) -> bool:
     """Check if a TokenInfo is for pump.fun platform.
-    
+
     Args:
         token_info: Token information to check
-        
+
     Returns:
         True if token is for pump.fun platform
     """
@@ -308,10 +312,10 @@ def is_pump_fun_token(token_info: TokenInfo) -> bool:
 
 def is_lets_bonk_token(token_info: TokenInfo) -> bool:
     """Check if a TokenInfo is for LetsBonk platform.
-    
+
     Args:
         token_info: Token information to check
-        
+
     Returns:
         True if token is for LetsBonk platform
     """
@@ -320,10 +324,10 @@ def is_lets_bonk_token(token_info: TokenInfo) -> bool:
 
 def get_platform_specific_fields(token_info: TokenInfo) -> dict[str, Any]:
     """Get platform-specific fields from TokenInfo.
-    
+
     Args:
         token_info: Token information
-        
+
     Returns:
         Dictionary of platform-specific fields
     """
@@ -345,51 +349,57 @@ def get_platform_specific_fields(token_info: TokenInfo) -> dict[str, Any]:
 
 def validate_token_info(token_info: TokenInfo) -> bool:
     """Validate that TokenInfo has required fields for its platform.
-    
+
     Args:
         token_info: Token information to validate
-        
+
     Returns:
         True if TokenInfo is valid for its platform
     """
     # Check common required fields
-    if not all([
-        token_info.name,
-        token_info.symbol,
-        token_info.mint,
-        token_info.platform,
-    ]):
+    if not all(
+        [
+            token_info.name,
+            token_info.symbol,
+            token_info.mint,
+            token_info.platform,
+        ]
+    ):
         return False
-    
+
     # Check platform-specific required fields
     if token_info.platform == Platform.PUMP_FUN:
-        return all([
-            token_info.bonding_curve,
-            token_info.associated_bonding_curve,
-        ])
+        return all(
+            [
+                token_info.bonding_curve,
+                token_info.associated_bonding_curve,
+            ]
+        )
     elif token_info.platform == Platform.LETS_BONK:
-        return all([
-            token_info.pool_state,
-            token_info.base_vault,
-            token_info.quote_vault,
-        ])
-    
+        return all(
+            [
+                token_info.pool_state,
+                token_info.base_vault,
+                token_info.quote_vault,
+            ]
+        )
+
     return True
 
 
 # Backward compatibility exports
 __all__ = [
-    'Platform',            # Platform enum
-    'TokenInfo',           # Enhanced TokenInfo (main export)
-    'TokenInfo_Legacy',    # Legacy TokenInfo for compatibility
-    'TradeResult',         # Enhanced TradeResult
-    'Trader',              # Enhanced Trader base class
-    'create_legacy_token_info',
-    'create_lets_bonk_token_info',
-    'create_pump_fun_token_info',
-    'get_platform_specific_fields',
-    'is_lets_bonk_token',
-    'is_pump_fun_token',
-    'upgrade_token_info',
-    'validate_token_info',
+    "Platform",  # Platform enum
+    "TokenInfo",  # Enhanced TokenInfo (main export)
+    "TokenInfo_Legacy",  # Legacy TokenInfo for compatibility
+    "TradeResult",  # Enhanced TradeResult
+    "Trader",  # Enhanced Trader base class
+    "create_legacy_token_info",
+    "create_lets_bonk_token_info",
+    "create_pump_fun_token_info",
+    "get_platform_specific_fields",
+    "is_lets_bonk_token",
+    "is_pump_fun_token",
+    "upgrade_token_info",
+    "validate_token_info",
 ]

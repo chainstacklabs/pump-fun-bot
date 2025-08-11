@@ -20,11 +20,15 @@ PRIVATE_KEY = os.getenv("SOLANA_PRIVATE_KEY")
 MINT_ADDRESS = Pubkey.from_string("9WHpYbqG6LJvfCYfMjvGbyo1wHXgroCrixPb33s2pump")
 
 
-async def close_account_if_exists(client: SolanaClient, wallet: Wallet, account: Pubkey, mint: Pubkey):
+async def close_account_if_exists(
+    client: SolanaClient, wallet: Wallet, account: Pubkey, mint: Pubkey
+):
     """Safely close a token account if it exists and reclaim rent."""
     try:
         solana_client = await client.get_client()
-        info = await solana_client.get_account_info(account, encoding="base64") # base64 encoding for account data by deafult
+        info = await solana_client.get_account_info(
+            account, encoding="base64"
+        )  # base64 encoding for account data by deafult
 
         # WARNING: This will permanently burn all tokens in the account before closing it
         # Closing account is impossible if balance is positive

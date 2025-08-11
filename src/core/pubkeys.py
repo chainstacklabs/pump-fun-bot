@@ -14,7 +14,9 @@ TOKEN_DECIMALS: Final[int] = 6
 
 # Token account constants
 TOKEN_ACCOUNT_SIZE: Final[int] = 165  # Size of a token account in bytes
-TOKEN_ACCOUNT_RENT_EXEMPT_RESERVE: Final[int] = 2_039_280  # Rent-exempt minimum for token accounts
+TOKEN_ACCOUNT_RENT_EXEMPT_RESERVE: Final[int] = (
+    2_039_280  # Rent-exempt minimum for token accounts
+)
 
 # Core system programs
 SYSTEM_PROGRAM: Final[Pubkey] = Pubkey.from_string("11111111111111111111111111111111")
@@ -26,9 +28,7 @@ ASSOCIATED_TOKEN_PROGRAM: Final[Pubkey] = Pubkey.from_string(
 )
 
 # System accounts
-RENT: Final[Pubkey] = Pubkey.from_string(
-    "SysvarRent111111111111111111111111111111111"
-)
+RENT: Final[Pubkey] = Pubkey.from_string("SysvarRent111111111111111111111111111111111")
 
 # Native SOL token
 SOL_MINT: Final[Pubkey] = Pubkey.from_string(
@@ -38,18 +38,18 @@ SOL_MINT: Final[Pubkey] = Pubkey.from_string(
 
 class SystemAddresses:
     """System-level Solana addresses shared across all platforms."""
-    
+
     # Reference the module-level constants
     SYSTEM_PROGRAM = SYSTEM_PROGRAM
     TOKEN_PROGRAM = TOKEN_PROGRAM
     ASSOCIATED_TOKEN_PROGRAM = ASSOCIATED_TOKEN_PROGRAM
     RENT = RENT
     SOL_MINT = SOL_MINT
-    
+
     @classmethod
     def get_all_system_addresses(cls) -> dict[str, Pubkey]:
         """Get all system addresses as a dictionary.
-        
+
         Returns:
             Dictionary mapping address names to Pubkey objects
         """

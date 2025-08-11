@@ -33,25 +33,25 @@ class UniversalBlockListener(BaseTokenListener):
         super().__init__()
         self.wss_endpoint = wss_endpoint
         self.ping_interval = 20  # seconds
-        
+
         # Import platform factory and get supported platforms
         from platforms import platform_factory
-        
+
         if platforms is None:
             # Monitor all supported platforms
             self.platforms = platform_factory.get_supported_platforms()
         else:
             self.platforms = platforms
-            
+
         # Get event parsers for all platforms
         self.platform_parsers = {}
         self.platform_program_ids = []
-        
+
         for platform in self.platforms:
             try:
                 # Create a simple dummy client that doesn't start blockhash updater
                 from core.client import SolanaClient
-                
+
                 # Create a mock client class to avoid network operations
                 class DummyClient(SolanaClient):
                     def __init__(self):
@@ -61,16 +61,18 @@ class UniversalBlockListener(BaseTokenListener):
                         self._cached_blockhash = None
                         self._blockhash_lock = None
                         self._blockhash_updater_task = None
-                
+
                 dummy_client = DummyClient()
-                
+
                 implementations = get_platform_implementations(platform, dummy_client)
                 parser = implementations.event_parser
                 self.platform_parsers[platform] = parser
                 self.platform_program_ids.append(str(parser.get_program_id()))
-                
-                logger.info(f"Registered platform {platform.value} with program ID {parser.get_program_id()}")
-                
+
+                logger.info(
+                    f"Registered platform {platform.value} with program ID {parser.get_program_id()}"
+                )
+
             except Exception as e:
                 logger.warning(f"Could not register platform {platform.value}: {e}")
 
@@ -117,7 +119,10 @@ class UniversalBlockListener(BaseTokenListener):
                                 )
                                 continue
 
-                            if creator_address and str(token_info.user) != creator_address:
+                            if (
+                                creator_address
+                                and str(token_info.user) != creator_address
+                            ):
                                 logger.info(
                                     f"Token not created by {creator_address}. Skipping..."
                                 )
@@ -220,10 +225,10 @@ class UniversalBlockListener(BaseTokenListener):
 
                 for platform, parser in self.platform_parsers.items():
                     # Check if the parser has a block parsing method
-                    if hasattr(parser, 'parse_token_creation_from_block'):
-                        token_info = parser.parse_token_creation_from_block({
-                            "transactions": [tx]
-                        })
+                    if hasattr(parser, "parse_token_creation_from_block"):
+                        token_info = parser.parse_token_creation_from_block(
+                            {"transactions": [tx]}
+                        )
                         if token_info:
                             return token_info
 

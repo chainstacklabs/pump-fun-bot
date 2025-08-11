@@ -7,6 +7,7 @@ SYSTEM_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM = Pubkey.from_string(
     "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
 )
 
+
 def get_bonding_curve_address(mint: Pubkey, program_id: Pubkey) -> tuple[Pubkey, int]:
     """
     Derives the bonding curve address for a given mint
@@ -37,9 +38,7 @@ def main():
     try:
         mint = Pubkey.from_string(mint_address)
 
-        bonding_curve_address, bump = get_bonding_curve_address(
-            mint, PUMP_PROGRAM
-        )
+        bonding_curve_address, bump = get_bonding_curve_address(mint, PUMP_PROGRAM)
 
         # Calculate the associated bonding curve
         associated_bonding_curve = find_associated_bonding_curve(

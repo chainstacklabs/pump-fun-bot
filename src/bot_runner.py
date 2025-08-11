@@ -46,8 +46,11 @@ async def start_bot(config_path: str):
     # Validate platform support
     try:
         from platforms import platform_factory
+
         if not platform_factory.registry.is_platform_supported(platform):
-            logging.error(f"Platform {platform.value} is not supported. Available platforms: {[p.value for p in platform_factory.get_supported_platforms()]}")
+            logging.error(
+                f"Platform {platform.value} is not supported. Available platforms: {[p.value for p in platform_factory.get_supported_platforms()]}"
+            )
             return
     except Exception as e:
         logging.exception(f"Could not validate platform support: {e}")
@@ -57,8 +60,11 @@ async def start_bot(config_path: str):
     listener_type = cfg["filters"]["listener_type"]
     if not validate_platform_listener_combination(platform, listener_type):
         from config_loader import get_supported_listeners_for_platform
+
         supported = get_supported_listeners_for_platform(platform)
-        logging.error(f"Listener '{listener_type}' is not compatible with platform '{platform.value}'. Supported listeners: {supported}")
+        logging.error(
+            f"Listener '{listener_type}' is not compatible with platform '{platform.value}'. Supported listeners: {supported}"
+        )
         return
 
     # Initialize universal trader with platform-specific configuration
@@ -68,39 +74,31 @@ async def start_bot(config_path: str):
             rpc_endpoint=cfg["rpc_endpoint"],
             wss_endpoint=cfg["wss_endpoint"],
             private_key=cfg["private_key"],
-            
             # Platform configuration - pass platform enum directly
             platform=platform,
-            
             # Trade parameters
             buy_amount=cfg["trade"]["buy_amount"],
             buy_slippage=cfg["trade"]["buy_slippage"],
             sell_slippage=cfg["trade"]["sell_slippage"],
-            
             # Extreme fast mode settings
             extreme_fast_mode=cfg["trade"].get("extreme_fast_mode", False),
             extreme_fast_token_amount=cfg["trade"].get("extreme_fast_token_amount", 30),
-            
             # Exit strategy configuration
             exit_strategy=cfg["trade"].get("exit_strategy", "time_based"),
             take_profit_percentage=cfg["trade"].get("take_profit_percentage"),
             stop_loss_percentage=cfg["trade"].get("stop_loss_percentage"),
             max_hold_time=cfg["trade"].get("max_hold_time"),
             price_check_interval=cfg["trade"].get("price_check_interval", 10),
-            
             # Listener configuration
             listener_type=cfg["filters"]["listener_type"],
-            
             # Geyser configuration (if applicable)
             geyser_endpoint=cfg.get("geyser", {}).get("endpoint"),
             geyser_api_token=cfg.get("geyser", {}).get("api_token"),
             geyser_auth_type=cfg.get("geyser", {}).get("auth_type", "x-token"),
-            
             # PumpPortal configuration (if applicable)
             pumpportal_url=cfg.get("pumpportal", {}).get(
                 "url", "wss://pumpportal.fun/api/data"
             ),
-            
             # Priority fee configuration
             enable_dynamic_priority_fee=cfg.get("priority_fees", {}).get(
                 "enable_dynamic", False
@@ -109,19 +107,21 @@ async def start_bot(config_path: str):
                 "enable_fixed", True
             ),
             fixed_priority_fee=cfg.get("priority_fees", {}).get("fixed_amount", 500000),
-            extra_priority_fee=cfg.get("priority_fees", {}).get("extra_percentage", 0.0),
+            extra_priority_fee=cfg.get("priority_fees", {}).get(
+                "extra_percentage", 0.0
+            ),
             hard_cap_prior_fee=cfg.get("priority_fees", {}).get("hard_cap", 500000),
-            
             # Retry and timeout settings
             max_retries=cfg.get("retries", {}).get("max_attempts", 10),
-            wait_time_after_creation=cfg.get("retries", {}).get("wait_after_creation", 15),
+            wait_time_after_creation=cfg.get("retries", {}).get(
+                "wait_after_creation", 15
+            ),
             wait_time_after_buy=cfg.get("retries", {}).get("wait_after_buy", 15),
             wait_time_before_new_token=cfg.get("retries", {}).get(
                 "wait_before_new_token", 15
             ),
             max_token_age=cfg.get("filters", {}).get("max_token_age", 0.001),
             token_wait_timeout=cfg.get("timing", {}).get("token_wait_timeout", 120),
-            
             # Cleanup settings
             cleanup_mode=cfg.get("cleanup", {}).get("mode", "disabled"),
             cleanup_force_close_with_burn=cfg.get("cleanup", {}).get(
@@ -130,7 +130,6 @@ async def start_bot(config_path: str):
             cleanup_with_priority_fee=cfg.get("cleanup", {}).get(
                 "with_priority_fee", False
             ),
-            
             # Trading filters
             match_string=cfg["filters"].get("match_string"),
             bro_address=cfg["filters"].get("bro_address"),
@@ -139,7 +138,7 @@ async def start_bot(config_path: str):
         )
 
         await trader.start()
-        
+
     except Exception as e:
         logging.exception(f"Failed to initialize or start trader: {e}")
         raise
@@ -180,40 +179,52 @@ def run_all_bots():
             # Validate platform configuration
             try:
                 platform = get_platform_from_config(cfg)
-                
+
                 # Check platform support
                 from platforms import platform_factory
+
                 if not platform_factory.registry.is_platform_supported(platform):
-                    logging.error(f"Platform {platform.value} is not supported for bot '{bot_name}'. Available platforms: {[p.value for p in platform_factory.get_supported_platforms()]}")
+                    logging.error(
+                        f"Platform {platform.value} is not supported for bot '{bot_name}'. Available platforms: {[p.value for p in platform_factory.get_supported_platforms()]}"
+                    )
                     skipped_bots += 1
                     continue
-                    
+
                 # Validate listener compatibility
                 listener_type = cfg["filters"]["listener_type"]
                 if not validate_platform_listener_combination(platform, listener_type):
                     from config_loader import get_supported_listeners_for_platform
+
                     supported = get_supported_listeners_for_platform(platform)
-                    logging.error(f"Listener '{listener_type}' is not compatible with platform '{platform.value}' for bot '{bot_name}'. Supported listeners: {supported}")
+                    logging.error(
+                        f"Listener '{listener_type}' is not compatible with platform '{platform.value}' for bot '{bot_name}'. Supported listeners: {supported}"
+                    )
                     skipped_bots += 1
                     continue
-                    
+
             except Exception as e:
-                logging.exception(f"Invalid platform configuration for bot '{bot_name}': {e}. Skipping...")
+                logging.exception(
+                    f"Invalid platform configuration for bot '{bot_name}': {e}. Skipping..."
+                )
                 skipped_bots += 1
                 continue
 
             # Start bot in separate process or main process
             if cfg.get("separate_process", False):
-                logging.info(f"Starting bot '{bot_name}' ({platform.value}) in separate process")
+                logging.info(
+                    f"Starting bot '{bot_name}' ({platform.value}) in separate process"
+                )
                 p = multiprocessing.Process(
                     target=run_bot_process, args=(str(file),), name=f"bot-{bot_name}"
                 )
                 p.start()
                 processes.append(p)
             else:
-                logging.info(f"Starting bot '{bot_name}' ({platform.value}) in main process")
+                logging.info(
+                    f"Starting bot '{bot_name}' ({platform.value}) in main process"
+                )
                 asyncio.run(start_bot(str(file)))
-                
+
         except Exception as e:
             logging.exception(f"Failed to start bot from {file}: {e}")
             skipped_bots += 1
@@ -237,15 +248,17 @@ def main() -> None:
     # Log supported platforms and listeners
     try:
         from platforms import platform_factory
+
         supported_platforms = platform_factory.get_supported_platforms()
         logging.info(f"Supported platforms: {[p.value for p in supported_platforms]}")
-        
+
         # Log listener compatibility for each platform
         from config_loader import get_supported_listeners_for_platform
+
         for platform in supported_platforms:
             listeners = get_supported_listeners_for_platform(platform)
             logging.info(f"Platform {platform.value} supports listeners: {listeners}")
-            
+
     except Exception as e:
         logging.warning(f"Could not load platform information: {e}")
 

@@ -108,6 +108,7 @@ class UniversalTrader:
         # Validate platform support
         try:
             from platforms import platform_factory
+
             if not platform_factory.registry.is_platform_supported(self.platform):
                 raise ValueError(f"Platform {self.platform.value} is not supported")
         except Exception:
@@ -130,7 +131,7 @@ class UniversalTrader:
             extreme_fast_token_amount,
             extreme_fast_mode,
         )
-        
+
         self.seller = PlatformAwareSeller(
             self.solana_client,
             self.wallet,
@@ -193,17 +194,27 @@ class UniversalTrader:
     async def start(self) -> None:
         """Start the trading bot and listen for new tokens."""
         logger.info(f"Starting Universal Trader for {self.platform.value}")
-        logger.info(f"Match filter: {self.match_string if self.match_string else 'None'}")
-        logger.info(f"Creator filter: {self.bro_address if self.bro_address else 'None'}")
+        logger.info(
+            f"Match filter: {self.match_string if self.match_string else 'None'}"
+        )
+        logger.info(
+            f"Creator filter: {self.bro_address if self.bro_address else 'None'}"
+        )
         logger.info(f"Marry mode: {self.marry_mode}")
         logger.info(f"YOLO mode: {self.yolo_mode}")
         logger.info(f"Exit strategy: {self.exit_strategy}")
-        
+
         if self.exit_strategy == "tp_sl":
-            logger.info(f"Take profit: {self.take_profit_percentage * 100 if self.take_profit_percentage else 'None'}%")
-            logger.info(f"Stop loss: {self.stop_loss_percentage * 100 if self.stop_loss_percentage else 'None'}%")
-            logger.info(f"Max hold time: {self.max_hold_time if self.max_hold_time else 'None'} seconds")
-        
+            logger.info(
+                f"Take profit: {self.take_profit_percentage * 100 if self.take_profit_percentage else 'None'}%"
+            )
+            logger.info(
+                f"Stop loss: {self.stop_loss_percentage * 100 if self.stop_loss_percentage else 'None'}%"
+            )
+            logger.info(
+                f"Max hold time: {self.max_hold_time if self.max_hold_time else 'None'} seconds"
+            )
+
         logger.info(f"Max token age: {self.max_token_age} seconds")
 
         try:
@@ -216,16 +227,22 @@ class UniversalTrader:
             # Choose operating mode based on yolo_mode
             if not self.yolo_mode:
                 # Single token mode: process one token and exit
-                logger.info("Running in single token mode - will process one token and exit")
+                logger.info(
+                    "Running in single token mode - will process one token and exit"
+                )
                 token_info = await self._wait_for_token()
                 if token_info:
                     await self._handle_token(token_info)
                     logger.info("Finished processing single token. Exiting...")
                 else:
-                    logger.info(f"No suitable token found within timeout period ({self.token_wait_timeout}s). Exiting...")
+                    logger.info(
+                        f"No suitable token found within timeout period ({self.token_wait_timeout}s). Exiting..."
+                    )
             else:
                 # Continuous mode: process tokens until interrupted
-                logger.info("Running in continuous mode - will process tokens until interrupted")
+                logger.info(
+                    "Running in continuous mode - will process tokens until interrupted"
+                )
                 processor_task = asyncio.create_task(self._process_token_queue())
 
                 try:
@@ -278,12 +295,16 @@ class UniversalTrader:
 
         # Wait for a token with a timeout
         try:
-            logger.info(f"Waiting for a suitable token (timeout: {self.token_wait_timeout}s)...")
+            logger.info(
+                f"Waiting for a suitable token (timeout: {self.token_wait_timeout}s)..."
+            )
             await asyncio.wait_for(token_found.wait(), timeout=self.token_wait_timeout)
             logger.info(f"Found token: {found_token.symbol} ({found_token.mint})")
             return found_token
         except TimeoutError:
-            logger.info(f"Timed out after waiting {self.token_wait_timeout}s for a token")
+            logger.info(
+                f"Timed out after waiting {self.token_wait_timeout}s for a token"
+            )
             return None
         finally:
             listener_task.cancel()
@@ -327,7 +348,9 @@ class UniversalTrader:
         self.token_timestamps[token_key] = monotonic()
 
         await self.token_queue.put(token_info)
-        logger.info(f"Queued new token: {token_info.symbol} ({token_info.mint}) on {token_info.platform.value}")
+        logger.info(
+            f"Queued new token: {token_info.symbol} ({token_info.mint}) on {token_info.platform.value}"
+        )
 
     async def _process_token_queue(self) -> None:
         """Continuously process tokens from the queue, only if they're fresh."""
@@ -338,15 +361,21 @@ class UniversalTrader:
 
                 # Check if token is still "fresh"
                 current_time = monotonic()
-                token_age = current_time - self.token_timestamps.get(token_key, current_time)
+                token_age = current_time - self.token_timestamps.get(
+                    token_key, current_time
+                )
 
                 if token_age > self.max_token_age:
-                    logger.info(f"Skipping token {token_info.symbol} - too old ({token_age:.1f}s > {self.max_token_age}s)")
+                    logger.info(
+                        f"Skipping token {token_info.symbol} - too old ({token_age:.1f}s > {self.max_token_age}s)"
+                    )
                     continue
 
                 self.processed_tokens.add(token_key)
 
-                logger.info(f"Processing fresh token: {token_info.symbol} (age: {token_age:.1f}s)")
+                logger.info(
+                    f"Processing fresh token: {token_info.symbol} (age: {token_age:.1f}s)"
+                )
                 await self._handle_token(token_info)
 
             except asyncio.CancelledError:
@@ -362,17 +391,23 @@ class UniversalTrader:
         try:
             # Validate that token is for our platform
             if token_info.platform != self.platform:
-                logger.warning(f"Token platform mismatch: expected {self.platform.value}, got {token_info.platform.value}")
+                logger.warning(
+                    f"Token platform mismatch: expected {self.platform.value}, got {token_info.platform.value}"
+                )
                 return
 
             # Wait for pool/curve to stabilize (unless in extreme fast mode)
             if not self.extreme_fast_mode:
                 await self._save_token_info(token_info)
-                logger.info(f"Waiting for {self.wait_time_after_creation} seconds for the pool/curve to stabilize...")
+                logger.info(
+                    f"Waiting for {self.wait_time_after_creation} seconds for the pool/curve to stabilize..."
+                )
                 await asyncio.sleep(self.wait_time_after_creation)
 
             # Buy token
-            logger.info(f"Buying {self.buy_amount:.6f} SOL worth of {token_info.symbol} on {token_info.platform.value}...")
+            logger.info(
+                f"Buying {self.buy_amount:.6f} SOL worth of {token_info.symbol} on {token_info.platform.value}..."
+            )
             buy_result: TradeResult = await self.buyer.execute(token_info)
 
             if buy_result.success:
@@ -382,16 +417,28 @@ class UniversalTrader:
 
             # Only wait for next token in yolo mode
             if self.yolo_mode:
-                logger.info(f"YOLO mode enabled. Waiting {self.wait_time_before_new_token} seconds before looking for next token...")
+                logger.info(
+                    f"YOLO mode enabled. Waiting {self.wait_time_before_new_token} seconds before looking for next token..."
+                )
                 await asyncio.sleep(self.wait_time_before_new_token)
 
         except Exception:
             logger.exception(f"Error handling token {token_info.symbol}")
 
-    async def _handle_successful_buy(self, token_info: TokenInfo, buy_result: TradeResult) -> None:
+    async def _handle_successful_buy(
+        self, token_info: TokenInfo, buy_result: TradeResult
+    ) -> None:
         """Handle successful token purchase."""
-        logger.info(f"Successfully bought {token_info.symbol} on {token_info.platform.value}")
-        self._log_trade("buy", token_info, buy_result.price, buy_result.amount, buy_result.tx_signature)
+        logger.info(
+            f"Successfully bought {token_info.symbol} on {token_info.platform.value}"
+        )
+        self._log_trade(
+            "buy",
+            token_info,
+            buy_result.price,
+            buy_result.amount,
+            buy_result.tx_signature,
+        )
         self.traded_mints.add(token_info.mint)
 
         # Choose exit strategy
@@ -405,7 +452,9 @@ class UniversalTrader:
         else:
             logger.info("Marry mode enabled. Skipping sell operation.")
 
-    async def _handle_failed_buy(self, token_info: TokenInfo, buy_result: TradeResult) -> None:
+    async def _handle_failed_buy(
+        self, token_info: TokenInfo, buy_result: TradeResult
+    ) -> None:
         """Handle failed token purchase."""
         logger.error(f"Failed to buy {token_info.symbol}: {buy_result.error_message}")
         # Close ATA if enabled
@@ -419,7 +468,9 @@ class UniversalTrader:
             self.cleanup_force_close_with_burn,
         )
 
-    async def _handle_tp_sl_exit(self, token_info: TokenInfo, buy_result: TradeResult) -> None:
+    async def _handle_tp_sl_exit(
+        self, token_info: TokenInfo, buy_result: TradeResult
+    ) -> None:
         """Handle take profit/stop loss exit strategy."""
         # Create position
         position = Position.create_from_buy_result(
@@ -451,7 +502,13 @@ class UniversalTrader:
 
         if sell_result.success:
             logger.info(f"Successfully sold {token_info.symbol}")
-            self._log_trade("sell", token_info, sell_result.price, sell_result.amount, sell_result.tx_signature)
+            self._log_trade(
+                "sell",
+                token_info,
+                sell_result.price,
+                sell_result.amount,
+                sell_result.tx_signature,
+            )
             # Close ATA if enabled
             await handle_cleanup_after_sell(
                 self.solana_client,
@@ -463,11 +520,17 @@ class UniversalTrader:
                 self.cleanup_force_close_with_burn,
             )
         else:
-            logger.error(f"Failed to sell {token_info.symbol}: {sell_result.error_message}")
+            logger.error(
+                f"Failed to sell {token_info.symbol}: {sell_result.error_message}"
+            )
 
-    async def _monitor_position_until_exit(self, token_info: TokenInfo, position: Position) -> None:
+    async def _monitor_position_until_exit(
+        self, token_info: TokenInfo, position: Position
+    ) -> None:
         """Monitor a position until exit conditions are met."""
-        logger.info(f"Starting position monitoring (check interval: {self.price_check_interval}s)")
+        logger.info(
+            f"Starting position monitoring (check interval: {self.price_check_interval}s)"
+        )
 
         # Get pool address for price monitoring using platform-agnostic method
         pool_address = self._get_pool_address(token_info)
@@ -487,7 +550,9 @@ class UniversalTrader:
 
                     # Log PnL before exit
                     pnl = position.get_pnl(current_price)
-                    logger.info(f"Position PnL: {pnl['price_change_pct']:.2f}% ({pnl['unrealized_pnl_sol']:.6f} SOL)")
+                    logger.info(
+                        f"Position PnL: {pnl['price_change_pct']:.2f}% ({pnl['unrealized_pnl_sol']:.6f} SOL)"
+                    )
 
                     # Execute sell
                     sell_result = await self.seller.execute(token_info)
@@ -496,12 +561,22 @@ class UniversalTrader:
                         # Close position with actual exit price
                         position.close_position(sell_result.price, exit_reason)
 
-                        logger.info(f"Successfully exited position: {exit_reason.value}")
-                        self._log_trade("sell", token_info, sell_result.price, sell_result.amount, sell_result.tx_signature)
+                        logger.info(
+                            f"Successfully exited position: {exit_reason.value}"
+                        )
+                        self._log_trade(
+                            "sell",
+                            token_info,
+                            sell_result.price,
+                            sell_result.amount,
+                            sell_result.tx_signature,
+                        )
 
                         # Log final PnL
                         final_pnl = position.get_pnl()
-                        logger.info(f"Final PnL: {final_pnl['price_change_pct']:.2f}% ({final_pnl['unrealized_pnl_sol']:.6f} SOL)")
+                        logger.info(
+                            f"Final PnL: {final_pnl['price_change_pct']:.2f}% ({final_pnl['unrealized_pnl_sol']:.6f} SOL)"
+                        )
 
                         # Close ATA if enabled
                         await handle_cleanup_after_sell(
@@ -514,30 +589,36 @@ class UniversalTrader:
                             self.cleanup_force_close_with_burn,
                         )
                     else:
-                        logger.error(f"Failed to exit position: {sell_result.error_message}")
+                        logger.error(
+                            f"Failed to exit position: {sell_result.error_message}"
+                        )
                         # Keep monitoring in case sell can be retried
 
                     break
                 else:
                     # Log current status
                     pnl = position.get_pnl(current_price)
-                    logger.debug(f"Position status: {current_price:.8f} SOL ({pnl['price_change_pct']:+.2f}%)")
+                    logger.debug(
+                        f"Position status: {current_price:.8f} SOL ({pnl['price_change_pct']:+.2f}%)"
+                    )
 
                 # Wait before next price check
                 await asyncio.sleep(self.price_check_interval)
 
             except Exception:
                 logger.exception("Error monitoring position")
-                await asyncio.sleep(self.price_check_interval)  # Continue monitoring despite errors
+                await asyncio.sleep(
+                    self.price_check_interval
+                )  # Continue monitoring despite errors
 
     def _get_pool_address(self, token_info: TokenInfo) -> Pubkey:
         """Get the pool/curve address for price monitoring using platform-agnostic method."""
         address_provider = self.platform_implementations.address_provider
-        
+
         # Use platform-specific logic to get the appropriate address
-        if hasattr(token_info, 'bonding_curve') and token_info.bonding_curve:
+        if hasattr(token_info, "bonding_curve") and token_info.bonding_curve:
             return token_info.bonding_curve
-        elif hasattr(token_info, 'pool_state') and token_info.pool_state:
+        elif hasattr(token_info, "pool_state") and token_info.pool_state:
             return token_info.pool_state
         else:
             # Fallback to deriving the address using platform provider
@@ -561,7 +642,7 @@ class UniversalTrader:
                 "creator": str(token_info.creator) if token_info.creator else None,
                 "creation_timestamp": token_info.creation_timestamp,
             }
-            
+
             # Add platform-specific fields only if they exist
             platform_fields = {
                 "bonding_curve": token_info.bonding_curve,
@@ -571,7 +652,7 @@ class UniversalTrader:
                 "base_vault": token_info.base_vault,
                 "quote_vault": token_info.quote_vault,
             }
-            
+
             for field_name, field_value in platform_fields.items():
                 if field_value is not None:
                     token_dict[field_name] = str(field_value)
@@ -582,7 +663,14 @@ class UniversalTrader:
         except OSError:
             logger.exception("Failed to save token information")
 
-    def _log_trade(self, action: str, token_info: TokenInfo, price: float, amount: float, tx_hash: str | None) -> None:
+    def _log_trade(
+        self,
+        action: str,
+        token_info: TokenInfo,
+        price: float,
+        amount: float,
+        tx_hash: str | None,
+    ) -> None:
         """Log trade information."""
         try:
             trades_dir = Path("trades")

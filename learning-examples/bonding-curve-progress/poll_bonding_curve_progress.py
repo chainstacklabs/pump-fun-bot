@@ -17,21 +17,25 @@ load_dotenv()
 # Constants
 RPC_URL: Final[str] = os.getenv("SOLANA_NODE_RPC_ENDPOINT")
 TOKEN_MINT: Final[str] = "xWrzYY4c1LnbSkLrd2LDUg9vw7YtVyJhGmw7MABpump"
-PUMP_PROGRAM_ID: Final[Pubkey] = Pubkey.from_string("6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P")
+PUMP_PROGRAM_ID: Final[Pubkey] = Pubkey.from_string(
+    "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
+)
 LAMPORTS_PER_SOL: Final[int] = 1_000_000_000
 TOKEN_DECIMALS: Final[int] = 6
-EXPECTED_DISCRIMINATOR: Final[bytes] = struct.pack("<Q", 6966180631402821399)  # Pump.fun bonding curve discriminator
+EXPECTED_DISCRIMINATOR: Final[bytes] = struct.pack(
+    "<Q", 6966180631402821399
+)  # Pump.fun bonding curve discriminator
 POLL_INTERVAL: Final[int] = 10  # Seconds between each status check
 
 
 def get_associated_bonding_curve_address(mint: Pubkey, program_id: Pubkey) -> Pubkey:
     """
     Derive the bonding curve PDA address from a mint address.
-    
+
     Args:
         mint: The token mint address
         program_id: The program ID for the bonding curve
-        
+
     Returns:
         The bonding curve address
     """
@@ -41,14 +45,14 @@ def get_associated_bonding_curve_address(mint: Pubkey, program_id: Pubkey) -> Pu
 async def get_account_data(client: AsyncClient, pubkey: Pubkey) -> bytes:
     """
     Fetch raw account data for a given public key.
-    
+
     Args:
         client: AsyncClient connection to Solana RPC
         pubkey: The public key of the account to fetch
-        
+
     Returns:
         The raw account data as bytes
-        
+
     Raises:
         ValueError: If the account is not found or has no data
     """
@@ -62,13 +66,13 @@ async def get_account_data(client: AsyncClient, pubkey: Pubkey) -> bytes:
 def parse_curve_state(data: bytes) -> dict:
     """
     Decode bonding curve account data into a readable format.
-    
+
     Args:
         data: The raw bonding curve account data
-        
+
     Returns:
         A dictionary containing parsed bonding curve fields
-        
+
     Raises:
         ValueError: If the account discriminator is invalid
     """
@@ -89,7 +93,7 @@ def parse_curve_state(data: bytes) -> dict:
 def print_curve_status(state: dict) -> None:
     """
     Print the current status of the bonding curve in a readable format.
-    
+
     Args:
         state: The parsed bonding curve state dictionary
     """
@@ -98,11 +102,11 @@ def print_curve_status(state: dict) -> None:
         progress = 100.0
     else:
         # Pump.fun constants (already converted to human-readable format)
-        TOTAL_SUPPLY = 1_000_000_000  # 1B tokens 
+        TOTAL_SUPPLY = 1_000_000_000  # 1B tokens
         RESERVED_TOKENS = 206_900_000  # 206.9M tokens reserved for migration
-        
+
         initial_real_token_reserves = TOTAL_SUPPLY - RESERVED_TOKENS  # 793.1M tokens
-        
+
         if initial_real_token_reserves > 0:
             left_tokens = state["real_token_reserves"]
             progress = 100 - (left_tokens * 100) / initial_real_token_reserves
@@ -124,7 +128,9 @@ async def track_curve() -> None:
         return
 
     mint_pubkey: Pubkey = Pubkey.from_string(TOKEN_MINT)
-    curve_pubkey: Pubkey = get_associated_bonding_curve_address(mint_pubkey, PUMP_PROGRAM_ID)
+    curve_pubkey: Pubkey = get_associated_bonding_curve_address(
+        mint_pubkey, PUMP_PROGRAM_ID
+    )
 
     print("Tracking bonding curve for:", mint_pubkey)
     print("Curve address:", curve_pubkey, "\n")

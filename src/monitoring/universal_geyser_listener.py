@@ -30,7 +30,7 @@ class UniversalGeyserListener(BaseTokenListener):
         super().__init__()
         self.geyser_endpoint = geyser_endpoint
         self.geyser_api_token = geyser_api_token
-        
+
         valid_auth_types = {"x-token", "basic"}
         self.auth_type: str = (geyser_auth_type or "x-token").lower()
         if self.auth_type not in valid_auth_types:
@@ -38,21 +38,21 @@ class UniversalGeyserListener(BaseTokenListener):
                 f"Unsupported auth_type={self.auth_type!r}. "
                 f"Expected one of {valid_auth_types}"
             )
-        
+
         if platforms is None:
             self.platforms = platform_factory.get_supported_platforms()
         else:
             self.platforms = platforms
-            
+
         # Get event parsers for all platforms
         self.platform_parsers = {}
         self.platform_program_ids = set()
-        
+
         for platform in self.platforms:
             try:
                 # Create a simple dummy client that doesn't start blockhash updater
                 from core.client import SolanaClient
-                
+
                 # Create a mock client class to avoid network operations
                 class DummyClient(SolanaClient):
                     def __init__(self):
@@ -62,22 +62,26 @@ class UniversalGeyserListener(BaseTokenListener):
                         self._cached_blockhash = None
                         self._blockhash_lock = None
                         self._blockhash_updater_task = None
-                
+
                 dummy_client = DummyClient()
-                
-                implementations = platform_factory.create_for_platform(platform, dummy_client)
+
+                implementations = platform_factory.create_for_platform(
+                    platform, dummy_client
+                )
                 parser = implementations.event_parser
                 self.platform_parsers[platform] = parser
                 self.platform_program_ids.add(parser.get_program_id())
-                
-                logger.info(f"Registered platform {platform.value} with program ID {parser.get_program_id()}")
-                
+
+                logger.info(
+                    f"Registered platform {platform.value} with program ID {parser.get_program_id()}"
+                )
+
             except Exception as e:
                 logger.warning(f"Could not register platform {platform.value}: {e}")
 
     async def _create_geyser_connection(self):
         """Establish a secure connection to the Geyser endpoint."""
-        
+
         if self.auth_type == "x-token":
             auth = grpc.metadata_call_credentials(
                 lambda _, callback: callback(
@@ -92,20 +96,20 @@ class UniversalGeyserListener(BaseTokenListener):
             )
         creds = grpc.composite_channel_credentials(grpc.ssl_channel_credentials(), auth)
         channel = grpc.aio.secure_channel(self.geyser_endpoint, creds)
-        
+
         return geyser_pb2_grpc.GeyserStub(channel), channel
 
     def _create_subscription_request(self):
         """Create a subscription request for all monitored platforms."""
-        
+
         request = geyser_pb2.SubscribeRequest()
-        
+
         # Add all platform program IDs to the filter
         for program_id in self.platform_program_ids:
             filter_name = f"platform_filter_{program_id}"
             request.transactions[filter_name].account_include.append(str(program_id))
             request.transactions[filter_name].failed = False
-            
+
         request.commitment = geyser_pb2.CommitmentLevel.PROCESSED
         return request
 
@@ -126,8 +130,12 @@ class UniversalGeyserListener(BaseTokenListener):
                 request = self._create_subscription_request()
 
                 logger.info(f"Connected to Geyser endpoint: {self.geyser_endpoint}")
-                logger.info(f"Monitoring platforms: {[p.value for p in self.platforms]}")
-                logger.info(f"Monitoring program IDs: {[str(pid) for pid in self.platform_program_ids]}")
+                logger.info(
+                    f"Monitoring platforms: {[p.value for p in self.platforms]}"
+                )
+                logger.info(
+                    f"Monitoring program IDs: {[str(pid) for pid in self.platform_program_ids]}"
+                )
 
                 try:
                     async for update in stub.Subscribe(iter([request])):
@@ -192,7 +200,7 @@ class UniversalGeyserListener(BaseTokenListener):
                     continue
 
                 program_id = Pubkey.from_bytes(msg.account_keys[program_idx])
-                
+
                 # Find the matching platform parser
                 for platform, parser in self.platform_parsers.items():
                     if program_id == parser.get_program_id():

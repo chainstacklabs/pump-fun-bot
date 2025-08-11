@@ -22,7 +22,10 @@ load_dotenv()
 WSS_ENDPOINT = os.environ.get("SOLANA_NODE_WSS_ENDPOINT")
 PUMP_PROGRAM_ID = Pubkey.from_string("6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P")
 TOKEN_PROGRAM_ID = Pubkey.from_string("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
-ASSOCIATED_TOKEN_PROGRAM_ID = Pubkey.from_string("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL")
+ASSOCIATED_TOKEN_PROGRAM_ID = Pubkey.from_string(
+    "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+)
+
 
 def find_associated_bonding_curve(mint: Pubkey, bonding_curve: Pubkey) -> Pubkey:
     """

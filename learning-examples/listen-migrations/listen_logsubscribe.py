@@ -20,7 +20,9 @@ from solders.pubkey import Pubkey
 load_dotenv()
 
 WSS_ENDPOINT = os.environ.get("SOLANA_NODE_WSS_ENDPOINT")
-MIGRATION_PROGRAM_ID = Pubkey.from_string("39azUYFWPz3VHgKCf3VChUwbpURdCHRxjWVowf5jUJjg")
+MIGRATION_PROGRAM_ID = Pubkey.from_string(
+    "39azUYFWPz3VHgKCf3VChUwbpURdCHRxjWVowf5jUJjg"
+)
 
 
 def parse_migrate_instruction(data):
@@ -33,7 +35,7 @@ def parse_migrate_instruction(data):
 
     fields = [
         ("timestamp", "i64"),
-        ("index", "u16"), 
+        ("index", "u16"),
         ("creator", "publicKey"),
         ("baseMint", "publicKey"),
         ("quoteMint", "publicKey"),
@@ -56,15 +58,19 @@ def parse_migrate_instruction(data):
     try:
         for field_name, field_type in fields:
             if field_type == "publicKey":
-                value = data[offset:offset + 32]
+                value = data[offset : offset + 32]
                 parsed_data[field_name] = base58.b58encode(value).decode("utf-8")
                 offset += 32
             elif field_type in {"u64", "i64"}:
-                value = struct.unpack("<Q", data[offset:offset + 8])[0] if field_type == "u64" else struct.unpack("<q", data[offset:offset + 8])[0]
+                value = (
+                    struct.unpack("<Q", data[offset : offset + 8])[0]
+                    if field_type == "u64"
+                    else struct.unpack("<q", data[offset : offset + 8])[0]
+                )
                 parsed_data[field_name] = value
                 offset += 8
             elif field_type == "u16":
-                value = struct.unpack("<H", data[offset:offset + 2])[0]
+                value = struct.unpack("<H", data[offset : offset + 2])[0]
                 parsed_data[field_name] = value
                 offset += 2
             elif field_type == "u8":
@@ -124,7 +130,9 @@ async def listen_for_migrations():
                     }
                 )
                 await websocket.send(subscription_message)
-                print(f"[INFO] Listening for migration instructions from program: {MIGRATION_PROGRAM_ID}")
+                print(
+                    f"[INFO] Listening for migration instructions from program: {MIGRATION_PROGRAM_ID}"
+                )
 
                 response = await websocket.recv()
                 print(f"[INFO] Subscription response: {response}")
@@ -138,16 +146,24 @@ async def listen_for_migrations():
                             log_data = data["params"]["result"]["value"]
                             logs = log_data.get("logs", [])
 
-                            signature = log_data.get('signature', 'N/A')
+                            signature = log_data.get("signature", "N/A")
                             print(f"\n[INFO] Transaction signature: {signature}")
 
                             if is_transaction_successful(logs):
-                                if not any("Program log: Instruction: Migrate" in log for log in logs):
+                                if not any(
+                                    "Program log: Instruction: Migrate" in log
+                                    for log in logs
+                                ):
                                     print("[INFO] Skipping: no migrate instruction")
                                     continue
 
-                                if any("Program log: Bonding curve already migrated" in log for log in logs):
-                                    print("[INFO] Skipping: bonding curve already migrated")
+                                if any(
+                                    "Program log: Bonding curve already migrated" in log
+                                    for log in logs
+                                ):
+                                    print(
+                                        "[INFO] Skipping: bonding curve already migrated"
+                                    )
                                     continue
 
                                 print("[INFO] Processing migration instruction...")
@@ -155,7 +171,9 @@ async def listen_for_migrations():
                             else:
                                 print("[INFO] Skipping failed transaction.")
                     except TimeoutError:
-                        print("[INFO] Timeout waiting for WebSocket message, retrying...")
+                        print(
+                            "[INFO] Timeout waiting for WebSocket message, retrying..."
+                        )
                     except Exception as e:
                         print(f"[ERROR] An error occurred: {e}")
                         break
@@ -164,6 +182,7 @@ async def listen_for_migrations():
             print(f"[ERROR] Connection error: {e}")
             print("[INFO] Reconnecting in 5 seconds...")
             await asyncio.sleep(5)
+
 
 if __name__ == "__main__":
     asyncio.run(listen_for_migrations())

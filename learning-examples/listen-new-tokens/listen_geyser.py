@@ -37,9 +37,11 @@ async def create_geyser_connection():
         )
     else:  # Default to basic auth
         auth = grpc.metadata_call_credentials(
-            lambda _, callback: callback((("authorization", f"Basic {GEYSER_API_TOKEN}"),), None)
+            lambda _, callback: callback(
+                (("authorization", f"Basic {GEYSER_API_TOKEN}"),), None
+            )
         )
-    
+
     creds = grpc.composite_channel_credentials(grpc.ssl_channel_credentials(), auth)
     channel = grpc.aio.secure_channel(GEYSER_ENDPOINT, creds)
     return geyser_pb2_grpc.GeyserStub(channel)
@@ -58,14 +60,14 @@ def decode_create_instruction(ix_data: bytes, keys, accounts) -> dict:
     """Decode a create instruction from transaction data."""
     # Skip past the 8-byte discriminator prefix
     offset = 8
-    
+
     # Extract account keys in base58 format
     def get_account_key(index):
         if index >= len(accounts):
             return "N/A"
         account_index = accounts[index]
         return base58.b58encode(keys[account_index]).decode()
-    
+
     # Read string fields (prefixed with length)
     def read_string():
         nonlocal offset
@@ -73,21 +75,21 @@ def decode_create_instruction(ix_data: bytes, keys, accounts) -> dict:
         length = struct.unpack_from("<I", ix_data, offset)[0]
         offset += 4
         # Extract and decode the string
-        value = ix_data[offset:offset + length].decode()
+        value = ix_data[offset : offset + length].decode()
         offset += length
         return value
-    
+
     def read_pubkey():
         nonlocal offset
         value = base58.b58encode(ix_data[offset : offset + 32]).decode("utf-8")
         offset += 32
         return value
-    
+
     name = read_string()
     symbol = read_string()
     uri = read_string()
     creator = read_pubkey()
-    
+
     token_info = {
         "name": name,
         "symbol": symbol,
@@ -102,7 +104,7 @@ def decode_create_instruction(ix_data: bytes, keys, accounts) -> dict:
         "rent": get_account_key(6),
         "user": get_account_key(7),
     }
-        
+
     return token_info
 
 
@@ -122,24 +124,26 @@ async def monitor_pump():
     print(f"Starting Pump.fun token monitor using {AUTH_TYPE.upper()} authentication")
     stub = await create_geyser_connection()
     request = create_subscription_request()
-    
+
     async for update in stub.Subscribe(iter([request])):
         # Skip non-transaction updates
         if not update.HasField("transaction"):
             continue
-        
+
         tx = update.transaction.transaction.transaction
         msg = getattr(tx, "message", None)
         if msg is None:
             continue
-        
+
         # Check each instruction in the transaction
         for ix in msg.instructions:
             if not ix.data.startswith(PUMP_CREATE_PREFIX):
                 continue
 
             info = decode_create_instruction(ix.data, msg.account_keys, ix.accounts)
-            signature = base58.b58encode(bytes(update.transaction.transaction.signature)).decode()
+            signature = base58.b58encode(
+                bytes(update.transaction.transaction.signature)
+            ).decode()
             print_token_info(info, signature)
 
 

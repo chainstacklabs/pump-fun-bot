@@ -66,7 +66,7 @@ class BondingCurveState:
         self.__dict__.update(parsed)
 
         # Convert raw bytes to Pubkey for creator field
-        if hasattr(self, 'creator') and isinstance(self.creator, bytes):
+        if hasattr(self, "creator") and isinstance(self.creator, bytes):
             self.creator = Pubkey.from_bytes(self.creator)
 
 
@@ -95,33 +95,25 @@ def calculate_pump_curve_price(curve_state: BondingCurveState) -> float:
 
 def _find_creator_vault(creator: Pubkey) -> Pubkey:
     derived_address, _ = Pubkey.find_program_address(
-        [
-            b"creator-vault",
-            bytes(creator)
-        ],
+        [b"creator-vault", bytes(creator)],
         PUMP_PROGRAM,
-        )
+    )
     return derived_address
 
 
 def _find_global_volume_accumulator() -> Pubkey:
     derived_address, _ = Pubkey.find_program_address(
-        [
-            b"global_volume_accumulator"
-        ],
+        [b"global_volume_accumulator"],
         PUMP_PROGRAM,
-        )
+    )
     return derived_address
 
 
 def _find_user_volume_accumulator(user: Pubkey) -> Pubkey:
     derived_address, _ = Pubkey.find_program_address(
-        [
-            b"user_volume_accumulator",
-            bytes(user)
-        ],
+        [b"user_volume_accumulator", bytes(user)],
         PUMP_PROGRAM,
-        )
+    )
     return derived_address
 
 
@@ -174,8 +166,16 @@ async def buy_token(
                 pubkey=PUMP_EVENT_AUTHORITY, is_signer=False, is_writable=False
             ),
             AccountMeta(pubkey=PUMP_PROGRAM, is_signer=False, is_writable=False),
-            AccountMeta(pubkey=_find_global_volume_accumulator(), is_signer=False, is_writable=True),
-            AccountMeta(pubkey=_find_user_volume_accumulator(payer.pubkey()), is_signer=False, is_writable=True),
+            AccountMeta(
+                pubkey=_find_global_volume_accumulator(),
+                is_signer=False,
+                is_writable=True,
+            ),
+            AccountMeta(
+                pubkey=_find_user_volume_accumulator(payer.pubkey()),
+                is_signer=False,
+                is_writable=True,
+            ),
         ]
 
         discriminator = struct.pack("<Q", 16927863322537952870)
@@ -205,10 +205,10 @@ async def buy_token(
                     opts=opts,
                 )
                 tx_hash = tx_buy.value
-                print(
-                    f"Transaction sent: https://explorer.solana.com/tx/{tx_hash}"
+                print(f"Transaction sent: https://explorer.solana.com/tx/{tx_hash}")
+                await client.confirm_transaction(
+                    tx_hash, commitment="confirmed", sleep_seconds=1
                 )
-                await client.confirm_transaction(tx_hash, commitment="confirmed", sleep_seconds=1)
                 print("Transaction confirmed")
                 return  # Success, exit the function
             except Exception as e:
@@ -219,7 +219,6 @@ async def buy_token(
                     await asyncio.sleep(wait_time)
                 else:
                     print("Max retries reached. Unable to complete the transaction.")
-
 
 
 def load_idl(file_path):
@@ -367,7 +366,9 @@ async def main():
     print(
         f"Buying {amount:.6f} SOL worth of the new token with {slippage * 100:.1f}% slippage tolerance..."
     )
-    await buy_token(mint, bonding_curve, associated_bonding_curve, creator_vault, amount, slippage)
+    await buy_token(
+        mint, bonding_curve, associated_bonding_curve, creator_vault, amount, slippage
+    )
 
 
 if __name__ == "__main__":

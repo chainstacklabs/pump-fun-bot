@@ -45,7 +45,9 @@ class PlatformAwareBuyer(Trader):
         """Execute buy operation using platform-specific implementations."""
         try:
             # Get platform-specific implementations
-            implementations = get_platform_implementations(token_info.platform, self.client)
+            implementations = get_platform_implementations(
+                token_info.platform, self.client
+            )
             address_provider = implementations.address_provider
             instruction_builder = implementations.instruction_builder
             curve_manager = implementations.curve_manager
@@ -60,10 +62,12 @@ class PlatformAwareBuyer(Trader):
             else:
                 # Get pool address based on platform using platform-agnostic method
                 pool_address = self._get_pool_address(token_info, address_provider)
-                
+
                 # Regular behavior with RPC call
                 token_price_sol = await curve_manager.calculate_price(pool_address)
-                token_amount = self.amount / token_price_sol if token_price_sol > 0 else 0
+                token_amount = (
+                    self.amount / token_price_sol if token_price_sol > 0 else 0
+                )
 
             # Calculate minimum token amount with slippage
             minimum_token_amount = token_amount * (1 - self.slippage)
@@ -78,7 +82,7 @@ class PlatformAwareBuyer(Trader):
                 self.wallet.pubkey,
                 max_amount_lamports,  # amount_in (SOL)
                 minimum_token_amount_raw,  # minimum_amount_out (tokens)
-                address_provider
+                address_provider,
             )
 
             # Get accounts for priority fee calculation
@@ -125,21 +129,21 @@ class PlatformAwareBuyer(Trader):
         except Exception as e:
             logger.exception("Buy operation failed")
             return TradeResult(
-                success=False, 
-                platform=token_info.platform,
-                error_message=str(e)
+                success=False, platform=token_info.platform, error_message=str(e)
             )
 
-    def _get_pool_address(self, token_info: TokenInfo, address_provider: AddressProvider) -> Pubkey:
+    def _get_pool_address(
+        self, token_info: TokenInfo, address_provider: AddressProvider
+    ) -> Pubkey:
         """Get the pool/curve address for price calculations using platform-agnostic method."""
         # Try to get the address from token_info first, then derive if needed
         if token_info.platform == Platform.PUMP_FUN:
-            if hasattr(token_info, 'bonding_curve') and token_info.bonding_curve:
+            if hasattr(token_info, "bonding_curve") and token_info.bonding_curve:
                 return token_info.bonding_curve
         elif token_info.platform == Platform.LETS_BONK:
-            if hasattr(token_info, 'pool_state') and token_info.pool_state:
+            if hasattr(token_info, "pool_state") and token_info.pool_state:
                 return token_info.pool_state
-        
+
         # Fallback to deriving the address using platform provider
         return address_provider.derive_pool_address(token_info.mint)
 
@@ -166,7 +170,9 @@ class PlatformAwareSeller(Trader):
         """Execute sell operation using platform-specific implementations."""
         try:
             # Get platform-specific implementations
-            implementations = get_platform_implementations(token_info.platform, self.client)
+            implementations = get_platform_implementations(
+                token_info.platform, self.client
+            )
             address_provider = implementations.address_provider
             instruction_builder = implementations.instruction_builder
             curve_manager = implementations.curve_manager
@@ -175,8 +181,10 @@ class PlatformAwareSeller(Trader):
             user_token_account = address_provider.derive_user_token_account(
                 self.wallet.pubkey, token_info.mint
             )
-            
-            token_balance = await self.client.get_token_account_balance(user_token_account)
+
+            token_balance = await self.client.get_token_account_balance(
+                user_token_account
+            )
             token_balance_decimal = token_balance / 10**TOKEN_DECIMALS
 
             logger.info(f"Token balance: {token_balance_decimal}")
@@ -184,9 +192,9 @@ class PlatformAwareSeller(Trader):
             if token_balance == 0:
                 logger.info("No tokens to sell.")
                 return TradeResult(
-                    success=False, 
+                    success=False,
                     platform=token_info.platform,
-                    error_message="No tokens to sell"
+                    error_message="No tokens to sell",
                 )
 
             # Get pool address and current price using platform-agnostic method
@@ -197,9 +205,13 @@ class PlatformAwareSeller(Trader):
 
             # Calculate minimum SOL output with slippage
             expected_sol_output = float(token_balance_decimal) * float(token_price_sol)
-            min_sol_output = int((expected_sol_output * (1 - self.slippage)) * LAMPORTS_PER_SOL)
+            min_sol_output = int(
+                (expected_sol_output * (1 - self.slippage)) * LAMPORTS_PER_SOL
+            )
 
-            logger.info(f"Selling {token_balance_decimal} tokens on {token_info.platform.value}")
+            logger.info(
+                f"Selling {token_balance_decimal} tokens on {token_info.platform.value}"
+            )
             logger.info(f"Expected SOL output: {expected_sol_output:.8f} SOL")
             logger.info(
                 f"Minimum SOL output (with {self.slippage * 100}% slippage): {min_sol_output / LAMPORTS_PER_SOL:.8f} SOL"
@@ -211,7 +223,7 @@ class PlatformAwareSeller(Trader):
                 self.wallet.pubkey,
                 token_balance,  # amount_in (tokens)
                 min_sol_output,  # minimum_amount_out (SOL)
-                address_provider
+                address_provider,
             )
 
             # Get accounts for priority fee calculation
@@ -251,20 +263,20 @@ class PlatformAwareSeller(Trader):
         except Exception as e:
             logger.exception("Sell operation failed")
             return TradeResult(
-                success=False, 
-                platform=token_info.platform,
-                error_message=str(e)
+                success=False, platform=token_info.platform, error_message=str(e)
             )
 
-    def _get_pool_address(self, token_info: TokenInfo, address_provider: AddressProvider) -> Pubkey:
+    def _get_pool_address(
+        self, token_info: TokenInfo, address_provider: AddressProvider
+    ) -> Pubkey:
         """Get the pool/curve address for price calculations using platform-agnostic method."""
         # Try to get the address from token_info first, then derive if needed
         if token_info.platform == Platform.PUMP_FUN:
-            if hasattr(token_info, 'bonding_curve') and token_info.bonding_curve:
+            if hasattr(token_info, "bonding_curve") and token_info.bonding_curve:
                 return token_info.bonding_curve
         elif token_info.platform == Platform.LETS_BONK:
-            if hasattr(token_info, 'pool_state') and token_info.pool_state:
+            if hasattr(token_info, "pool_state") and token_info.pool_state:
                 return token_info.pool_state
-        
+
         # Fallback to deriving the address using platform provider
         return address_provider.derive_pool_address(token_info.mint)

@@ -13,7 +13,7 @@ class BaseTokenListener(ABC):
 
     def __init__(self, platform: Platform | None = None):
         """Initialize the listener with optional platform specification.
-        
+
         Args:
             platform: Platform to monitor (if None, monitor all platforms)
         """
@@ -38,10 +38,10 @@ class BaseTokenListener(ABC):
 
     def should_process_token(self, token_info: TokenInfo) -> bool:
         """Check if a token should be processed based on platform filter.
-        
+
         Args:
             token_info: Token information
-            
+
         Returns:
             True if token should be processed
         """

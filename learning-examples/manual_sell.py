@@ -60,7 +60,7 @@ class BondingCurveState:
         self.__dict__.update(parsed)
 
         # Convert raw bytes to Pubkey for creator field
-        if hasattr(self, 'creator') and isinstance(self.creator, bytes):
+        if hasattr(self, "creator") and isinstance(self.creator, bytes):
             self.creator = Pubkey.from_bytes(self.creator)
 
 
@@ -96,10 +96,7 @@ def find_associated_bonding_curve(mint: Pubkey, bonding_curve: Pubkey) -> Pubkey
 
 def find_creator_vault(creator: Pubkey) -> Pubkey:
     derived_address, _ = Pubkey.find_program_address(
-        [
-            b"creator-vault",
-            bytes(creator)
-        ],
+        [b"creator-vault", bytes(creator)],
         PUMP_PROGRAM,
     )
     return derived_address
@@ -161,9 +158,7 @@ async def sell_token(
             AccountMeta(pubkey=PUMP_GLOBAL, is_signer=False, is_writable=False),
             AccountMeta(pubkey=PUMP_FEE, is_signer=False, is_writable=True),
             AccountMeta(pubkey=mint, is_signer=False, is_writable=False),
-            AccountMeta(
-                pubkey=bonding_curve, is_signer=False, is_writable=True
-            ),
+            AccountMeta(pubkey=bonding_curve, is_signer=False, is_writable=True),
             AccountMeta(
                 pubkey=associated_bonding_curve,
                 is_signer=False,
@@ -174,12 +169,8 @@ async def sell_token(
                 is_signer=False,
                 is_writable=True,
             ),
-            AccountMeta(
-                pubkey=payer.pubkey(), is_signer=True, is_writable=True
-            ),
-            AccountMeta(
-                pubkey=SYSTEM_PROGRAM, is_signer=False, is_writable=False
-            ),
+            AccountMeta(pubkey=payer.pubkey(), is_signer=True, is_writable=True),
+            AccountMeta(pubkey=SYSTEM_PROGRAM, is_signer=False, is_writable=False),
             AccountMeta(
                 pubkey=creator_vault,
                 is_signer=False,
@@ -191,9 +182,7 @@ async def sell_token(
             AccountMeta(
                 pubkey=PUMP_EVENT_AUTHORITY, is_signer=False, is_writable=False
             ),
-            AccountMeta(
-                pubkey=PUMP_PROGRAM, is_signer=False, is_writable=False
-            ),
+            AccountMeta(pubkey=PUMP_PROGRAM, is_signer=False, is_writable=False),
         ]
 
         discriminator = struct.pack("<Q", 12502976635542562355)
@@ -220,7 +209,9 @@ async def sell_token(
                 )
                 tx_hash = tx.value
                 print(f"Transaction sent: https://explorer.solana.com/tx/{tx_hash}")
-                await client.confirm_transaction(tx_hash, commitment="confirmed", sleep_seconds=1)
+                await client.confirm_transaction(
+                    tx_hash, commitment="confirmed", sleep_seconds=1
+                )
                 print("Transaction confirmed")
                 return  # Success, exit the function
             except Exception as e:
@@ -248,7 +239,9 @@ async def main():
 
     print(f"Bonding curve address: {bonding_curve}")
     print(f"Selling tokens with {slippage * 100:.1f}% slippage tolerance...")
-    await sell_token(mint, bonding_curve, associated_bonding_curve, creator_vault, slippage)
+    await sell_token(
+        mint, bonding_curve, associated_bonding_curve, creator_vault, slippage
+    )
 
 
 if __name__ == "__main__":

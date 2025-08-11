@@ -14,39 +14,39 @@ logger = get_logger(__name__)
 
 class PumpFunPumpPortalProcessor:
     """PumpPortal processor for pump.fun tokens."""
-    
+
     def __init__(self):
         """Initialize the processor with address provider."""
         self.address_provider = PumpFunAddressProvider()
-    
+
     @property
     def platform(self) -> Platform:
         """Get the platform this processor handles."""
         return Platform.PUMP_FUN
-    
+
     @property
     def supported_pool_names(self) -> list[str]:
         """Get the pool names this processor supports from PumpPortal."""
         return ["pump"]  # PumpPortal pool name for pump.fun
-    
+
     def can_process(self, token_data: dict) -> bool:
         """Check if this processor can handle the given token data.
-        
+
         Args:
             token_data: Token data from PumpPortal
-            
+
         Returns:
             True if this processor can handle the token data
         """
         pool = token_data.get("pool", "").lower()
         return pool in self.supported_pool_names
-    
+
     def process_token_data(self, token_data: dict) -> TokenInfo | None:
         """Process pump.fun token data from PumpPortal.
-        
+
         Args:
             token_data: Token data from PumpPortal WebSocket
-            
+
         Returns:
             TokenInfo if token creation found, None otherwise
         """
@@ -81,8 +81,10 @@ class PumpFunPumpPortalProcessor:
             creator = user
 
             # Derive additional addresses using platform provider
-            associated_bonding_curve = self.address_provider.derive_associated_bonding_curve(
-                mint, bonding_curve
+            associated_bonding_curve = (
+                self.address_provider.derive_associated_bonding_curve(
+                    mint, bonding_curve
+                )
             )
             creator_vault = self.address_provider.derive_creator_vault(creator)
 

@@ -23,59 +23,56 @@ logger = get_logger(__name__)
 
 class LetsBonkEventParser(EventParser):
     """LetsBonk implementation of EventParser interface with IDL-based parsing."""
-    
+
     def __init__(self, idl_parser: IDLParser):
         """Initialize LetsBonk event parser with injected IDL parser.
-        
+
         Args:
             idl_parser: Pre-loaded IDL parser for LetsBonk platform
         """
         self.address_provider = LetsBonkAddressProvider()
         self._idl_parser = idl_parser
-        
+
         # Get discriminators from injected IDL parser
         discriminators = self._idl_parser.get_instruction_discriminators()
         self._initialize_discriminator_bytes = discriminators["initialize"]
-        self._initialize_discriminator = struct.unpack("<Q", self._initialize_discriminator_bytes)[0]
-        
+        self._initialize_discriminator = struct.unpack(
+            "<Q", self._initialize_discriminator_bytes
+        )[0]
+
         logger.info("LetsBonk event parser initialized with injected IDL parser")
-    
+
     @property
     def platform(self) -> Platform:
         """Get the platform this parser serves."""
         return Platform.LETS_BONK
-    
+
     def parse_token_creation_from_logs(
-        self,
-        logs: list[str],
-        signature: str
+        self, logs: list[str], signature: str
     ) -> TokenInfo | None:
         """Parse token creation from LetsBonk transaction logs.
-        
+
         Args:
             logs: List of log strings from transaction
             signature: Transaction signature
-            
+
         Returns:
             TokenInfo if token creation found, None otherwise
         """
         # LetsBonk doesn't emit specific logs for token creation like pump.fun
         # Token creation is identified through instruction parsing
         return None
-    
+
     def parse_token_creation_from_instruction(
-        self,
-        instruction_data: bytes,
-        accounts: list[int],
-        account_keys: list[bytes]
+        self, instruction_data: bytes, accounts: list[int], account_keys: list[bytes]
     ) -> TokenInfo | None:
         """Parse token creation from LetsBonk instruction data using injected IDL parser.
-        
+
         Args:
             instruction_data: Raw instruction data
             accounts: List of account indices
             account_keys: List of account public keys
-            
+
         Returns:
             TokenInfo if token creation found, None otherwise
         """
@@ -93,14 +90,16 @@ class LetsBonkEventParser(EventParser):
                 return Pubkey.from_bytes(account_keys[account_index])
 
             # Parse instruction data using injected IDL parser
-            decoded = self._idl_parser.decode_instruction(instruction_data, account_keys, accounts)
-            if not decoded or decoded['instruction_name'] != 'initialize':
+            decoded = self._idl_parser.decode_instruction(
+                instruction_data, account_keys, accounts
+            )
+            if not decoded or decoded["instruction_name"] != "initialize":
                 return None
-            
-            args = decoded.get('args', {})
-            
+
+            args = decoded.get("args", {})
+
             # Extract MintParams from the decoded arguments
-            base_mint_param = args.get('base_mint_param', {})
+            base_mint_param = args.get("base_mint_param", {})
             if not base_mint_param:
                 return None
 
@@ -109,7 +108,7 @@ class LetsBonkEventParser(EventParser):
             # 0: creator (signer)
             # 1: creator_ata (not needed for TokenInfo)
             # 2: global_config
-            # 3: platform_config  
+            # 3: platform_config
             # 4: creator
             # 5: pool_state
             # 6: base_mint
@@ -117,7 +116,7 @@ class LetsBonkEventParser(EventParser):
             # 8: base_vault
             # 9: quote_vault
             # ... other accounts
-            
+
             creator = get_account_key(0)  # First signer account (creator)
             pool_state = get_account_key(5)  # pool_state account
             base_mint = get_account_key(6)  # base_mint account
@@ -125,8 +124,10 @@ class LetsBonkEventParser(EventParser):
             quote_vault = get_account_key(9)  # quote_vault account
 
             if not all([creator, pool_state, base_mint, base_vault, quote_vault]):
-                logger.debug(f"Missing required accounts: creator={creator}, pool_state={pool_state}, "
-                           f"base_mint={base_mint}, base_vault={base_vault}, quote_vault={quote_vault}")
+                logger.debug(
+                    f"Missing required accounts: creator={creator}, pool_state={pool_state}, "
+                    f"base_mint={base_mint}, base_vault={base_vault}, quote_vault={quote_vault}"
+                )
                 return None
 
             return TokenInfo(
@@ -146,21 +147,20 @@ class LetsBonkEventParser(EventParser):
         except Exception as e:
             logger.debug(f"Failed to parse initialize instruction: {e}")
             return None
-    
+
     def parse_token_creation_from_geyser(
-        self,
-        transaction_info: Any
+        self, transaction_info: Any
     ) -> TokenInfo | None:
         """Parse token creation from Geyser transaction data.
-        
+
         Args:
             transaction_info: Geyser transaction information
-            
+
         Returns:
             TokenInfo if token creation found, None otherwise
         """
         try:
-            if not hasattr(transaction_info, 'transaction'):
+            if not hasattr(transaction_info, "transaction"):
                 return None
 
             tx = transaction_info.transaction.transaction.transaction
@@ -183,10 +183,14 @@ class LetsBonkEventParser(EventParser):
                 for acc_idx in ix.accounts:
                     if acc_idx < len(msg.account_keys):
                         acc_key = msg.account_keys[acc_idx]
-                        if bytes(acc_key) == bytes(self.address_provider.get_system_addresses()["platform_config"]):
+                        if bytes(acc_key) == bytes(
+                            self.address_provider.get_system_addresses()[
+                                "platform_config"
+                            ]
+                        ):
                             has_platform_config = True
                             break
-                
+
                 if not has_platform_config:
                     continue
 
@@ -202,29 +206,29 @@ class LetsBonkEventParser(EventParser):
         except Exception as e:
             logger.debug(f"Failed to parse geyser transaction: {e}")
             return None
-    
+
     def get_program_id(self) -> Pubkey:
         """Get the Raydium LaunchLab program ID this parser monitors.
-        
+
         Returns:
             Raydium LaunchLab program ID
         """
         return self.address_provider.program_id
-    
+
     def get_instruction_discriminators(self) -> list[bytes]:
         """Get instruction discriminators for token creation.
-        
+
         Returns:
             List of discriminator bytes to match
         """
         return [self._initialize_discriminator_bytes]
-    
+
     def parse_token_creation_from_block(self, block_data: dict) -> TokenInfo | None:
         """Parse token creation from block data (for block listener).
-        
+
         Args:
             block_data: Block data from WebSocket
-            
+
         Returns:
             TokenInfo if token creation found, None otherwise
         """
@@ -243,82 +247,95 @@ class LetsBonkEventParser(EventParser):
                         tx_data_encoded = tx_data[0]
                         tx_data_decoded = base64.b64decode(tx_data_encoded)
                         transaction = VersionedTransaction.from_bytes(tx_data_decoded)
-                        
+
                         for ix in transaction.message.instructions:
-                            program_id = transaction.message.account_keys[ix.program_id_index]
-                            
+                            program_id = transaction.message.account_keys[
+                                ix.program_id_index
+                            ]
+
                             # Check if instruction is from LetsBonk program
                             if str(program_id) != str(self.get_program_id()):
                                 continue
 
                             ix_data = bytes(ix.data)
-                            
+
                             # Check for initialize discriminator
                             if len(ix_data) >= 8:
                                 discriminator = struct.unpack("<Q", ix_data[:8])[0]
-                                
+
                                 if discriminator == self._initialize_discriminator:
                                     # Token creation should have substantial data and many accounts
                                     if len(ix_data) <= 8 or len(ix.accounts) < 10:
                                         continue
-                                    
+
                                     account_keys_bytes = [
                                         bytes(key)
                                         for key in transaction.message.account_keys
                                     ]
-                                    
+
                                     # Parse the instruction
-                                    token_info = self.parse_token_creation_from_instruction(
-                                        ix_data, ix.accounts, account_keys_bytes
+                                    token_info = (
+                                        self.parse_token_creation_from_instruction(
+                                            ix_data, ix.accounts, account_keys_bytes
+                                        )
                                     )
                                     if token_info:
                                         return token_info
-                                        
+
                     except Exception as e:
                         logger.debug(f"Failed to parse block transaction: {e}")
                         continue
-                
+
                 # Handle already decoded transaction data
                 elif isinstance(tx_data, dict) and "message" in tx_data:
                     try:
                         message = tx_data["message"]
-                        if "instructions" not in message or "accountKeys" not in message:
+                        if (
+                            "instructions" not in message
+                            or "accountKeys" not in message
+                        ):
                             continue
-                            
+
                         for ix in message["instructions"]:
-                            if "programIdIndex" not in ix or "accounts" not in ix or "data" not in ix:
+                            if (
+                                "programIdIndex" not in ix
+                                or "accounts" not in ix
+                                or "data" not in ix
+                            ):
                                 continue
-                                
+
                             program_idx = ix["programIdIndex"]
                             if program_idx >= len(message["accountKeys"]):
                                 continue
-                                
+
                             program_id_str = message["accountKeys"][program_idx]
                             if program_id_str != str(self.get_program_id()):
                                 continue
-                            
+
                             # Decode instruction data
                             ix_data = base64.b64decode(ix["data"])
-                            
+
                             if len(ix_data) >= 8:
                                 discriminator = struct.unpack("<Q", ix_data[:8])[0]
-                                
+
                                 if discriminator == self._initialize_discriminator:
                                     if len(ix_data) <= 8 or len(ix["accounts"]) < 10:
                                         continue
-                                    
+
                                     # Convert account keys to bytes for parsing
                                     account_keys_bytes = [
-                                        Pubkey.from_string(key).to_bytes() 
+                                        Pubkey.from_string(key).to_bytes()
                                         for key in message["accountKeys"]
                                     ]
-                                    
-                                    token_info = self.parse_token_creation_from_instruction(
-                                        ix_data, ix["accounts"], account_keys_bytes
+
+                                    token_info = (
+                                        self.parse_token_creation_from_instruction(
+                                            ix_data, ix["accounts"], account_keys_bytes
+                                        )
                                     )
                                     if token_info:
                                         return token_info
-                                        
+
                     except Exception as e:
                         logger.debug(f"Failed to parse decoded block transaction: {e}")
                         continue

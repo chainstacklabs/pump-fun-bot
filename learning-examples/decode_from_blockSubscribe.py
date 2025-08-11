@@ -77,7 +77,9 @@ def decode_transaction(tx_data, idl):
         print(f"\nInstruction {idx}:")
         print(f"Program ID: {program_id}")
 
-        if program_id == "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P": # Pump Fun Program
+        if (
+            program_id == "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
+        ):  # Pump Fun Program
             ix_data = bytes(ix.data)
             discriminator = struct.unpack("<Q", ix_data[:8])[0]
 

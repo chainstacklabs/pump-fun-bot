@@ -32,23 +32,23 @@ class UniversalPumpPortalListener(BaseTokenListener):
         super().__init__()
         self.pumpportal_url = pumpportal_url
         self.ping_interval = 20  # seconds
-        
+
         # Get platform-specific processors
         from platforms.letsbonk.pumpportal_processor import LetsBonkPumpPortalProcessor
         from platforms.pumpfun.pumpportal_processor import PumpFunPumpPortalProcessor
-        
+
         # Create processor instances
         all_processors = [
             PumpFunPumpPortalProcessor(),
             LetsBonkPumpPortalProcessor(),
         ]
-        
+
         # Filter processors based on requested platforms
         if platforms is None:
             self.processors = all_processors
         else:
             self.processors = [p for p in all_processors if p.platform in platforms]
-        
+
         # Build mapping of pool names to processors for quick lookup
         self.pool_to_processors: dict[str, list] = {}
         for processor in self.processors:
@@ -56,8 +56,10 @@ class UniversalPumpPortalListener(BaseTokenListener):
                 if pool_name not in self.pool_to_processors:
                     self.pool_to_processors[pool_name] = []
                 self.pool_to_processors[pool_name].append(processor)
-        
-        logger.info(f"Initialized Universal PumpPortal listener for platforms: {[p.platform.value for p in self.processors]}")
+
+        logger.info(
+            f"Initialized Universal PumpPortal listener for platforms: {[p.platform.value for p in self.processors]}"
+        )
         logger.info(f"Monitoring pools: {list(self.pool_to_processors.keys())}")
 
     async def listen_for_tokens(
@@ -100,8 +102,14 @@ class UniversalPumpPortalListener(BaseTokenListener):
                                 continue
 
                             if creator_address:
-                                creator_str = str(token_info.creator) if token_info.creator else ""
-                                user_str = str(token_info.user) if token_info.user else ""
+                                creator_str = (
+                                    str(token_info.creator)
+                                    if token_info.creator
+                                    else ""
+                                )
+                                user_str = (
+                                    str(token_info.user) if token_info.user else ""
+                                )
                                 if creator_address not in [creator_str, user_str]:
                                     logger.info(
                                         f"Token not created by {creator_address}. Skipping..."
@@ -197,7 +205,9 @@ class UniversalPumpPortalListener(BaseTokenListener):
                 if processor.can_process(token_data):
                     token_info = processor.process_token_data(token_data)
                     if token_info:
-                        logger.debug(f"Successfully processed token using {processor.platform.value} processor")
+                        logger.debug(
+                            f"Successfully processed token using {processor.platform.value} processor"
+                        )
                         return token_info
 
             logger.debug(f"No processor could handle token data from pool {pool_name}")

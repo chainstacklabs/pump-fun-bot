@@ -46,11 +46,7 @@ async def listen_for_events():
                         "id": 1,
                         "method": "blockSubscribe",
                         "params": [
-                            {
-                                "mentionsAccountOrProgram": str(
-                                    PUMP_MIGRATOR_ID
-                                )
-                            },
+                            {"mentionsAccountOrProgram": str(PUMP_MIGRATOR_ID)},
                             {
                                 "commitment": "confirmed",
                                 "encoding": "json",

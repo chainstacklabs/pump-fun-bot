@@ -25,14 +25,16 @@ RPC_ENDPOINT = os.environ.get("SOLANA_NODE_RPC_ENDPOINT")
 TOKEN_MINT = "..."
 
 # Constants
-PUMP_PROGRAM_ID: Final[Pubkey] = Pubkey.from_string("6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P")
+PUMP_PROGRAM_ID: Final[Pubkey] = Pubkey.from_string(
+    "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
+)
 EXPECTED_DISCRIMINATOR: Final[bytes] = struct.pack("<Q", 6966180631402821399)
 
 
 class BondingCurveState:
     """
     Represents the state of a bonding curve account.
-    
+
     Attributes:
         virtual_token_reserves: Virtual token reserves in the curve
         virtual_sol_reserves: Virtual SOL reserves in the curve
@@ -41,6 +43,7 @@ class BondingCurveState:
         token_total_supply: Total token supply in the curve
         complete: Whether the curve has completed and liquidity migrated
     """
+
     _STRUCT_1 = Struct(
         "virtual_token_reserves" / Int64ul,
         "virtual_sol_reserves" / Int64ul,
@@ -73,9 +76,9 @@ class BondingCurveState:
 
         else:
             parsed = self._STRUCT_2.parse(data[8:])
-            self.__dict__.update(parsed) 
+            self.__dict__.update(parsed)
             # Convert raw bytes to Pubkey for creator field
-            if hasattr(self, 'creator') and isinstance(self.creator, bytes):
+            if hasattr(self, "creator") and isinstance(self.creator, bytes):
                 self.creator = Pubkey.from_bytes(self.creator)
 
 
@@ -84,11 +87,11 @@ def get_associated_bonding_curve_address(
 ) -> tuple[Pubkey, int]:
     """
     Derives the associated bonding curve address for a given mint.
-    
+
     Args:
         mint: The token mint address
         program_id: The program ID for the bonding curve
-        
+
     Returns:
         Tuple of (bonding curve address, bump seed)
     """
@@ -100,14 +103,14 @@ async def get_bonding_curve_state(
 ) -> BondingCurveState:
     """
     Fetches and validates the state of a bonding curve account.
-    
+
     Args:
         conn: AsyncClient connection to Solana RPC
         curve_address: Address of the bonding curve account
-        
+
     Returns:
         BondingCurveState object containing parsed account data
-        
+
     Raises:
         ValueError: If account data is invalid or missing
     """
@@ -125,7 +128,7 @@ async def get_bonding_curve_state(
 async def check_token_status(mint_address: str) -> None:
     """
     Checks and prints the status of a token and its bonding curve.
-    
+
     Args:
         mint_address: The token mint address as a string
     """
@@ -174,9 +177,11 @@ async def check_token_status(mint_address: str) -> None:
 def main() -> None:
     """Main entry point for the token status checker."""
     parser = argparse.ArgumentParser(description="Check token bonding curve status")
-    parser.add_argument("mint_address", nargs='?', help="The token mint address", default=TOKEN_MINT)
+    parser.add_argument(
+        "mint_address", nargs="?", help="The token mint address", default=TOKEN_MINT
+    )
     args = parser.parse_args()
-    
+
     asyncio.run(check_token_status(args.mint_address))
 
 

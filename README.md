@@ -69,7 +69,7 @@ Edit the `.env` file and add your **Solana RPC endpoints** and **private key**.
 
 Edit `.yaml` templates in the `bots/` directory. Each file is a separate instance of a trading bot. Examine its parameters and apply your preferred strategy.
 
-For example, to run the pump.fun bot, set `platform: "pump_fun"`; to run the bonk.fun bot, se `platform: "lets_bonk"`.
+For example, to run the pump.fun bot, set `platform: "pump_fun"`; to run the bonk.fun bot, set `platform: "lets_bonk"`.
 
 #### 4️⃣ Install the bot as a package
 ```bash

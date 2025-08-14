@@ -18,7 +18,7 @@ load_dotenv()
 
 RPC_ENDPOINT = os.environ.get("SOLANA_NODE_RPC_ENDPOINT")
 PUMP_AMM_PROGRAM_ID = Pubkey.from_string("pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA")
-TOKEN_MINT = Pubkey.from_string("35ySx7Rt3RqeTp75QB81FgRvPT5yDY2m5BupsUYDpump")
+TOKEN_MINT = Pubkey.from_string("...")
 
 
 async def get_market_address_by_base_mint(

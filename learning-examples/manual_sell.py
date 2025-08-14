@@ -18,6 +18,7 @@ from spl.token.instructions import get_associated_token_address
 # Here and later all the discriminators are precalculated. See learning-examples/calculate_discriminator.py
 EXPECTED_DISCRIMINATOR = struct.pack("<Q", 6966180631402821399)
 TOKEN_DECIMALS = 6
+TOKEN_MINT = Pubkey.from_string("...")
 
 # Global constants
 PUMP_PROGRAM = Pubkey.from_string("6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P")
@@ -226,9 +227,8 @@ async def sell_token(
 
 async def main():
     # Replace these with the actual values for the token you want to sell
-    mint = Pubkey.from_string("...")
-    bonding_curve, _ = get_bonding_curve_address(mint)
-    associated_bonding_curve = find_associated_bonding_curve(mint, bonding_curve)
+    bonding_curve, _ = get_bonding_curve_address(TOKEN_MINT)
+    associated_bonding_curve = find_associated_bonding_curve(TOKEN_MINT, bonding_curve)
 
     async with AsyncClient(RPC_ENDPOINT) as client:
         curve_state = await get_pump_curve_state(client, bonding_curve)
@@ -240,7 +240,7 @@ async def main():
     print(f"Bonding curve address: {bonding_curve}")
     print(f"Selling tokens with {slippage * 100:.1f}% slippage tolerance...")
     await sell_token(
-        mint, bonding_curve, associated_bonding_curve, creator_vault, slippage
+        TOKEN_MINT, bonding_curve, associated_bonding_curve, creator_vault, slippage
     )
 
 

@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import struct
+import sys
 
 import base58
 import grpc
@@ -20,6 +21,7 @@ from spl.token.instructions import (
     get_associated_token_address,
 )
 
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from src.geyser.generated import (
     geyser_pb2,
     geyser_pb2_grpc,
